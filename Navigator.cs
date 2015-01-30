@@ -202,9 +202,12 @@ public class Navigator
 			}
 
 			for (int i = 0; i < q.Length; i++) {
+				if (Mahalanobis(q[i], measurement) > 5) {
+					continue;
+				}
+
 				double[,] gain       = PH[i].Multiply(S[i].Inverse());
-				double[]  innovation = measurement.Subtract(pose.MeasurePerfect(m[i]));
-				double[]  mean       = m[i].Add(gain.Multiply(innovation));
+				double[]  mean       = m[i].Add(gain.Multiply(measurement.Subtract(pose.MeasurePerfect(m[i]))));
 				double[,] covariance = I.Subtract(gain.Multiply(H[i])).Multiply(P[i]);
 
 				double weight = PD * q[i].Weight * q[i].Evaluate(measurement) / (ClutterDensity + PD * weightsum);

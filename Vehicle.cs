@@ -40,8 +40,8 @@ public class Vehicle
 	/// <summary>
 	/// Measurement model covariance matrix.
 	/// </summary>
-	public static readonly double[,] MeasurementCovariance = new double[2, 2] {{1e-4, 0},
-	                                                                           {0, 1e-4}};
+	public static readonly double[,] MeasurementCovariance = new double[2, 2] {{2e-4, 0},
+	                                                                           {0, 2e-4}};
 
 	/// <summary>
 	/// Probability of detection.
@@ -51,7 +51,12 @@ public class Vehicle
 	/// <summary>
 	/// Vision range in radians, measured from straight ahead orientation.
 	/// </summary>
-	public static readonly Range AngleVision = new Range(-0.5f, 0.5f);
+	public static readonly Range VisionRange = new Range(-0.5f, 0.5f);
+
+	/// <summary>
+	/// Cached vision range angle.
+	/// </summary>
+	public static readonly double VisionAngle = VisionRange.Max - VisionRange.Min;
 
 	/// <summary>
 	/// Internal state as a vector.
@@ -256,10 +261,9 @@ public class Vehicle
 		double[] diff  = landmark.Subtract(this.Location);
 		double bearing = Math.Atan2(diff[1], diff[0]) - this.Theta;
 
-		double anglediff = bearing - AngleVision.Min;
-		double anglearc  = AngleVision.Max - AngleVision.Min;
+		double anglediff = bearing - VisionRange.Min;
 
-		return U.NormalizeAngle2(anglediff) < anglearc;
+		return U.NormalizeAngle2(anglediff) < VisionAngle;
 	}
 
 	/// <summary>
@@ -270,10 +274,9 @@ public class Vehicle
 	/// <returns>True if the landmark is visible; false otherwise.</returns>
 	public bool VisibleM(double[] measurement)
 	{
-		double anglediff = measurement[1] - AngleVision.Min;
-		double anglearc  = AngleVision.Max - AngleVision.Min;
+		double anglediff = measurement[1] - VisionRange.Min;
 
-		return U.NormalizeAngle2(anglediff) < anglearc;
+		return U.NormalizeAngle2(anglediff) < VisionAngle;
 	}
 
 	/// <summary>
@@ -387,8 +390,8 @@ public class Vehicle
 		Color innercolor =  Color.LightGreen; innercolor.A = 30;
 		Color outercolor =  Color.DarkGreen;  outercolor.A = 30;
 		
-		double ct1 = Math.Cos(Theta + AngleVision.Min); double st1 = Math.Sin(Theta + AngleVision.Min);
-		double ct2 = Math.Cos(Theta + AngleVision.Max); double st2 = Math.Sin(Theta + AngleVision.Max);
+		double ct1 = Math.Cos(Theta + VisionRange.Min); double st1 = Math.Sin(Theta + VisionRange.Min);
+		double ct2 = Math.Cos(Theta + VisionRange.Max); double st2 = Math.Sin(Theta + VisionRange.Max);
 		
 		vertices[0] = new VertexPositionColor(new Vector3((float) X,                 (float) Y,                 0), innercolor);
 		vertices[1] = new VertexPositionColor(new Vector3((float)(X + radius * ct1), (float)(Y + radius * st1), 0), innercolor);

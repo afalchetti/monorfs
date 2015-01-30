@@ -27,7 +27,7 @@ public class Simulation : Game
 	/// Measure cycle period in miliseconds. Every this
 	/// amount of time the SLAM solver is invoked.
 	/// </summary>
-	public const double MeasurePeriod = 400;
+	public const double MeasurePeriod = 100;
 
 	/// <summary>
 	/// Main vehicle.
