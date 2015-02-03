@@ -27,7 +27,7 @@ public class Simulation : Game
 	/// Measure cycle period in miliseconds. Every this
 	/// amount of time the SLAM solver is invoked.
 	/// </summary>
-	public const double MeasurePeriod = 100;
+	public const double MeasurePeriod = 200;
 
 	/// <summary>
 	/// Main vehicle.
@@ -88,10 +88,19 @@ public class Simulation : Game
 	private float[] mapclip;
 	
 	/// <summary>
-	/// Last time the navigator update method was called in
-	/// milliseconds since an arbitrary starting time.
+	/// Last time the navigator update method was called.
 	/// </summary>
-	private double lastnavigationupdate = 0;
+	private GameTime lastnavigationupdate = new GameTime();
+
+	/// <summary>
+	/// Accumulated ds between navigator updates
+	/// </summary>
+	private double acds = 0;
+	
+	/// <summary>
+	/// Accumulated dtheta between navigator updates
+	/// </summary>
+	private double acdtheta = 0;
 
 	/// <summary>
 	/// Construct a simulation from a formatted desccription file.
@@ -136,7 +145,7 @@ public class Simulation : Game
 			this.Landmarks.Add(maploc[i]);
 		}
 
-		this.Navigator = new Navigator(Explorer);
+		this.Navigator = new Navigator(Explorer, 25, false);
 
 		// MonoGame-related construction
 		this.graphicsManager = new GraphicsDeviceManager(this);
@@ -234,19 +243,19 @@ public class Simulation : Game
 		double dtheta = 0;
 		
 		if (keyboard.IsKeyDown(Keys.Down)) {
-			ds -= 0.01;
+			ds -= 0.02;
 		}
 
 		if (keyboard.IsKeyDown(Keys.Up)) {
-			ds += 0.01;
+			ds += 0.02;
 		}
 
 		if (keyboard.IsKeyDown(Keys.Left)) {
-			dtheta += 0.02;
+			dtheta += 0.12;
 		}
 
 		if (keyboard.IsKeyDown(Keys.Right)) {
-			dtheta -= 0.02;
+			dtheta -= 0.12;
 		}
 		
 		bool DoPredict = !keyboard.IsKeyDown(Keys.P);
@@ -254,11 +263,24 @@ public class Simulation : Game
 		bool DoPrune   = !keyboard.IsKeyDown(Keys.Q);
 
 		Explorer.Update(time, ds, 0, dtheta);
+		if (!Navigator.OnlyMapping) {
+			for (int i = 0; i < Navigator.VehicleParticles.Length; i++) {
+				Navigator.VehicleParticles[i].Update(time, ds, 0, dtheta);
+			}
+		}
 
-		if (time.TotalGameTime.TotalMilliseconds - lastnavigationupdate > MeasurePeriod) {
+		acds     += ds;
+		acdtheta += dtheta;
+
+		if (time.TotalGameTime.TotalMilliseconds - lastnavigationupdate.TotalGameTime.TotalMilliseconds > MeasurePeriod) {
 			List<double[]> measurements = Explorer.Measure(Landmarks);
-			Navigator.Update(measurements, DoPredict, DoCorrect, DoPrune);
-			lastnavigationupdate = time.TotalGameTime.TotalMilliseconds;
+			GameTime       actime       = new GameTime(time.TotalGameTime, time.TotalGameTime - lastnavigationupdate.TotalGameTime);
+
+			Navigator.Update(actime, acds, acdtheta, measurements, DoPredict, DoCorrect, DoPrune);
+
+			lastnavigationupdate = new GameTime(time.TotalGameTime, time.ElapsedGameTime);
+			acds                 = 0;
+			acdtheta             = 0;
 
 			MeasurementReadings = new List<double[]>();
 			foreach (double[] z in measurements) {
@@ -281,6 +303,7 @@ public class Simulation : Game
 		foreach (EffectPass pass in effect.CurrentTechnique.Passes) {
 			pass.Apply();
 			
+			Navigator.RenderParticles();
 			Explorer.RenderTrajectory();
 			Explorer.RenderFOV();
 			

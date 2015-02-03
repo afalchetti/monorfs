@@ -8,6 +8,8 @@
 // work via any medium is strictly forbidden without
 // express written consent from the author.
 
+// TODO navigator shouldn't know the exact measurement/model noise variances, should give them on the constructor
+
 using System;
 using System.Collections.Generic;
 using Accord.Math;
@@ -65,9 +67,30 @@ public class Navigator
 	public Vehicle[] VehicleParticles { get;  private set; }
 
 	/// <summary>
-	/// PHD representation as a mixture-of-gaussians. Sorted.
+	/// Weight associated to each vehicle particle.
 	/// </summary>
-	public List<Gaussian> MapModel { get; private set; }
+	public double[] VehicleWeights { get; private set; }
+
+	/// <summary>
+	/// PHD representation as a mixture-of-gaussians.
+	/// One per vehicle particle.
+	/// </summary>
+	public List<Gaussian>[] MapModels { get; private set; }
+
+	/// <summary>
+	/// Expected number of landmarks after the prediction step.
+	/// </summary>
+	public double[] Mpredicted;
+
+	/// <summary>
+	/// Expected number of landmarks after the correction step.
+	/// </summary>
+	public double[] Mcorrected;
+
+	/// <summary>
+	/// True if the localization of the vehicle is known.
+	/// </summary>
+	public bool OnlyMapping;
 
 	/// <summary>
 	/// Prediction interval base model.
@@ -75,26 +98,73 @@ public class Navigator
 	public double[][] pinterval;
 
 	/// <summary>
+	/// Internel render output.
+	/// </summary>
+	private GraphicsDevice graphics;
+
+	/// <summary>
 	/// Render output.
 	/// </summary>
-	public GraphicsDevice Graphics { get; set; }
+	public GraphicsDevice Graphics {
+		get
+		{
+			return graphics;
+		}
+		set
+		{
+			graphics = value;
+
+			for (int i = 0; i < VehicleParticles.Length; i++) {
+				VehicleParticles[i].Graphics = value;
+			}
+		}
+	}
 
 	/// <summary>
 	/// Construct a Navigator using the indicated vehicle as a reference.
 	/// </summary>
-	public Navigator(Vehicle vehicle)
+	/// <param name="vehicle">Vehicle to track.</param>
+	/// <param name="particlecount">Number of particles for the Montecarlo filter.</param>
+	/// <param name="onlymapping">If true, don't do SLAM, but mapping (i.e. the localization is assumed known).</param>
+	public Navigator(Vehicle vehicle, int particlecount, bool onlymapping = false)
 	{
-		VehicleParticles = new Vehicle[1];
-		VehicleParticles[0] = vehicle;
+		this.OnlyMapping = onlymapping;
+
+		if (onlymapping) {
+			// a reference copy, which gives the navigator precise info about
+			// the real vehicle pose
+			this.VehicleParticles = new Vehicle       [1];
+			this.MapModels        = new List<Gaussian>[1];
+			this.VehicleWeights   = new double[1];
+
+			this.VehicleParticles[0] = vehicle;
+			this.MapModels       [0] = new List<Gaussian>();
+			this.VehicleWeights  [0] = 1;
+		}
+		else {	
+			// if doing SLAM, do a deep copy, so no real info flows
+			// into the navigator, only estimates
+			this.VehicleParticles = new Vehicle       [particlecount];
+			this.MapModels        = new List<Gaussian>[particlecount];
+			this.VehicleWeights   = new double        [particlecount];
+
+			for (int i = 0; i < particlecount; i++) {
+				this.VehicleParticles[i] = new Vehicle(vehicle);
+				this.MapModels       [i] = new List<Gaussian>();
+				this.VehicleWeights  [i] = 1.0 / particlecount;
+			}
+		}
+		
+		Mpredicted = new double[VehicleParticles.Length];
+		Mcorrected = new double[VehicleParticles.Length];
 
 		const int segments = 32;
-		pinterval = new double[segments][];
+		this.pinterval = new double[segments][];
 
+		// pinterval will be the 5-sigma ellipse
 		for (int i = 0; i < segments; i++) {
-			pinterval[i] = new double[2] {Math.Cos(2 * Math.PI * i / segments), Math.Sin(2 * Math.PI * i / segments)};
+			this.pinterval[i] = new double[2] {5*Math.Cos(2 * Math.PI * i / segments), 5*Math.Sin(2 * Math.PI * i / segments)};
 		}
-
-		MapModel = new List<Gaussian>();
 	}
 
 	/// <summary>
@@ -102,15 +172,83 @@ public class Navigator
 	/// This means doing a model prediction and a measurement update.
 	/// This method is the core of the whole program.
 	/// </summary>
+	/// <param name="time">Provides a snapshot of timing values.</param>
+	/// <param name="ds">Odometry forward movement.</param>
+	/// <param name="dtheta">Odometry angular movement.</param>
 	/// <param name="measurements">Sensor measurements in range-bearing  form.</param>
 	/// <param name="predict">Predict flag; if false, no prediction step is done.</param>
 	/// <param name="correct">Correct flag; if false, no correction step is done.</param>
 	/// <param name="prune">Prune flag; if false, no prune step is done.</param>
-	public void Update(List<double[]> measurements, bool predict, bool correct, bool prune)
+	public void Update(GameTime time, double ds, double dtheta, List<double[]> measurements, bool predict, bool correct, bool prune)
 	{
-		if (predict) { PredictConditional(measurements, VehicleParticles[0]); }
-		if (correct) { CorrectConditional(measurements, VehicleParticles[0]); }
-		if (prune)   { PruneModel(); }
+		// map update
+		for (int i = 0; i < VehicleParticles.Length; i++) {
+			if (predict) { MapModels[i] = PredictConditional(measurements, VehicleParticles[i], MapModels[i]); }
+			Mpredicted[i] = ExpectedSize(MapModels[i]);
+
+			if (correct) { MapModels[i] = CorrectConditional(measurements, VehicleParticles[i], MapModels[i]); }
+			Mcorrected[i] = ExpectedSize(MapModels[i]);
+
+			if (prune)   { MapModels[i] = PruneModel(MapModels[i]); }
+		}
+
+		// localization update
+		if (!OnlyMapping) {
+			UpdateParticleWeights(Mpredicted, Mcorrected);
+			ResampleParticles();
+		}
+	}
+
+	/// <summary>
+	/// Update the weights of each vehicle using the sequential importance sampling technique.
+	/// It uses the empty map technique for now as it is simple and gives reasonable results.
+	/// </summary>
+	public void UpdateParticleWeights(double[] Mpredicted, double[] Mcorrected)
+	{
+		for (int i = 0; i < VehicleWeights.Length; i++) {
+			// using the empty-map trick, the new weight follows approximately the formula
+			// w' = k^|Z| exp(|Mcorrected| - |Mpredicted| - integral of k) w, where
+			// k   is the clutter density,
+			// |Z| is the number of measurements
+			// |M| is the expected number of landmarks (integral of the map model)
+			// interestingly, given k a constant density, k^|Z| and the integral of k are constant too
+			// so there's no real need to use them (as they will drop after the renormalization)
+			VehicleWeights[i] *= Math.Exp(Mcorrected[i] - Mpredicted[i]);
+		}
+
+		VehicleWeights = VehicleWeights.Divide(VehicleWeights.Sum());
+	}
+
+	/// <summary>
+	/// Resample the vehicle particles with their corresponding weights and map models
+	/// using systematic resampling (aka Wheel resampling).
+	/// The weights are transferred into the unit range (0, 1] and random number is
+	/// generated in the range (0, 1/n], adding 1/n to iterate through the unit range
+	/// obtaining appropiate samples.
+	/// This method is fast and simple although it loses the important property of
+	/// giving independent samples, but in practice works very well.
+	/// </summary>
+	public void ResampleParticles()
+	{
+		double           random    = (double) Util.uniform.Next() / VehicleWeights.Length;
+		double[]         weights   = new double[VehicleWeights.Length];
+		Vehicle[]        particles = new Vehicle[VehicleParticles.Length];
+		List<Gaussian>[] models    = new List<Gaussian>[MapModels.Length];
+
+		for (int i = 0, k = 0; i < weights.Length; i++) {
+			for (; random > 0; k++) {
+				random -= VehicleWeights[k];
+			}
+			
+			particles[i] = new Vehicle(VehicleParticles[k - 1]);
+			models   [i] = new List<Gaussian>(MapModels[k - 1]);
+			weights  [i] = 1.0 / weights.Length;
+			random      += 1.0 / weights.Length;
+		}
+
+		VehicleParticles = particles;
+		VehicleWeights   = weights;
+		MapModels        = models;
 	}
 
 	/// <summary>
@@ -119,12 +257,14 @@ public class Navigator
 	/// </summary>
 	/// <param name="measurements">Sensor measurements in range-bearing  form.</param>
 	/// <param name="pose">Vehicle pose that conditions the mapping.</param>
+	/// <param name="model">Associated map model.</param>
+	/// <returns>Predicted map model.</returns>
 	/// <remarks>Though in theory the predict doesn't depend on the measurements,
 	/// the birth region (i.e. the unexplored areas) is large to represent on gaussians.
 	/// To diminish the computational time, only the areas near the new measurements are
 	/// used (i.e. the same measurements). This is equivalent to artificially increasing
 	/// belief on the new measurements (when in a new area).</remarks>
-	public void PredictConditional(List<double[]> measurements, Vehicle pose)
+	public List<Gaussian> PredictConditional(List<double[]> measurements, Vehicle pose, List<Gaussian> model)
 	{
 		// gaussian are born on any unexplored areas,
 		// as something is expected to be there.
@@ -135,15 +275,19 @@ public class Navigator
 
 		foreach (double[] measurement in measurements) {
 			double[] candidate = pose.MeasureToMap(measurement);
-			if (EvaluateModel(candidate) < ExplorationThreshold) {
+			if (EvaluateModel(model, candidate) < ExplorationThreshold) {
 				unexplored.Add(candidate);
 			}
 		}
 
+		List<Gaussian> predicted = new List<Gaussian>(model);
+
 		// birth RFS
 		foreach (double[] candidate in unexplored) {
-			MapModel.Add(new Gaussian(candidate, BirthCovariance, BirthWeight));
+			predicted.Add(new Gaussian(candidate, BirthCovariance, BirthWeight));
 		}
+
+		return predicted;
 	}
 
 	/// <summary>
@@ -152,30 +296,32 @@ public class Navigator
 	/// </summary>
 	/// <param name="measurements">Sensor measurements in range-bearing  form.</param>
 	/// <param name="pose">Vehicle pose that conditions the mapping.</param>
-	public void CorrectConditional(List<double[]> measurements, Vehicle pose)
+	/// <param name="model">Associated map model.</param>
+	/// <returns>Corrected map model.</returns>
+	public List<Gaussian> CorrectConditional(List<double[]> measurements, Vehicle pose, List<Gaussian> model)
 	{
 		List<Gaussian> corrected = new List<Gaussian>();
 
 		// reduce predicted weight to acocunt for misdetection
 		// v += (1-PD) v
-		foreach (Gaussian component in MapModel) {
+		foreach (Gaussian component in model) {
 			corrected.Add(new Gaussian(component.Mean,
 			                           component.Covariance,
 			                           (1 - pose.DetectionProbability(component.Mean)) * component.Weight));
 		}
 
 		// measurement PHD update
-		double[,]   R  = Vehicle.MeasurementCovariance;
+		double[,]   R  = pose.MeasurementCovariance;
 		double[,]   I  = Accord.Math.Matrix.Identity(2);
-		double[][]  m  = new double  [MapModel.Count][];
-		double[][,] H  = new double  [MapModel.Count][,];
-		double[][,] P  = new double  [MapModel.Count][,];
-		double[][,] PH = new double  [MapModel.Count][,];
-		double[][,] S  = new double  [MapModel.Count][,];
-		Gaussian[]  q  = new Gaussian[MapModel.Count];
+		double[][]  m  = new double  [model.Count][];
+		double[][,] H  = new double  [model.Count][,];
+		double[][,] P  = new double  [model.Count][,];
+		double[][,] PH = new double  [model.Count][,];
+		double[][,] S  = new double  [model.Count][,];
+		Gaussian[]  q  = new Gaussian[model.Count];
 
 		for (int i = 0; i < q.Length; i++) {
-			Gaussian component = MapModel[i];
+			Gaussian component = model[i];
 			m [i] = component.Mean;
 			H [i] = pose.MeasurementJacobian(m[i]);
 			P [i] = component.Covariance;
@@ -216,43 +362,50 @@ public class Navigator
 			}
 		}
 
-		this.MapModel = corrected;
+		return corrected;
 	}
 
 	/// <summary>
 	/// Remove irrelevant gaussians from the map model.
 	/// </summary>
-	public void PruneModel()
+	/// <param name="model">Map model.</param>
+	/// <returns>Pruned model.</returns>
+	public List<Gaussian> PruneModel(List<Gaussian> model)
 	{
 		List<Gaussian> pruned = new List<Gaussian>();
 		Gaussian       candidate;
 		List<Gaussian> close;
 
-		this.MapModel.Sort((a, b) => Math.Sign(b.Weight - a.Weight));
+		model.Sort((a, b) => Math.Sign(b.Weight - a.Weight));
 
-		for (int i = 0; i < Math.Min(MaxQuantity, MapModel.Count); i++) {
-			if (MapModel[i].Weight < MinWeight) {
+		for (int i = 0; i < Math.Min(MaxQuantity, model.Count); i++) {
+			if (model[i].Weight < MinWeight) {
 				break;
 			}
 
-			candidate = MapModel[i];
+			candidate = model[i];
 			close     = new List<Gaussian>();
 
-			for (int k = i + 1; k < Math.Min(MaxQuantity, MapModel.Count); k++) {
-				if (areClose(MapModel[i], MapModel[k])) {
-					close.Add(MapModel[k]);
-					MapModel.RemoveAt(k--);
+			for (int k = i + 1; k < Math.Min(MaxQuantity, model.Count); k++) {
+				if (AreClose(model[i], model[k])) {
+					close.Add(model[k]);
+					model.RemoveAt(k--);
 				}
 			}
 
 			if (close.Count > 0) {
-				candidate = merge(candidate, close);
+				candidate = Merge(candidate, close);
 			}
 
 			pruned.Add(candidate);
 		}
 
-		MapModel = pruned;
+		// after the procedure, the list is almost sorted (only merges can mess with the order)
+		// and this won't occur too many times with overlapping gaussians so this sort is not really necessary;
+		// it purpose is to make rendering prettier (heavier gaussians drawn on top of lighter ones)
+		//pruned.Sort((a, b) => Math.Sign(b.Weight - a.Weight));
+
+		return pruned;
 	}
 
 	/// <summary>
@@ -262,7 +415,7 @@ public class Navigator
 	/// <param name="a">First gaussian.</param>
 	/// <param name="b">Second gaussian.</param>
 	/// <returns>True if the gaussians are close enough to merge; false otherwise.</returns>
-	private bool areClose(Gaussian a, Gaussian b)
+	private bool AreClose(Gaussian a, Gaussian b)
 	{
 		return Mahalanobis(a, b.Mean) < MergeThreshold;
 	}
@@ -274,7 +427,7 @@ public class Navigator
 	/// </summary>
 	/// <param name="components">List of gaussian components.</param>
 	/// <returns>Merged gaussian.</returns>
-	private Gaussian merge(Gaussian maincomponent, List<Gaussian> components)
+	private Gaussian Merge(Gaussian maincomponent, List<Gaussian> components)
 	{
 		double    weight     = maincomponent.Weight;
 		double[]  mean       = maincomponent.Weight.Multiply(maincomponent.Mean);
@@ -312,17 +465,35 @@ public class Navigator
 	/// <summary>
 	/// Evaluate the Gaussian Mixture model of the map on a specified location.
 	/// </summary>
+	/// <param name="model">Evaluated model.</param>
 	/// <param name="x">Location.</param>
 	/// <returns>PHD density on the specified location.</returns>
-	public double EvaluateModel(double[] x)
+	public double EvaluateModel(List<Gaussian> model, double[] x)
 	{
 		double value = 0;
 
-		foreach (Gaussian component in MapModel) {
+		foreach (Gaussian component in model) {
 			value += component.Weight * component.Evaluate(x);
 		}
 
 		return value;
+	}
+
+	/// <summary>
+	/// Calculates the expected number of landmarks of a certain model.
+	/// This turn out to be the sum of all the weights of the gaussians.
+	/// </summary>
+	/// <param name="model">Map model.</param>
+	/// <returns>Expected number of landmarks.</returns>
+	public double ExpectedSize(List<Gaussian> model)
+	{
+		double expected = 0;
+
+		foreach (Gaussian component in model) {
+			expected += component.Weight;
+		}
+
+		return expected;
 	}
 
 	/// <summary>
@@ -332,16 +503,20 @@ public class Navigator
 	/// </summary>
 	public void Render()
 	{
-		foreach (var component in  MapModel) {
-			RenderGaussian(component);
+		for (int i = MapModels[0].Count - 1; i >= 0; i--) {
+			RenderGaussian(MapModels[0][i]);
+		}
+	}
+
+	public void RenderParticles()
+	{
+		foreach (Vehicle particle in VehicleParticles) {
+			particle.RenderTrajectory(Color.Blue);
 		}
 	}
 
 	public void RenderGaussian(Gaussian gaussian)
 	{
-		//Color innercolor = Color.Coral;   innercolor.A = 200;
-		//Color outercolor = Color.Crimson; outercolor.A = 200;
-
 		Color innercolor = Color.DeepSkyBlue; innercolor.A = 200;
 		Color outercolor = Color.Blue;        outercolor.A = 200;
 

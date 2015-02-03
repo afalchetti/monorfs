@@ -33,30 +33,30 @@ public class Vehicle
 	/// <summary>
 	/// Motion model covariance matrix.
 	/// </summary>
-	public static readonly double[,] MotionCovariance = new double[3, 3] {{5e-3, 0, 0},
-	                                                                      {0, 5e-3, 0},
-	                                                                      {0, 0, 5e-3}};
+	public readonly double[,] MotionCovariance = new double[3, 3] {{5e-3, 0, 0},
+	                                                               {0, 5e-3, 0},
+	                                                               {0, 0, 5e-3}};
 
 	/// <summary>
 	/// Measurement model covariance matrix.
 	/// </summary>
-	public static readonly double[,] MeasurementCovariance = new double[2, 2] {{2e-4, 0},
-	                                                                           {0, 2e-4}};
+	public readonly double[,] MeasurementCovariance = new double[2, 2] {{2e-4, 0},
+	                                                                    {0, 2e-4}};
 
 	/// <summary>
 	/// Probability of detection.
 	/// </summary>
-	private const double detectionProbability = 0.95;
+	private readonly double detectionProbability = 0.95;
 
 	/// <summary>
 	/// Vision range in radians, measured from straight ahead orientation.
 	/// </summary>
-	public static readonly Range VisionRange = new Range(-0.5f, 0.5f);
+	public readonly Range VisionRange = new Range(-0.5f, 0.5f);
 
 	/// <summary>
 	/// Cached vision range angle.
 	/// </summary>
-	public static readonly double VisionAngle = VisionRange.Max - VisionRange.Min;
+	public readonly double VisionAngle = 1.0f;
 
 	/// <summary>
 	/// Internal state as a vector.
@@ -116,10 +116,26 @@ public class Vehicle
 	/// <param name="theta">Orientation.</param>
 	public Vehicle(double x, double y, double theta)
 	{
-		this.State = new double[3] {x, y, theta};
-
-		this.Waypoints = new List<double[]>();
+		this.State       = new double[3] {x, y, theta};
+		this.VisionAngle = this.VisionRange.Max - this.VisionRange.Min;
+		this.Waypoints   = new List<double[]>();
 		this.Waypoints.Add(new double[2] {x, y});
+	}
+
+	/// <summary>
+	/// Copy constructor. Performs a deep copy of another vehicle.
+	/// </summary>
+	/// <param name="that"></param>
+	public Vehicle(Vehicle that)
+	{
+		this.State                 = new double[3] {that.X, that.Y, that.Theta};
+		this.VisionRange           = new Range(that.VisionRange.Min, that.VisionRange.Max);
+		this.VisionAngle           = that.VisionAngle;
+		this.detectionProbability  = that.detectionProbability;
+		this.MotionCovariance      = that.MotionCovariance.MemberwiseClone();
+		this.MeasurementCovariance = that.MeasurementCovariance.MemberwiseClone();
+		this.Waypoints             = new List<double[]>(that.Waypoints);
+		this.Graphics              = that.Graphics;
 	}
 
 	/// <summary>
@@ -404,17 +420,24 @@ public class Vehicle
 	/// <summary>
 	/// Render the path that the vehicle has travelled so far.
 	/// </summary>
-	public void RenderTrajectory()
+	/// <param name="color">Trail color.</param>
+	public void RenderTrajectory() {
+		RenderTrajectory(Color.Yellow);
+	}
+
+	/// <summary>
+	/// Render the path that the vehicle has travelled so far.
+	/// </summary>
+	/// <param name="color">Trail color.</param>
+	public void RenderTrajectory(Color color)
 	{
 		VertexPositionColor[] vertices = new VertexPositionColor[Waypoints.Count];
 
-		Color trailcolor = Color.Yellow;
-
 		for (int i = 0; i < Waypoints.Count; i++) {
-			vertices[i] = new VertexPositionColor(new Vector3((float) Waypoints[i][0], (float) Waypoints[i][1], 0), trailcolor);
+			vertices[i] = new VertexPositionColor(new Vector3((float) Waypoints[i][0], (float) Waypoints[i][1], 0), color);
 		}
 
-		Graphics.DrawUser2DPolygon(vertices, 0.02f, trailcolor, false);
+		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, false);
 	}
 }
 }
