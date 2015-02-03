@@ -49,7 +49,7 @@ public class Navigator
 	/// <summary>
 	/// Maximum number of gaussians kept after a model prune.
 	/// </summary>
-	public const int MaxQuantity = 200;
+	public const int MaxQuantity = 50;
 
 	/// <summary>
 	/// Threshold used to decide when to merge close gaussian components.
@@ -220,9 +220,8 @@ public class Navigator
 			Mpredicted[i] = ExpectedSize(MapModels[i]);
 
 			if (correct) { MapModels[i] = CorrectConditional(measurements, VehicleParticles[i], MapModels[i]); }
-			Mcorrected[i] = ExpectedSize(MapModels[i]);
-
 			if (prune)   { MapModels[i] = PruneModel(MapModels[i]); }
+			Mcorrected[i] = ExpectedSize(MapModels[i]);
 		});
 
 		// localization update
@@ -270,7 +269,10 @@ public class Navigator
 		double           maxweight = 0;
 
 		for (int i = 0, k = 0; i < weights.Length; i++) {
-			for (; random > 0; k++) {
+			// k should never be out of range, but because of floating point arithmetic,
+			// the probabilities may not add up to one. If the random number hits this tiny difference
+			// it will throw an exception. In such rare case, just expand the last guy's probability
+			for (; random > 0 && k < VehicleWeights.Length; k++) {
 				random -= VehicleWeights[k];
 			}
 			

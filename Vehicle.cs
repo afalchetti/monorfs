@@ -46,7 +46,7 @@ public class Vehicle
 	/// <summary>
 	/// Probability of detection.
 	/// </summary>
-	private readonly double detectionProbability = 0.95;
+	private readonly double detectionProbability = 0.85;
 
 	/// <summary>
 	/// Vision range in radians, measured from straight ahead orientation.

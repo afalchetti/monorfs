@@ -135,7 +135,7 @@ public class Simulation : Game
 			this.Landmarks.Add(maploc[i]);
 		}
 
-		this.Navigator = new Navigator(Explorer, 10, false);
+		this.Navigator = new Navigator(Explorer, 1, true);
 
 		// MonoGame-related construction
 		this.graphicsManager = new GraphicsDeviceManager(this);
