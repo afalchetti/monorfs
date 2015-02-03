@@ -125,8 +125,9 @@ public class Vehicle
 	/// <summary>
 	/// Copy constructor. Performs a deep copy of another vehicle.
 	/// </summary>
-	/// <param name="that"></param>
-	public Vehicle(Vehicle that)
+	/// <param name="that">Copied vehicle</param>
+	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
+	public Vehicle(Vehicle that, bool copytrajectory = false)
 	{
 		this.State                 = new double[3] {that.X, that.Y, that.Theta};
 		this.VisionRange           = new Range(that.VisionRange.Min, that.VisionRange.Max);
@@ -134,8 +135,15 @@ public class Vehicle
 		this.detectionProbability  = that.detectionProbability;
 		this.MotionCovariance      = that.MotionCovariance.MemberwiseClone();
 		this.MeasurementCovariance = that.MeasurementCovariance.MemberwiseClone();
-		this.Waypoints             = new List<double[]>(that.Waypoints);
 		this.Graphics              = that.Graphics;
+
+		if (copytrajectory) {
+			this.Waypoints = new List<double[]>(that.Waypoints);
+		}
+		else {
+			this.Waypoints = new List<double[]>();
+			this.Waypoints.Add(new double[2] {that.X, that.Y});
+		}
 	}
 
 	/// <summary>
@@ -420,18 +428,10 @@ public class Vehicle
 	/// <summary>
 	/// Render the path that the vehicle has travelled so far.
 	/// </summary>
-	/// <param name="color">Trail color.</param>
-	public void RenderTrajectory() {
-		RenderTrajectory(Color.Yellow);
-	}
-
-	/// <summary>
-	/// Render the path that the vehicle has travelled so far.
-	/// </summary>
-	/// <param name="color">Trail color.</param>
-	public void RenderTrajectory(Color color)
+	public void RenderTrajectory()
 	{
 		VertexPositionColor[] vertices = new VertexPositionColor[Waypoints.Count];
+		Color color = Color.Yellow;
 
 		for (int i = 0; i < Waypoints.Count; i++) {
 			vertices[i] = new VertexPositionColor(new Vector3((float) Waypoints[i][0], (float) Waypoints[i][1], 0), color);

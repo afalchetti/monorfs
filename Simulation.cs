@@ -93,16 +93,6 @@ public class Simulation : Game
 	private GameTime lastnavigationupdate = new GameTime();
 
 	/// <summary>
-	/// Accumulated ds between navigator updates
-	/// </summary>
-	private double acds = 0;
-	
-	/// <summary>
-	/// Accumulated dtheta between navigator updates
-	/// </summary>
-	private double acdtheta = 0;
-
-	/// <summary>
 	/// Construct a simulation from a formatted desccription file.
 	/// </summary>
 	/// <param name="filename">Scene descriptor file.</param>
@@ -145,7 +135,7 @@ public class Simulation : Game
 			this.Landmarks.Add(maploc[i]);
 		}
 
-		this.Navigator = new Navigator(Explorer, 25, false);
+		this.Navigator = new Navigator(Explorer, 10, false);
 
 		// MonoGame-related construction
 		this.graphicsManager = new GraphicsDeviceManager(this);
@@ -262,25 +252,15 @@ public class Simulation : Game
 		bool DoCorrect = !keyboard.IsKeyDown(Keys.C);
 		bool DoPrune   = !keyboard.IsKeyDown(Keys.Q);
 
-		Explorer.Update(time, ds, 0, dtheta);
-		if (!Navigator.OnlyMapping) {
-			for (int i = 0; i < Navigator.VehicleParticles.Length; i++) {
-				Navigator.VehicleParticles[i].Update(time, ds, 0, dtheta);
-			}
-		}
-
-		acds     += ds;
-		acdtheta += dtheta;
+		Explorer.Update (time, ds, 0, dtheta);
+		Navigator.Update(time, ds, 0, dtheta);
 
 		if (time.TotalGameTime.TotalMilliseconds - lastnavigationupdate.TotalGameTime.TotalMilliseconds > MeasurePeriod) {
 			List<double[]> measurements = Explorer.Measure(Landmarks);
-			GameTime       actime       = new GameTime(time.TotalGameTime, time.TotalGameTime - lastnavigationupdate.TotalGameTime);
 
-			Navigator.Update(actime, acds, acdtheta, measurements, DoPredict, DoCorrect, DoPrune);
+			Navigator.SlamUpdate(measurements, DoPredict, DoCorrect, DoPrune);
 
 			lastnavigationupdate = new GameTime(time.TotalGameTime, time.ElapsedGameTime);
-			acds                 = 0;
-			acdtheta             = 0;
 
 			MeasurementReadings = new List<double[]>();
 			foreach (double[] z in measurements) {
@@ -303,9 +283,9 @@ public class Simulation : Game
 		foreach (EffectPass pass in effect.CurrentTechnique.Passes) {
 			pass.Apply();
 			
-			Navigator.RenderParticles();
-			Explorer.RenderTrajectory();
-			Explorer.RenderFOV();
+			Navigator.RenderTrajectory();
+			Explorer .RenderTrajectory();
+			Explorer .RenderFOV();
 			
 			foreach (double[] landmark in Landmarks) {
 				RenderLandmark(landmark);

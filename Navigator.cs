@@ -14,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using Accord.Math;
 using Accord.Math.Decompositions;
+using AForge;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -60,6 +61,7 @@ public class Navigator
 	/// If it is, it should be explored (birth of a new gaussian).
 	/// </summary>
 	public const double ExplorationThreshold = 1e-3;
+	//public const double ExplorationThreshold = 3;
 
 	/// <summary>
 	/// Particle filter representation of the vehicle pose.
@@ -88,6 +90,11 @@ public class Navigator
 	public double[] Mcorrected;
 
 	/// <summary>
+	/// Index of the particle with the biggest weight.
+	/// </summary>
+	public int BestParticle;
+
+	/// <summary>
 	/// True if the localization of the vehicle is known.
 	/// </summary>
 	public bool OnlyMapping;
@@ -96,6 +103,11 @@ public class Navigator
 	/// Prediction interval base model.
 	/// </summary>
 	public double[][] pinterval;
+
+	/// <summary>
+	/// The estimated trajectory.
+	/// </summary>
+	public List<double[]> Waypoints;
 
 	/// <summary>
 	/// Internel render output.
@@ -155,8 +167,12 @@ public class Navigator
 			}
 		}
 		
-		Mpredicted = new double[VehicleParticles.Length];
-		Mcorrected = new double[VehicleParticles.Length];
+		this.Mpredicted   = new double[VehicleParticles.Length];
+		this.Mcorrected   = new double[VehicleParticles.Length];
+		this.BestParticle = 0;
+
+		this.Waypoints = new List<double[]>();
+		this.Waypoints.Add(vehicle.Location);
 
 		const int segments = 32;
 		this.pinterval = new double[segments][];
@@ -168,21 +184,38 @@ public class Navigator
 	}
 
 	/// <summary>
+	/// Update the vehicle particles.
+	/// </summary>
+	/// <param name="time">Provides a snapshot of timing values.</param>
+	/// <param name="dx">Odometry forward movement.</param>
+	/// <param name="dy">Odometry perpendicular movement.</param>
+	/// <param name="dtheta">Odometry angular movement.</param>
+	public void Update(GameTime time, double dx, double dy, double dtheta)
+	{
+		if (!OnlyMapping) {
+			for (int i = 0; i < VehicleParticles.Length; i++) {
+				VehicleParticles[i].Update(time, dx, dy, dtheta);
+			}
+		}
+
+		if (VehicleParticles[BestParticle].Location.Subtract(Waypoints[Waypoints.Count - 1]).SquareEuclidean() >= 1e-2f) {
+			Waypoints.Add(VehicleParticles[BestParticle].Location);
+		}
+	}
+
+	/// <summary>
 	/// Update both the estimated map and the localization.
 	/// This means doing a model prediction and a measurement update.
 	/// This method is the core of the whole program.
 	/// </summary>
-	/// <param name="time">Provides a snapshot of timing values.</param>
-	/// <param name="ds">Odometry forward movement.</param>
-	/// <param name="dtheta">Odometry angular movement.</param>
 	/// <param name="measurements">Sensor measurements in range-bearing  form.</param>
 	/// <param name="predict">Predict flag; if false, no prediction step is done.</param>
 	/// <param name="correct">Correct flag; if false, no correction step is done.</param>
 	/// <param name="prune">Prune flag; if false, no prune step is done.</param>
-	public void Update(GameTime time, double ds, double dtheta, List<double[]> measurements, bool predict, bool correct, bool prune)
+	public void SlamUpdate(List<double[]> measurements, bool predict, bool correct, bool prune)
 	{
 		// map update
-		for (int i = 0; i < VehicleParticles.Length; i++) {
+		Parallel.For (0, VehicleParticles.Length, i => {
 			if (predict) { MapModels[i] = PredictConditional(measurements, VehicleParticles[i], MapModels[i]); }
 			Mpredicted[i] = ExpectedSize(MapModels[i]);
 
@@ -190,7 +223,7 @@ public class Navigator
 			Mcorrected[i] = ExpectedSize(MapModels[i]);
 
 			if (prune)   { MapModels[i] = PruneModel(MapModels[i]); }
-		}
+		});
 
 		// localization update
 		if (!OnlyMapping) {
@@ -234,6 +267,7 @@ public class Navigator
 		double[]         weights   = new double[VehicleWeights.Length];
 		Vehicle[]        particles = new Vehicle[VehicleParticles.Length];
 		List<Gaussian>[] models    = new List<Gaussian>[MapModels.Length];
+		double           maxweight = 0;
 
 		for (int i = 0, k = 0; i < weights.Length; i++) {
 			for (; random > 0; k++) {
@@ -244,6 +278,11 @@ public class Navigator
 			models   [i] = new List<Gaussian>(MapModels[k - 1]);
 			weights  [i] = 1.0 / weights.Length;
 			random      += 1.0 / weights.Length;
+
+			if (weights[i] > maxweight) {
+				maxweight = weights[i];
+				BestParticle = i;
+			}
 		}
 
 		VehicleParticles = particles;
@@ -275,7 +314,7 @@ public class Navigator
 
 		foreach (double[] measurement in measurements) {
 			double[] candidate = pose.MeasureToMap(measurement);
-			if (EvaluateModel(model, candidate) < ExplorationThreshold) {
+			if (!Explored(model, candidate)) {
 				unexplored.Add(candidate);
 			}
 		}
@@ -340,7 +379,7 @@ public class Navigator
 		// R is the measurement covariance
 		// H is the measurement linear operator (jacobian) from the model
 		foreach (double[] measurement in measurements) {
-			double PD = pose.DetectionProbabilityM(measurement);	
+			double PD        = pose.DetectionProbabilityM(measurement);	
 			double weightsum = 0;
 
 			for (int i = 0; i < q.Length; i++) {
@@ -459,9 +498,27 @@ public class Navigator
 	private double Mahalanobis(Gaussian distribution, double[] point)
 	{
 		double[] diff = distribution.Mean.Subtract(point);
-		return Accord.Math.Matrix.InnerProduct(diff, distribution.Covariance.Inverse().Multiply(diff));
+		return Accord.Math.Matrix.InnerProduct(diff, distribution.CovarianceInverse.Multiply(diff));
 	}
 
+	/// <summary>
+	/// Queries if a location has been explored on a given map model.
+	/// </summary>
+	/// <param name="model">Map model.</param>
+	/// <param name="x">Location.</param>
+	/// <returns>True if the location has been explored.</returns>
+	public bool Explored(List<Gaussian> model, double[] x)
+	{
+		return EvaluateModel(model, x) > ExplorationThreshold;
+
+		/*foreach (Gaussian component in model) {
+			if (Mahalanobis(component, x) < ExplorationThreshold) {
+				return true;
+			}
+		}
+
+		return false;*/
+	}
 	/// <summary>
 	/// Evaluate the Gaussian Mixture model of the map on a specified location.
 	/// </summary>
@@ -503,16 +560,24 @@ public class Navigator
 	/// </summary>
 	public void Render()
 	{
-		for (int i = MapModels[0].Count - 1; i >= 0; i--) {
-			RenderGaussian(MapModels[0][i]);
+		foreach (Gaussian component in MapModels[BestParticle]) {
+			RenderGaussian(component);
 		}
 	}
 
-	public void RenderParticles()
+	/// <summary>
+	/// Render the path that the vehicle has travelled so far.
+	/// </summary>
+	public void RenderTrajectory()
 	{
-		foreach (Vehicle particle in VehicleParticles) {
-			particle.RenderTrajectory(Color.Blue);
+		VertexPositionColor[] vertices = new VertexPositionColor[Waypoints.Count];
+		Color color = Color.Blue;
+
+		for (int i = 0; i < Waypoints.Count; i++) {
+			vertices[i] = new VertexPositionColor(new Vector3((float) Waypoints[i][0], (float) Waypoints[i][1], 0), color);
 		}
+
+		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, false);
 	}
 
 	public void RenderGaussian(Gaussian gaussian)
@@ -564,30 +629,26 @@ public class Gaussian
 
 	public double[,] Covariance { get; private set; }
 
-	private double[,] CovarianceInverse;
+	public double[,] CovarianceInverse;
 
-	//private double[,] DeviationInverse;
+	public double multiplier;
 
-	private double multiplier;
+	private static readonly double[] tabulatedexp;
 
-	/*private static double[] tabulated;
+	private const int tabgrid = 128;
 
-	private static int tabgrid;
+	private const double tabdelta = 128 / 16;
 
-	private static double tabmax;
+	private const double tabmax = 16;
 
 	static Gaussian()
 	{
-		Gaussian standard = new Gaussian(new double[1] {0}, new double[1, 1] {{1}}, 1);
+		tabulatedexp = new double[tabgrid + 1];
 
-		tabgrid   = 200;
-		tabmax    = 5.0*5.0;  // tabulate from 0 to 5 standard deviations
-		tabulated = new double[tabgrid];
-
-		for (int i = 0; i < tabgrid; i++) {
-			tabulated[i] = standard.Evaluate(new double[1] {tabmax * Math.Sqrt(i) / tabgrid});
+		for (int i = 0; i < tabgrid + 1; i++) {
+			tabulatedexp[i] = Math.Exp(-tabmax * i / tabgrid);
 		}
-	}*/
+	}
 
 	public Gaussian(double[] mean, double[,] covariance, double weight)
 	{
@@ -596,32 +657,23 @@ public class Gaussian
 		this.Weight            = weight;
 		this.multiplier        = Math.Pow(2 * Math.PI, -mean.Length / 2) / Math.Sqrt(covariance.Determinant());
 		this.CovarianceInverse = covariance.Inverse();
-
-		/*var decomp = new CholeskyDecomposition(covariance);
-		double[,] sqrtdiag = decomp.DiagonalMatrix;
-
-		for (int i = 0; i < sqrtdiag.GetLength(0); i++) {
-			sqrtdiag[i, i] = Math.Sqrt(sqrtdiag[i, i]);
-		}
-
-		this.DeviationInverse = decomp.LeftTriangularFactor.Multiply(sqrtdiag).Inverse();*/
 	}
 
 	public double Evaluate(double[] x)
 	{
 		double[]  diff = x.Subtract(Mean);
-		return multiplier * Math.Exp(-0.5 * Accord.Math.Matrix.InnerProduct(diff, CovarianceInverse.Multiply(diff)));
+		return multiplier * ApproximateNegExp(0.5 * Accord.Math.Matrix.InnerProduct(diff, CovarianceInverse.Multiply(diff)));
+		//return multiplier * Math.Exp(-0.5 * Accord.Math.Matrix.InnerProduct(diff, CovarianceInverse.Multiply(diff)));
 	}
 
-	/*public double ApproximateEvaluate(double[] x)
+	public double ApproximateNegExp(double x)
 	{
-		return ApproximateEvaluate1D(DeviationInverse.Multiply(x).Subtract(Mean).SquareEuclidean(Mean));
+		if (x <= tabmax) {
+			return tabulatedexp[(int)(tabdelta * x)];
+		}
+		else {
+			return 0;
+		}
 	}
-
-	public double ApproximateEvaluate1D(double x2)
-	{
-		x2 = (x2 <= tabmax) ? x2 : tabmax;
-		return tabulated[(int)(tabgrid * x2 / tabmax)];
-	}*/
 }
 }
