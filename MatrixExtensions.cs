@@ -13,6 +13,7 @@ using System.Collections.Generic;
 
 using Accord;
 using Accord.Math;
+using Microsoft.Xna.Framework;
 
 namespace monorfs
 {
@@ -90,6 +91,72 @@ public static class MatrixExtensions
 		double ct = Math.Cos(angle);
 		double st = Math.Sin(angle);
 		return new double[3, 3] {{ct, -st, translation[0]}, {st, ct, translation[1]}, {0, 0, 1}};
+	}
+
+	/// <summary>
+	/// Creates a 3x3 rotation matrix for rotating in the yz plane
+	/// with a given angle.
+	/// </summary>
+	/// <param name="angle">Angle measured in radians, counterclockwise starting from (0, 0, 1).</param>
+	/// <returns>The rotation matrix.</returns>
+	public static double[,] CreateRotationX(double angle)
+	{
+		double ct = Math.Cos(angle);
+		double st = Math.Sin(angle);
+		return new double[3, 3] {{1, 0, 0}, {0, ct, -st}, {0, st, ct}};
+	}
+
+	/// <summary>
+	/// Creates a 3x3 rotation matrix for rotating in the xz plane
+	/// with a given angle.
+	/// </summary>
+	/// <param name="angle">Angle measured in radians, counterclockwise starting from (1, 0, 0).</param>
+	/// <returns>The rotation matrix.</returns>
+	public static double[,] CreateRotationY(double angle)
+	{
+		double ct = Math.Cos(angle);
+		double st = Math.Sin(angle);
+		return new double[3, 3] {{st, 0, ct}, {0, 1, 0}, {ct, 0, -st}};
+	}
+
+	/// <summary>
+	/// Creates a 3x3 rotation matrix for rotating in the xy plane
+	/// with a given angle.
+	/// </summary>
+	/// <param name="angle">Angle measured in radians, counterclockwise starting from (0, 1, 0).</param>
+	/// <returns>The rotation matrix.</returns>
+	public static double[,] CreateRotationZ(double angle)
+	{
+		double ct = Math.Cos(angle);
+		double st = Math.Sin(angle);
+		return new double[3, 3] {{ct, -st, 0}, {st, ct, 0}, {0, 0, 1}};
+	}
+
+	/// <summary>
+	/// Obtain the corresponding rotation matriz from a quaternion.
+	/// </summary>
+	/// <param name="q">Original rotation quaternion.</param>
+	/// <returns>Rotation matrix.</returns>
+	public static double[,] MatrixFromQuaternion(Quaternion q)
+	{
+		double xx = q.X * q.X;
+		double yy = q.Y * q.Y;
+		double zz = q.Z * q.Z;
+		double xy = q.X * q.Y;
+		double xz = q.X * q.Z;
+		double xw = q.X * q.W;
+		double yz = q.Y * q.Z;
+		double yw = q.Y * q.W;
+		double zw = q.Z * q.W;
+
+		return new double[3, 3] {{1 - 2 * (yy + zz), 2 * (xy + zw),     2 * (xz - yw)},
+		                         {2 * (xy - zw),     1 - 2 * (xx + zz), 2 * (yz + xw)},
+		                         {2 * (xz + yw),     2 * (yz - xw),     1 - 2 * (xx + yy)}};
+	}
+
+	public static Vector3 ToVector3(this double[] x)
+	{
+		return new Vector3((float) x[0], (float) x[1], (float) x[2]);
 	}
 
 	/*

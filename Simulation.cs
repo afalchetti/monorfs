@@ -16,6 +16,8 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 
+using Accord.Math;
+
 namespace monorfs
 {
 /// <summary>
@@ -27,7 +29,7 @@ public class Simulation : Game
 	/// Measure cycle period in miliseconds. Every this
 	/// amount of time the SLAM solver is invoked.
 	/// </summary>
-	public const double MeasurePeriod = 200;
+	public const double MeasurePeriod = 100;
 
 	/// <summary>
 	/// Main vehicle.
@@ -42,7 +44,7 @@ public class Simulation : Game
 	/// <summary>
 	/// SLAM solver.
 	/// </summary>
-	public Navigator Navigator { get; private set; }
+	/*public Navigator Navigator { get; private set; }*/
 
 	/// <summary>
 	/// Cached measurements from the update process for rendering purposes.
@@ -86,6 +88,16 @@ public class Simulation : Game
 	/// It is formatted as [left, right, bottom, top].
 	/// </summary>
 	private float[] mapclip;
+
+	/// <summary>
+	/// Camera angle.
+	/// </summary>
+	private double camangle;
+
+	/// <summary>
+	/// Cmaera matrix.
+	/// </summary>
+	private double[,] camera;
 	
 	/// <summary>
 	/// Last time the navigator update method was called.
@@ -110,9 +122,13 @@ public class Simulation : Game
 
 		double[] vehiclepose = ParseDoubleList(dict["vehicle"][0]);
 
-		if (vehiclepose.Length != 3) {
-			throw new FormatException("Vehicle description must have exactly three arguments: x, y and theta");
+		if (vehiclepose.Length != 7) {
+			throw new FormatException("Vehicle description must have exactly seven arguments: x, y, z (location), theta, ax, ay, az (rotation axis)");
 		}
+		
+		double[] location = new double[3] {vehiclepose[0], vehiclepose[1], vehiclepose[2]};
+		double   angle    = vehiclepose[3];
+		double[] axis     = new double[3] {vehiclepose[4], vehiclepose[5], vehiclepose[6]};
 
 		List<double[]> maploc      = new List<double[]>();
 		List<string>   mapdescript = dict["landmarks"];
@@ -120,14 +136,14 @@ public class Simulation : Game
 		for (int i = 0; i < mapdescript.Count; i++) {
 			double[] landmark = ParseDoubleList(mapdescript[i]);
 
-			if (landmark.Length != 2) {
-				throw new FormatException("Map landmarks must be 2D");
+			if (landmark.Length != 3) {
+				throw new FormatException("Map landmarks must be 3D");
 			}
 
 			maploc.Add(landmark);
 		}
 
-		this.Explorer            = new Vehicle(vehiclepose[0], vehiclepose[1], vehiclepose[2]);
+		this.Explorer            = new Vehicle(location, angle, axis);
 		this.Landmarks           = new List<double[]>();
 		this.MeasurementReadings = new List<double[]>();
 
@@ -135,7 +151,7 @@ public class Simulation : Game
 			this.Landmarks.Add(maploc[i]);
 		}
 
-		this.Navigator = new Navigator(Explorer, 1, true);
+		/*this.Navigator = new Navigator(Explorer, 1, true);*/
 
 		// MonoGame-related construction
 		this.graphicsManager = new GraphicsDeviceManager(this);
@@ -152,6 +168,9 @@ public class Simulation : Game
 		this.bufferdest = clipCenter(graphicsManager.PreferredBackBufferWidth,
 		                             graphicsManager.PreferredBackBufferHeight,
 		                             (mapclip[1] - mapclip[0]) / (mapclip[3] - mapclip[2]));
+
+		camangle = 0;
+		camera   = Accord.Math.Matrix.Identity(3);
 	}
 
 	/// <summary>
@@ -186,24 +205,24 @@ public class Simulation : Game
 	{
 		this.graphics           = this.graphicsManager.GraphicsDevice;
 		this.Explorer .Graphics = this.graphics;
-		this.Navigator.Graphics = this.graphics;
+		//this.Navigator.Graphics = this.graphics;
 
 		this.graphics.BlendState        = BlendState.NonPremultiplied;
-		this.graphics.DepthStencilState = DepthStencilState.None;
+		this.graphics.DepthStencilState = DepthStencilState.Default;
 		this.graphics.RasterizerState   = RasterizerState.CullNone;
 		this.graphics.SamplerStates[0]  = SamplerState.LinearClamp;
 
 		this.effect            = new BasicEffect(this.graphics);
 		this.effect.Alpha      = 1.0f;
-		this.effect.View       = Matrix.Identity;
-		this.effect.World      = Matrix.Identity;
-		this.effect.Projection = Matrix.CreateOrthographicOffCenter(mapclip[0], mapclip[1], mapclip[2], mapclip[3], -1, 2);
+		this.effect.View       = Microsoft.Xna.Framework.Matrix.Identity;
+		this.effect.World      = Microsoft.Xna.Framework.Matrix.Identity;
+		this.effect.Projection = Microsoft.Xna.Framework.Matrix.CreateOrthographicOffCenter(mapclip[0], mapclip[1], mapclip[2], mapclip[3], -100, 100);
 
 		this.effect.LightingEnabled    = false;
 		this.effect.VertexColorEnabled = true;
 
 		this.buffer = new RenderTarget2D(graphics, 2 * bufferdest.Width, 2 * bufferdest.Height,
-		                                 false, SurfaceFormat.Color, DepthFormat.None,
+		                                 false, SurfaceFormat.Color, DepthFormat.Depth16,
 		                                 0, RenderTargetUsage.DiscardContents);
 
 		//this.IsFixedTimeStep = false;
@@ -230,35 +249,73 @@ public class Simulation : Game
 		KeyboardState keyboard = Keyboard.GetState();
 
 		double ds     = 0;
-		double dtheta = 0;
+		double dyaw   = 0;
+		double dpitch = 0;
+		double droll  = 0;
+		double dcam   = 0;
 		
-		if (keyboard.IsKeyDown(Keys.Down)) {
-			ds -= 0.02;
+		bool fast = keyboard.IsKeyDown(Keys.LeftShift);
+		bool slow = keyboard.IsKeyDown(Keys.LeftControl);
+
+		double multiplier = 1.0;
+		multiplier *= (fast) ? 2.0 : 1.0;
+		multiplier /= (slow) ? 4.0 : 1.0;
+		
+		if (keyboard.IsKeyDown(Keys.I)) {
+			ds += 0.02 * multiplier;
 		}
 
-		if (keyboard.IsKeyDown(Keys.Up)) {
-			ds += 0.02;
+		if (keyboard.IsKeyDown(Keys.K)) {
+			ds -= 0.02 * multiplier;
 		}
 
-		if (keyboard.IsKeyDown(Keys.Left)) {
-			dtheta += 0.12;
+		if (keyboard.IsKeyDown(Keys.J)) {
+			dyaw += 0.1 * multiplier;
 		}
 
-		if (keyboard.IsKeyDown(Keys.Right)) {
-			dtheta -= 0.12;
+		if (keyboard.IsKeyDown(Keys.L)) {
+			dyaw -= 0.1 * multiplier;
+		}
+
+		if (keyboard.IsKeyDown(Keys.W)) {
+			dpitch -= 0.1 * multiplier;
+		}
+
+		if (keyboard.IsKeyDown(Keys.S)) {
+			dpitch += 0.1 * multiplier;
+		}
+
+		if (keyboard.IsKeyDown(Keys.A)) {
+			droll -= 0.1 * multiplier;
+		}
+
+		if (keyboard.IsKeyDown(Keys.D)) {
+			droll += 0.1 * multiplier;
+		}
+
+		if (keyboard.IsKeyDown(Keys.B)) {
+			dcam += 0.06 * multiplier;
+		}
+
+		if (keyboard.IsKeyDown(Keys.V)) {
+			dcam -= 0.06 * multiplier;
 		}
 		
 		bool DoPredict = !keyboard.IsKeyDown(Keys.P);
 		bool DoCorrect = !keyboard.IsKeyDown(Keys.C);
 		bool DoPrune   = !keyboard.IsKeyDown(Keys.Q);
 
-		Explorer.Update (time, ds, 0, dtheta);
-		Navigator.Update(time, ds, 0, dtheta);
+		Explorer.Update (time, 0, 0, ds, dyaw, dpitch, droll);
+
+		camangle += dcam;
+		camera    = MatrixExtensions.CreateRotationX(camangle);
+
+		/*Navigator.Update(time, ds, 0, dtheta);*/
 
 		if (time.TotalGameTime.TotalMilliseconds - lastnavigationupdate.TotalGameTime.TotalMilliseconds > MeasurePeriod) {
 			List<double[]> measurements = Explorer.Measure(Landmarks);
 
-			Navigator.SlamUpdate(measurements, DoPredict, DoCorrect, DoPrune);
+			/*Navigator.SlamUpdate(measurements, DoPredict, DoCorrect, DoPrune);*/
 
 			lastnavigationupdate = new GameTime(time.TotalGameTime, time.ElapsedGameTime);
 
@@ -283,25 +340,26 @@ public class Simulation : Game
 		foreach (EffectPass pass in effect.CurrentTechnique.Passes) {
 			pass.Apply();
 			
-			Navigator.RenderTrajectory();
-			Explorer .RenderTrajectory();
-			Explorer .RenderFOV();
+			Explorer .RenderFOV(camera);
+			/*Navigator.RenderTrajectory(camera);*/
+			Explorer .RenderTrajectory(camera);
 			
+
 			foreach (double[] landmark in Landmarks) {
-				RenderLandmark(landmark);
+				RenderLandmark(landmark, camera);
 			}
 
 			foreach (double[] measure in MeasurementReadings) {
-				RenderMeasure(measure);
+				RenderMeasure(measure, camera);
 			}
 
-			Explorer .RenderBody();
-			Navigator.Render();
+			Explorer .RenderBody(camera);
+			/*Navigator.Render(camera);*/
 		}
 
 		graphics.SetRenderTarget(null);
 		flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
-			DepthStencilState.None, RasterizerState.CullNone);
+			DepthStencilState.Default, RasterizerState.CullNone);
 
 		flip.Draw(buffer, bufferdest, Color.White);
 
@@ -316,25 +374,28 @@ public class Simulation : Game
 	/// Simple point landmark rendering.
 	/// </summary>
 	/// <param name="landmark">Point landmark position.</param>
-	private void RenderLandmark(double[] landmark)
+	/// <param name="camera">Camera rotation matrix.</param>
+	private void RenderLandmark(double[] landmark, double[,] camera)
 	{
 		const float halflen = 0.024f;
 		
 		Color innercolor =  Color.LightGray;
 		Color outercolor =  Color.Black;
+
+		landmark = camera.Multiply(landmark);
 		
 		VertexPositionColor[] invertices  = new VertexPositionColor[4];
-		VertexPositionColor[] outvertices = new VertexPositionColor[4];
+		double[][]            outvertices = new double[4][];
 
-		invertices[0] = new VertexPositionColor(new Vector3((float) landmark[0] - halflen, (float) landmark[1] - halflen, 0), innercolor);
-		invertices[1] = new VertexPositionColor(new Vector3((float) landmark[0] - halflen, (float) landmark[1] + halflen, 0), innercolor);
-		invertices[2] = new VertexPositionColor(new Vector3((float) landmark[0] + halflen, (float) landmark[1] - halflen, 0), innercolor);
-		invertices[3] = new VertexPositionColor(new Vector3((float) landmark[0] + halflen, (float) landmark[1] + halflen, 0), innercolor);
+		outvertices[0] = new double[] {landmark[0] - halflen, landmark[1] - halflen, landmark[2]};
+		outvertices[1] = new double[] {landmark[0] - halflen, landmark[1] + halflen, landmark[2]};
+		outvertices[2] = new double[] {landmark[0] + halflen, landmark[1] + halflen, landmark[2]};
+		outvertices[3] = new double[] {landmark[0] + halflen, landmark[1] - halflen, landmark[2]};
 
-		outvertices[0] = invertices[0];
-		outvertices[1] = invertices[1];
-		outvertices[2] = invertices[3];
-		outvertices[3] = invertices[2];
+		invertices[0] = new VertexPositionColor(outvertices[0].ToVector3(), innercolor);
+		invertices[1] = new VertexPositionColor(outvertices[1].ToVector3(), innercolor);
+		invertices[2] = new VertexPositionColor(outvertices[3].ToVector3(), innercolor);
+		invertices[3] = new VertexPositionColor(outvertices[2].ToVector3(), innercolor);
 
 		graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
 		graphics.DrawUser2DPolygon(outvertices, 0.02f, outercolor, true);
@@ -344,23 +405,26 @@ public class Simulation : Game
 	/// Simple point measurement rendering.
 	/// </summary>
 	/// <param name="measurement">Point measurement position.</param>
-	private void RenderMeasure(double[] measurement)
+	/// <param name="camera">Camera rotation matrix.</param>
+	private void RenderMeasure(double[] measurement, double[,] camera)
 	{
-		const float halflen = 0.024f;
+		const float halflen = 0.03f;
 		
 		Color color =  Color.Crimson;
+
+		measurement = camera.Multiply(measurement);
 		
-		VertexPositionColor[] vertices = new VertexPositionColor[2];
+		double[][] vertices = new double[2][];
 
-		vertices[0] = new VertexPositionColor(new Vector3((float) measurement[0] - halflen, (float) measurement[1] - halflen, 0), color);
-		vertices[1] = new VertexPositionColor(new Vector3((float) measurement[0] + halflen, (float) measurement[1] + halflen, 0), color);
+		vertices[0] = new double[] {measurement[0] - halflen, measurement[1] - halflen, measurement[2]};
+		vertices[1] = new double[] {measurement[0] + halflen, measurement[1] + halflen, measurement[2]};
 		
-		graphics.DrawUser2DPolygon(vertices, 0.02f, color, true);
+		graphics.DrawUser2DPolygon(vertices, 0.01f, color, true);
 
-		vertices[0] = new VertexPositionColor(new Vector3((float) measurement[0] - halflen, (float) measurement[1] + halflen, 0), color);
-		vertices[1] = new VertexPositionColor(new Vector3((float) measurement[0] + halflen, (float) measurement[1] - halflen, 0), color);
+		vertices[0] = new double[] {measurement[0] - halflen, measurement[1] + halflen, measurement[2]};
+		vertices[1] = new double[] {measurement[0] + halflen, measurement[1] - halflen, measurement[2]};
 
-		graphics.DrawUser2DPolygon(vertices, 0.02f, color, true);
+		graphics.DrawUser2DPolygon(vertices, 0.01f, color, true);
 	}
 
 	/// <summary>
@@ -378,7 +442,7 @@ public class Simulation : Game
 			}
 		}
 		catch (FormatException) {
-			throw new FormatException("the point descriptor '" + descriptor + "' is malformed");
+			throw new FormatException("the double descriptor '" + descriptor + "' is malformed");
 		}
 
 		return point;

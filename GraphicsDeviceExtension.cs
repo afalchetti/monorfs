@@ -27,9 +27,8 @@ public static class GraphicsDeviceExtension
 	/// <param name="x0">First point.</param>
 	/// <param name="x1">Second point.</param>
 	/// <param name="thickness">Line thickness.</param>
-	/// <param name="rect">Output array of points (rectangle).
-	/// It must have a capacity of at least 4.</param>
-	public static void ThickLine(Vector3 x0, Vector3 x1, float thickness, out Vector3[] rect)
+	/// <returns>Array of points (rectangle).</returns>
+	public static Vector3[] ThickLine(Vector3 x0, Vector3 x1, float thickness)
 	{
 		Vector3 direction = x1 - x0;
 
@@ -40,17 +39,18 @@ public static class GraphicsDeviceExtension
 			direction = Vector3.Zero;
 		}
 
-		Vector3 normal;
-		normal = new Vector3(direction.Y, -direction.X, 0);
+		Vector3 normal    = new Vector3(direction.Y, -direction.X, 0);
+		float   halfthick = thickness / 2;
 
-		float halfthick = thickness / 2;
+		Vector3[] rect = new Vector3[4];
 
-		rect = new Vector3[4];
+		// "- halftick" => do it on the outside (not in the middle)
+		rect[0] = x0 + (-halfthick - halfthick) * normal;
+		rect[1] = x0 + ( halfthick - halfthick) * normal;
+		rect[2] = x1 + (-halfthick - halfthick) * normal;
+		rect[3] = x1 + ( halfthick - halfthick) * normal;
 
-		rect[0] = x0 - halfthick * normal;
-		rect[1] = x0 + halfthick * normal;
-		rect[2] = x1 - halfthick * normal;
-		rect[3] = x1 + halfthick * normal;
+		return rect;
 	}
 
 	/// <summary>
@@ -62,7 +62,7 @@ public static class GraphicsDeviceExtension
 	/// <param name="color">Stroke color.</param>
 	/// <param name="close">If set to <c>true</c>,
 	/// join the last vertex and the first.</param>
-	public static void DrawUser2DPolygon(this GraphicsDevice graphics, VertexPositionColor[] vertices,
+	public static void DrawUser2DPolygon(this GraphicsDevice graphics, double[][] vertices,
 		float thickness, Color color, bool close = false)
 	{
 		if (vertices.Length < 2) {
@@ -73,19 +73,14 @@ public static class GraphicsDeviceExtension
 		VertexPositionColor[] outline = new VertexPositionColor[outlinelength];
 
 		Vector3[] line = new Vector3[4];
-		Vector3 x1     = vertices[0].Position;
-		Vector3 x2     = vertices[1].Position;
+		Vector3 x1     = vertices[0].ToVector3();
+		Vector3 x2     = vertices[0].ToVector3();
 		int     h      = 0;
-
-		// Z must be one, homogeneous coordinates
-		x2   = vertices[0].Position;
-		x2.Z = 1;
 
 		for (int i = 0; i < vertices.Length - 1; i++) {
 			x1   = x2;
-			x2   = vertices[i + 1].Position;
-			x2.Z = 1;
-			ThickLine(x1, x2, thickness, out line);
+			x2   = vertices[i + 1].ToVector3();
+			line = ThickLine(x1, x2, thickness);
 
 			outline[h++] = new VertexPositionColor(line[0], color);
 			outline[h++] = new VertexPositionColor(line[1], color);
@@ -95,9 +90,8 @@ public static class GraphicsDeviceExtension
 
 		if (close) {
 			x1   = x2;
-			x2   = vertices[0].Position;
-			x2.Z = 1;
-			ThickLine(x1, x2, thickness, out line);
+			x2   = vertices[0].ToVector3();
+			line = ThickLine(x1, x2, thickness);
 
 			outline[h++] = new VertexPositionColor(line[0], color);
 			outline[h++] = new VertexPositionColor(line[1], color);

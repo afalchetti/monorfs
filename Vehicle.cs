@@ -25,23 +25,28 @@ namespace monorfs
 {
 /// <summary>
 /// Vehicle model.
-/// It uses a 2d odometry motion model and
-/// a range-bearing measurement model.
+/// It uses a 3d odometry motion model (yaw-pitch-roll) and
+/// a pixel-range measurement model.
 /// </summary>
 public class Vehicle
 {
 	/// <summary>
 	/// Motion model covariance matrix.
 	/// </summary>
-	public readonly double[,] MotionCovariance = new double[3, 3] {{5e-3, 0, 0},
-	                                                               {0, 5e-3, 0},
-	                                                               {0, 0, 5e-3}};
+	public readonly double[,] MotionCovariance = new double[7, 7] {{5e-3, 0, 0, 0, 0, 0, 0},
+	                                                               {0, 5e-3, 0, 0, 0, 0, 0},
+	                                                               {0, 0, 5e-3, 0, 0, 0, 0},
+	                                                               {0, 0, 0, 5e-3, 0, 0, 0},
+	                                                               {0, 0, 0, 0, 5e-3, 0, 0},
+	                                                               {0, 0, 0, 0, 0, 5e-3, 0},
+	                                                               {0, 0, 0, 0, 0, 0, 5e-3}};
 
 	/// <summary>
 	/// Measurement model covariance matrix.
 	/// </summary>
-	public readonly double[,] MeasurementCovariance = new double[2, 2] {{2e-4, 0},
-	                                                                    {0, 2e-4}};
+	public readonly double[,] MeasurementCovariance = new double[3, 3] {{1e1,  0, 0},
+	                                                                    {0,  1e1, 0},
+	                                                                    {0, 0, 2e-3}};
 
 	/// <summary>
 	/// Probability of detection.
@@ -49,22 +54,12 @@ public class Vehicle
 	private readonly double detectionProbability = 0.85;
 
 	/// <summary>
-	/// Vision range in radians, measured from straight ahead orientation.
-	/// </summary>
-	public readonly Range VisionRange = new Range(-0.5f, 0.5f);
-
-	/// <summary>
-	/// Cached vision range angle.
-	/// </summary>
-	public readonly double VisionAngle = 1.0f;
-
-	/// <summary>
-	/// Internal state as a vector.
+	/// Get the internal state as a vector.
 	/// </summary>
 	public double[] State { get; private set; }
 
 	/// <summary>
-	/// Location x-axis coordinate.
+	/// Get the location x-axis coordinate.
 	/// </summary>
 	public double X
 	{
@@ -73,7 +68,7 @@ public class Vehicle
 	}
 
 	/// <summary>
-	/// Location y-axis coordinate.
+	/// Get the location y-axis coordinate.
 	/// </summary>
 	public double Y
 	{
@@ -82,21 +77,60 @@ public class Vehicle
 	}
 
 	/// <summary>
-	/// Get the space location of the vehicle, i.e. its coordinates
+	/// Get the location z-axis coordinate.
 	/// </summary>
-	public double[] Location
-	{
-		get { return new double[2] {State[0], State[1]}; }
-	}
-
-	/// <summary>
-	/// Orientation angle measured counterclockwise from (1, 0) in radians.
-	/// </summary>
-	public double Theta
+	public double Z
 	{
 		get { return  State[2]; }
 		private set { State[2] = value; }
 	}
+
+	/// <summary>
+	/// Get the space location of the vehicle, i.e. its coordinates.
+	/// </summary>
+	public double[] Location
+	{
+		get { return new double[3] {State[0], State[1], State[2]}; }
+		private set { State[0] = value[0]; State[1] = value[1]; State[2] = value[2]; }
+	}
+
+	/// <summary>
+	/// Get the rotation quaternion scalar component.
+	/// </summary>
+	public double W
+	{
+		get { return  State[3]; }
+		private set { State[3] = value; }
+	}
+
+	/// <summary>
+	/// Get the rotation quaternion vector component.
+	/// </summary>
+	public double[] K
+	{
+		get { return new double[3] {State[4], State[5], State[6]}; }
+		private set { State[4] = value[0]; State[5] = value[1]; State[6] = value[2]; }
+	}
+	
+
+	/// <summary>
+	/// Get the orientation of the vehicle.
+	/// </summary>
+	public Quaternion Orientation
+	{
+		get { return new Quaternion((float) State[4], (float) State[5], (float) State[6], (float) State[3]); }
+		private set { State[3] = value.W; State[4] = value.X; State[5] = value.Y; State[6] = value.Z; }
+	}
+
+	/// <summary>
+	/// Vision camera focal length.
+	/// </summary>
+	public const double VisionFocal = 480;
+
+	/// <summary>
+	/// 2D film clipping area (i.e. sensor size and offset).
+	/// </summary>
+	public readonly Rectangle FilmArea = new Rectangle(-320, -240, 640, 480); 
 
 	/// <summary>
 	/// Render output.
@@ -111,15 +145,19 @@ public class Vehicle
 	/// <summary>
 	/// Construct a new Vehicle object from its initial state.
 	/// </summary>
-	/// <param name="x">X coordinate.</param>
-	/// <param name="y">Y coordinate.</param>
-	/// <param name="theta">Orientation.</param>
-	public Vehicle(double x, double y, double theta)
+	/// <param name="location">Spatial coordinates.</param>
+	/// <param name="theta">Orientation angle.</param>
+	/// <param name="axis">Orientation rotation axis.</param>
+	public Vehicle(double[] location, double theta, double[] axis)
 	{
-		this.State       = new double[3] {x, y, theta};
-		this.VisionAngle = this.VisionRange.Max - this.VisionRange.Min;
+		double w = Math.Cos(theta / 2);
+		double d = Math.Sin(theta / 2);
+
+		axis.Divide(axis.Euclidean(), true);
+
+		this.State       = new double[7] {location[0], location[1], location[2], w, d * axis[0], d * axis[1], d * axis[2]};
 		this.Waypoints   = new List<double[]>();
-		this.Waypoints.Add(new double[2] {x, y});
+		this.Waypoints.Add(location);
 	}
 
 	/// <summary>
@@ -129,9 +167,9 @@ public class Vehicle
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
 	public Vehicle(Vehicle that, bool copytrajectory = false)
 	{
-		this.State                 = new double[3] {that.X, that.Y, that.Theta};
-		this.VisionRange           = new Range(that.VisionRange.Min, that.VisionRange.Max);
-		this.VisionAngle           = that.VisionAngle;
+		this.State                 = new double[7];
+		that.State.CopyTo(this.State, 0);
+
 		this.detectionProbability  = that.detectionProbability;
 		this.MotionCovariance      = that.MotionCovariance.MemberwiseClone();
 		this.MeasurementCovariance = that.MeasurementCovariance.MemberwiseClone();
@@ -142,33 +180,49 @@ public class Vehicle
 		}
 		else {
 			this.Waypoints = new List<double[]>();
-			this.Waypoints.Add(new double[2] {that.X, that.Y});
+			this.Waypoints.Add(that.Location);
 		}
 	}
 
 	/// <summary>
 	/// Apply the motion model to the vehicle. It corresponds to a
-	/// 2D odometry model following the equation:
+	/// 3D odometry model following the equation:
 	/// 
-	/// x = x + Rot(theta) dx + N(0, Q)
+	/// x = x + q dx q* + N(0, Q)
+	/// o = dq o dq* + N(0, Q')
 	/// 
-	/// where Rot() is a rotation matrix and N(a, b) is a normal function
+	/// where q is the midrotation quaternion (halfway between the old and new orientations) and N(a, b) is a normal function
 	/// with mean 'a' and covariance matrix 'b'.
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
-	/// <param name="dx">Moved distance from odometry in the local parallel direction since last timestep.</param>
-	/// <param name="dy">Moved distance from odometry in the local perpendicular direction since last timestep.</param>
-	/// <param name="dtheta">Angle variation from odometry since last timestep.</param>
-	public void Update(GameTime time, double dx, double dy, double dtheta)
+	/// <param name="dx">Moved distance from odometry in the local vertical movement-perpendicular direction since last timestep.</param>
+	/// <param name="dy">Moved distance from odometry in the local horizontal movement-perpendicular direction since last timestep.</param>
+	/// <param name="dz">Moved distance from odometry in the local depth movement-parallel direction since last timestep.</param>
+	/// <param name="dyaw">Angle variation from odometry in the yaw coordinate since last timestep.</param>
+	/// <param name="dpitch">Angle variation from odometry in the pitch coordinate since last timestep.</param>
+	/// <param name="droll">Angle variation from odometry in the roll coordinate since last timestep.</param>
+	public void Update(GameTime time, double dx, double dy, double dz, double dyaw, double dpitch, double droll)
 	{
 		// no input, static friction makes the robot stay put
-		if (dx == 0 && dy == 0 && dtheta == 0) {
+		if (dx == 0 && dy == 0 && dz == 0 && dyaw == 0 && dpitch == 0 && droll == 0) {
 			return;
 		}
 
-		this.State = this.State.Add(ME.Rotation2H(this.Theta + dtheta / 2).Multiply(new double[] {dx, dy, dtheta}));
-		this.State = this.State.Add(time.ElapsedGameTime.TotalSeconds.Multiply(
-		                            U.RandomGaussianVector(new double[3] {0, 0, 0}, MotionCovariance)));
+		// note that the framework uses Yaw = Y, Pitch = X, Roll = Z => YXZ Tait-Bryan parametrization
+		// this is equivalent to a plane pointing upwards with its wings on the X direction
+		Quaternion dorientation = Quaternion.CreateFromYawPitchRoll((float) dyaw, (float) dpitch, (float) droll);
+
+		Quaternion neworientation = Orientation * dorientation;
+		Quaternion midrotation    = Quaternion.Slerp(Orientation, neworientation, 0.5f);
+		Quaternion dlocation      = midrotation * new Quaternion((float) dx, (float) dy, (float) dz, 0) * Quaternion.Conjugate(midrotation);
+
+		Location    = new double[3] {X + dlocation.X, Y + dlocation.Y, Z + dlocation.Z};
+		Orientation = neworientation;
+
+		// Do a better noise (radial), though it seems to work just fine
+		State       = this.State.Add(time.ElapsedGameTime.TotalSeconds.Multiply(
+		                                  U.RandomGaussianVector(new double[7] {0, 0, 0, 0, 0, 0, 0}, MotionCovariance)));
+		Orientation = Quaternion.Normalize(this.Orientation);
 
 		if (Location.Subtract(Waypoints[Waypoints.Count - 1]).SquareEuclidean() >= 1e-2f) {
 			Waypoints.Add(Location);
@@ -177,21 +231,21 @@ public class Vehicle
 
 	/// <summary>
 	/// Obtain a measurement from the hidden state. It follows a
-	/// range-bearing model where the range and bearing from a
+	/// pixel-range model where the range and pixel index from a
 	/// map landmark m are:
 	/// 
-	/// [r, b] = [|m-x|, atan(dy/dx) - theta] + N(0, R)
+	/// [r, px, py] = [|m-x|, (f x/z)L, (f y/z)L] + N(0, R)
 	/// 
-	/// where |a-b| is the euclidean distance between a and b,
-	/// dy/dx is the slope of the line joining x and m.
+	/// where |a-b| is the euclidean distance between a and b and
+	/// (.)L is performed on the local axis
 	/// This method always detects the landmark (misdetection
 	/// probability is ignored).
 	/// </summary>
-	/// <param name="landmark">Landmark 2d location against which the measurement is performed.</param>
-	/// <returns>Range-bearing measurements.</returns>
+	/// <param name="landmark">Landmark 3d location against which the measurement is performed.</param>
+	/// <returns>Pixel-range measurements.</returns>
 	public double[] MeasureDetected(double[] landmark)
 	{
-		return MeasurePerfect(landmark).Add(U.RandomGaussianVector(new double[2] {0, 0}, MeasurementCovariance));
+		return MeasurePerfect(landmark).Add(U.RandomGaussianVector(new double[3] {0, 0, 0}, MeasurementCovariance));
 	}
 
 	/// <summary>
@@ -199,8 +253,8 @@ public class Vehicle
 	/// This method always detects the landmark (misdetection
 	/// probability is ignored).
 	/// </summary>
-	/// <param name="landmarks">Landmark 2d locations against which the measurements are performed.</param>
-	/// <returns>Range-bearing measurements.</returns>
+	/// <param name="landmarks">Landmark 3d locations against which the measurements are performed.</param>
+	/// <returns>Pixel-range measurements.</returns>
 	public double[][] MeasureDetected(List<double[]> landmarks)
 	{
 		double[][] measurements = new double[landmarks.Count][];
@@ -216,8 +270,8 @@ public class Vehicle
 	/// Obtain several measurements from the hidden state.
 	/// Ladmarks may be misdetected.
 	/// </summary>
-	/// <param name="landmarks">Landmark 2d locations against which the measurements are performed.</param>
-	/// <returns>Range-bearing measurements.</returns>
+	/// <param name="landmarks">Landmark 3d locations against which the measurements are performed.</param>
+	/// <returns>Pixel-range measurements.</returns>
 	public List<double[]> Measure(List<double[]> landmarks)
 	{
 		List<double[]> measurements = new List<double[]>();
@@ -246,15 +300,26 @@ public class Vehicle
 	/// Obtain the jacobian of the measurement model.
 	/// Designed to be used with EKF filters.
 	/// </summary>
-	/// <param name="landmark">Landmark 2d location against which the measurement is performed.</param>
+	/// <param name="landmark">Landmark 3d location against which the measurement is performed.</param>
 	/// <returns>Measurement model linearization jacobian.</returns>
 	public double[,] MeasurementJacobian(double[] landmark)
 	{
-		double[] diff = landmark.Subtract(this.Location);
-		double   mag  = diff.Euclidean();
-		double   den  = diff[1] * diff[1] + diff[0] * diff[0];
+		double[]   diff  = landmark.Subtract(this.Location);
+		Quaternion local = Quaternion.Conjugate(Orientation) *
+			                    new Quaternion((float) diff[0], (float) diff[1], (float) diff[2], 0) * Orientation;
 
-		return new double[2, 2] {{diff[0] / mag, diff[1] / mag}, {-diff[1]/den, diff[0]/den}};
+		// the jacobian of the homography projection part is given by
+		// f/z I 0
+		//  X/|X|
+		double mag = Math.Sqrt(local.X * local.X + local.Y * local.Y + local.Z * local.Z);
+		double[,] jprojection = {{VisionFocal / local.Z, 0,                     -VisionFocal * local.X / (local.Z * local.Z)},
+		                         {0,                     VisionFocal / local.Z, -VisionFocal * local.Y / (local.Z * local.Z)},
+		                         {local.X / mag,         local.Y / mag,         local.Z /mag}};
+
+		// the jacobian of the change of coordinates part of the measurement process is the rotation matrix 
+		double[,] jrotation = ME.MatrixFromQuaternion(Orientation);
+
+		return jprojection.Multiply(jrotation);
 	}
 	
 	/// <summary>
@@ -262,17 +327,20 @@ public class Vehicle
 	/// It does not use any randomness or misdetection, 
 	/// as it is designed to be used with UKF filters.
 	/// </summary>
-	/// <param name="landmark">Landmark 2d location against which the measurement is performed.</param>
-	/// <returns>Range-bearing measurements.</returns>
+	/// <param name="landmark">Landmark 3d location against which the measurement is performed.</param>
+	/// <returns>Pixel-range measurements.</returns>
 	
 	public double[] MeasurePerfect(double[] landmark)
 	{
-		double[] diff  = landmark.Subtract(this.Location);
-		double range   = diff.Euclidean();
-		double bearing = Math.Atan2(diff[1], diff[0]) - this.Theta;
+		double[]   diff  = landmark.Subtract(this.Location);
+		Quaternion local = Quaternion.Conjugate(Orientation) *
+			                    new Quaternion((float) diff[0], (float) diff[1], (float) diff[2], 0) * Orientation;
 
-		return new double[2] {range, U.NormalizeAngle(bearing)};
-	
+		double range  = diff.Euclidean();
+		double px     = VisionFocal * local.X / local.Z;
+		double py     = VisionFocal * local.Y / local.Z;
+
+		return new double[3] {px, py, range};
 	}
 
 	/// <summary>
@@ -282,25 +350,30 @@ public class Vehicle
 	/// <returns>True if the landmark is visible; false otherwise.</returns>
 	public bool Visible(double[] landmark)
 	{
-		double[] diff  = landmark.Subtract(this.Location);
-		double bearing = Math.Atan2(diff[1], diff[0]) - this.Theta;
+		double[]   diff  = landmark.Subtract(this.Location);
+		Quaternion local = Quaternion.Conjugate(Orientation) *
+			                    new Quaternion((float) diff[0], (float) diff[1], (float) diff[2], 0) * Orientation;
 
-		double anglediff = bearing - VisionRange.Min;
+		double px   = VisionFocal * local.X / local.Z;
+		double py   = VisionFocal * local.Y / local.Z;
 
-		return U.NormalizeAngle2(anglediff) < VisionAngle;
+		if (local.Z <= 0) {
+			return false;
+		}
+
+		return local.Z > 0 && FilmArea.Left < px && px < FilmArea.Right && FilmArea.Top < py && py < FilmArea.Bottom;
 	}
 
 	/// <summary>
 	/// Find if a given ladmark is visible from the current pose of the vehicle
-	/// using range-bearing coordinates to express the landmark.
+	/// using pixel-range coordinates to express the landmark.
 	/// </summary>
-	/// <param name="measurement">Queried landmark in range-bearing coordinates.</param>
+	/// <param name="measurement">Queried landmark in pixel-range coordinates.</param>
 	/// <returns>True if the landmark is visible; false otherwise.</returns>
 	public bool VisibleM(double[] measurement)
 	{
-		double anglediff = measurement[1] - VisionRange.Min;
-
-		return U.NormalizeAngle2(anglediff) < VisionAngle;
+		return FilmArea.Left < measurement[1] && measurement[1] < FilmArea.Right &&
+		       FilmArea.Top  < measurement[2] && measurement[2] < FilmArea.Bottom;
 	}
 
 	/// <summary>
@@ -316,10 +389,10 @@ public class Vehicle
 
 	/// <summary>
 	/// Get the probability of detection of a particular landmark
-	/// using range-bearing coordinates to express the landmark.
+	/// using pixel-range coordinates to express the landmark.
 	/// It is modelled as a constant if it's on the FOV and zero if not.
 	/// </summary>
-	/// <param name="measurement">Queried landmark in range-bearing coordinates.</param>
+	/// <param name="measurement">Queried landmark in pixel-range coordinates.</param>
 	/// <returns></returns>
 	public double DetectionProbabilityM(double[] measurement)
 	{
@@ -327,33 +400,118 @@ public class Vehicle
 	}
 
 	/// <summary>
-	/// Transform a measurement vector in measure-space (range-bearing)
+	/// Transform a measurement vector in measure-space (pixel-range)
 	/// into a map-space vector  (x-y plane)
 	/// </summary>
-	/// <param name="measurement">Measurement expressed as range-bearing.</param>
+	/// <param name="measurement">Measurement expressed as pixel-range.</param>
 	/// <returns>Measurement expressed in x-y plane</returns>
 	public double[] MeasureToMap(double[] measurement)
 	{
-		return new double[2] {X + measurement[0] * Math.Cos(measurement[1] + Theta), Y + measurement[0] * Math.Sin(measurement[1] + Theta)};
+		double   px    = measurement[0];
+		double   py    = measurement[1];
+		double   range = measurement[2];
+
+		double   alpha = range / Math.Sqrt(VisionFocal * VisionFocal + px * px + py * py);
+		double[] diff  = new double[3] {alpha * px, alpha * py, alpha * VisionFocal};
+
+		Quaternion rotated = Orientation *
+			                     new Quaternion((float) diff[0], (float) diff[1], (float) diff[2], 0) * Quaternion.Conjugate(Orientation);
+
+		return new double[3] {X + rotated.X, Y + rotated.Y, Z + rotated.Z};
 	}
 
 	/// <summary>
 	/// Render the vehicle on the graphics device.
 	/// The graphics device must be ready, otherwise
 	/// the method will throw an exception.
+	/// <param name="camera">Camera rotation matrix.</param>
 	/// </summary>
-	public void Render()
+	public void Render(double[,] camera)
 	{
-		RenderTrajectory();
-		RenderFOV();
-		RenderBody();
+		RenderFOV(camera);
+		RenderTrajectory(camera);
+		RenderBody(camera);
 	}
 
 	/// <summary>
 	/// Render the vehicle physical body on the graphics device.
+	/// <param name="camera">Camera rotation matrix.</param>
 	/// </summary>
-	public void RenderBody()
+	public void RenderBody(double[,] camera)
 	{
+		const float halflen = 0.06f;
+		
+		Color innercolor =  Color.LightBlue;
+		Color outercolor =  Color.Blue;
+
+		double[] pos = camera.Multiply(Location);
+		
+		VertexPositionColor[] invertices  = new VertexPositionColor[4];
+		double[][]            outvertices = new double[4][];
+
+		outvertices[0] = new double[] {pos[0] - halflen, pos[1] - halflen, pos[2]};
+		outvertices[1] = new double[] {pos[0] - halflen, pos[1] + halflen, pos[2]};
+		outvertices[2] = new double[] {pos[0] + halflen, pos[1] + halflen, pos[2]};
+		outvertices[3] = new double[] {pos[0] + halflen, pos[1] - halflen, pos[2]};
+
+		invertices[0] = new VertexPositionColor(outvertices[0].ToVector3(), innercolor);
+		invertices[1] = new VertexPositionColor(outvertices[1].ToVector3(), innercolor);
+		invertices[2] = new VertexPositionColor(outvertices[3].ToVector3(), innercolor);
+		invertices[3] = new VertexPositionColor(outvertices[2].ToVector3(), innercolor);
+
+		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
+		Graphics.DrawUser2DPolygon(outvertices, 0.02f, outercolor, true);
+		
+		Quaternion x = Orientation * new Quaternion(0.2f, 0, 0, 0) * Quaternion.Conjugate(Orientation);
+		pos = camera.Multiply(new double[3] {X + x.X, Y + x.Y, Z + x.Z});
+
+		outvertices[0] = new double[] {pos[0] - 0.4*halflen, pos[1] - 0.4*halflen, pos[2]};
+		outvertices[1] = new double[] {pos[0] - 0.4*halflen, pos[1] + 0.4*halflen, pos[2]};
+		outvertices[2] = new double[] {pos[0] + 0.4*halflen, pos[1] + 0.4*halflen, pos[2]};
+		outvertices[3] = new double[] {pos[0] + 0.4*halflen, pos[1] - 0.4*halflen, pos[2]};
+
+		invertices[0] = new VertexPositionColor(outvertices[0].ToVector3(), innercolor);
+		invertices[1] = new VertexPositionColor(outvertices[1].ToVector3(), innercolor);
+		invertices[2] = new VertexPositionColor(outvertices[3].ToVector3(), innercolor);
+		invertices[3] = new VertexPositionColor(outvertices[2].ToVector3(), innercolor);
+
+		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
+		Graphics.DrawUser2DPolygon(outvertices, 0.02f, Color.Blue, true);
+		
+		x   = Orientation * new Quaternion(0, 0.2f, 0, 0) * Quaternion.Conjugate(Orientation);
+		pos = camera.Multiply(new double[3] {X + x.X, Y + x.Y, Z + x.Z});
+
+		outvertices[0] = new double[] {pos[0] - 0.2*halflen, pos[1] - 0.2*halflen, pos[2]};
+		outvertices[1] = new double[] {pos[0] - 0.2*halflen, pos[1] + 0.2*halflen, pos[2]};
+		outvertices[2] = new double[] {pos[0] + 0.2*halflen, pos[1] + 0.2*halflen, pos[2]};
+		outvertices[3] = new double[] {pos[0] + 0.2*halflen, pos[1] - 0.2*halflen, pos[2]};
+
+		invertices[0] = new VertexPositionColor(outvertices[0].ToVector3(), innercolor);
+		invertices[1] = new VertexPositionColor(outvertices[1].ToVector3(), innercolor);
+		invertices[2] = new VertexPositionColor(outvertices[3].ToVector3(), innercolor);
+		invertices[3] = new VertexPositionColor(outvertices[2].ToVector3(), innercolor);
+
+		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
+		Graphics.DrawUser2DPolygon(outvertices, 0.02f, Color.Yellow, true);
+		
+		x   = Orientation * new Quaternion(0, 0, 0.2f, 0) * Quaternion.Conjugate(Orientation);
+		pos = camera.Multiply(new double[3] {X + x.X, Y + x.Y, Z + x.Z});
+
+		outvertices[0] = new double[] {pos[0] - 0.8*halflen, pos[1] - 0.8*halflen, pos[2]};
+		outvertices[1] = new double[] {pos[0] - 0.8*halflen, pos[1] + 0.8*halflen, pos[2]};
+		outvertices[2] = new double[] {pos[0] + 0.8*halflen, pos[1] + 0.8*halflen, pos[2]};
+		outvertices[3] = new double[] {pos[0] + 0.8*halflen, pos[1] - 0.8*halflen, pos[2]};
+
+		invertices[0] = new VertexPositionColor(outvertices[0].ToVector3(), innercolor);
+		invertices[1] = new VertexPositionColor(outvertices[1].ToVector3(), innercolor);
+		invertices[2] = new VertexPositionColor(outvertices[3].ToVector3(), innercolor);
+		invertices[3] = new VertexPositionColor(outvertices[2].ToVector3(), innercolor);
+
+		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
+		Graphics.DrawUser2DPolygon(outvertices, 0.02f, Color.Red, true);
+
+		/*landmark = camera.Multiply(landmark);
+
 		VertexPositionColor[] invertices  = new VertexPositionColor[7];
 		VertexPositionColor[] outvertices = new VertexPositionColor[7];
 		double[][] vertpos = new double[7][];
@@ -399,42 +557,80 @@ public class Vehicle
 		}
 		
 		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
-		Graphics.DrawUser2DPolygon(outvertices, 0.02f, outercolor, true);
+		Graphics.DrawUser2DPolygon(outvertices, 0.02f, outercolor, true);*/
 	}
 
 	/// <summary>
 	/// Render the Field-of-View cone on the graphics device.
 	/// </summary>
-	public void RenderFOV()
+	/// <param name="camera">Camera rotation matrix.</param>
+	public void RenderFOV(double[,] camera)
 	{
-		VertexPositionColor[] vertices  = new VertexPositionColor[3];
+		const double depth = 10;
 		
-		const double radius = 100;
+		Color incolorA = Color.LightGreen; incolorA.A = 30;
+		Color incolorB = Color.LightGreen; incolorB.A = 15;
+		Color outcolor = Color.DarkGreen;  outcolor.A = 30;
+
+		double[][] frustum = new double[5][];
 		
-		Color innercolor =  Color.LightGreen; innercolor.A = 30;
-		Color outercolor =  Color.DarkGreen;  outercolor.A = 30;
+		frustum[0] = new double[3] {0, 0, 0};
+		frustum[1] = new double[3] {depth * FilmArea.Left  / VisionFocal, depth * FilmArea.Top    / VisionFocal, depth};
+		frustum[2] = new double[3] {depth * FilmArea.Right / VisionFocal, depth * FilmArea.Top    / VisionFocal, depth};
+		frustum[3] = new double[3] {depth * FilmArea.Right / VisionFocal, depth * FilmArea.Bottom / VisionFocal, depth};
+		frustum[4] = new double[3] {depth * FilmArea.Left  / VisionFocal, depth * FilmArea.Bottom / VisionFocal, depth};
+
+		for (int i = 0; i < frustum.Length; i++) {
+			Quaternion local = Orientation *
+			                       new Quaternion((float) frustum[i][0], (float) frustum[i][1], (float) frustum[i][2], 0) * Quaternion.Conjugate(Orientation);
+			frustum[i] = camera.Multiply(new double[3] {local.X, local.Y, local.Z}.Add(Location));
+			frustum[i][2] = -100;
+		}
 		
-		double ct1 = Math.Cos(Theta + VisionRange.Min); double st1 = Math.Sin(Theta + VisionRange.Min);
-		double ct2 = Math.Cos(Theta + VisionRange.Max); double st2 = Math.Sin(Theta + VisionRange.Max);
+		VertexPositionColor[] verticesA = new VertexPositionColor[6];
+		VertexPositionColor[] verticesB = new VertexPositionColor[6];
+		double[][]            wireA     = new double[3][];
+		double[][]            wireB     = new double[3][];
 		
-		vertices[0] = new VertexPositionColor(new Vector3((float) X,                 (float) Y,                 0), innercolor);
-		vertices[1] = new VertexPositionColor(new Vector3((float)(X + radius * ct1), (float)(Y + radius * st1), 0), innercolor);
-		vertices[2] = new VertexPositionColor(new Vector3((float)(X + radius * ct2), (float)(Y + radius * st2), 0), innercolor);
+		wireA[0] = frustum[1];
+		wireA[1] = frustum[0];
+		wireA[2] = frustum[3];
+
+		wireB[0] = frustum[2];
+		wireB[1] = frustum[0];
+		wireB[2] = frustum[4];
+
+		verticesA[0] = new VertexPositionColor(frustum[0].ToVector3(), incolorA);
+		verticesA[1] = new VertexPositionColor(frustum[1].ToVector3(), incolorA);
+		verticesA[2] = new VertexPositionColor(frustum[2].ToVector3(), incolorA);
+		verticesA[3] = new VertexPositionColor(frustum[0].ToVector3(), incolorA);
+		verticesA[4] = new VertexPositionColor(frustum[3].ToVector3(), incolorA);
+		verticesA[5] = new VertexPositionColor(frustum[4].ToVector3(), incolorA);
+
+		verticesB[0] = new VertexPositionColor(frustum[0].ToVector3(), incolorB);
+		verticesB[1] = new VertexPositionColor(frustum[2].ToVector3(), incolorB);
+		verticesB[2] = new VertexPositionColor(frustum[3].ToVector3(), incolorB);
+		verticesB[3] = new VertexPositionColor(frustum[0].ToVector3(), incolorB);
+		verticesB[4] = new VertexPositionColor(frustum[4].ToVector3(), incolorB);
+		verticesB[5] = new VertexPositionColor(frustum[1].ToVector3(), incolorB);
 		
-		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, vertices, 0, vertices.Length - 2);
-		Graphics.DrawUser2DPolygon(vertices, 0.02f, outercolor, true);
+		Graphics.DrawUserPrimitives(PrimitiveType.TriangleList, verticesA, 0, 2);
+		Graphics.DrawUserPrimitives(PrimitiveType.TriangleList, verticesB, 0, 2);
+		Graphics.DrawUser2DPolygon(wireA, 0.02f, outcolor, false);
+		Graphics.DrawUser2DPolygon(wireB, 0.02f, outcolor, false);
 	}
 
 	/// <summary>
-	/// Render the path that the vehicle has travelled so far.
+	/// Render the path that the vehicle has traveled so far.
 	/// </summary>
-	public void RenderTrajectory()
+	/// <param name="camera">Camera rotation matrix.</param>
+	public void RenderTrajectory(double[,] camera)
 	{
-		VertexPositionColor[] vertices = new VertexPositionColor[Waypoints.Count];
-		Color color = Color.Yellow;
+		double[][] vertices = new double[Waypoints.Count][];
+		Color      color    = Color.Yellow;
 
 		for (int i = 0; i < Waypoints.Count; i++) {
-			vertices[i] = new VertexPositionColor(new Vector3((float) Waypoints[i][0], (float) Waypoints[i][1], 0), color);
+			vertices[i] = camera.Multiply(Waypoints[i]);
 		}
 
 		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, false);

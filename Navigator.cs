@@ -24,7 +24,7 @@ namespace monorfs
 /// SLAM solver. It uses the PHD Filter.
 /// </summary>
 public class Navigator
-{
+{/*
 	/// <summary>
 	/// Landmark density expected on unexplored areas.
 	/// </summary>
@@ -519,7 +519,7 @@ public class Navigator
 			}
 		}
 
-		return false;*/
+		return false;* /
 	}
 	/// <summary>
 	/// Evaluate the Gaussian Mixture model of the map on a specified location.
@@ -618,7 +618,7 @@ public class Navigator
 		Graphics.DrawUserIndexedPrimitives(PrimitiveType.TriangleStrip, vertices, 0, vertices.Length, index, 0, vertices.Length - 2);
 		Graphics.DrawUser2DPolygon(vertices, 0.04f * (float) gaussian.Weight, outercolor, true);
 	}
-}
+*/}
 
 /// <summary>
 /// Gaussian descriptor inside a gaussian mixture.
