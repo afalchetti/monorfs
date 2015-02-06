@@ -44,8 +44,8 @@ public class Vehicle
 	/// <summary>
 	/// Measurement model covariance matrix.
 	/// </summary>
-	public readonly double[,] MeasurementCovariance = new double[3, 3] {{1e1,  0, 0},
-	                                                                    {0,  1e1, 0},
+	public readonly double[,] MeasurementCovariance = new double[3, 3] {{2e0,  0, 0},
+	                                                                    {0,  2e0, 0},
 	                                                                    {0, 0, 2e-3}};
 
 	/// <summary>

@@ -23,6 +23,24 @@ namespace monorfs
 public static class MatrixExtensions
 {
 	/// <summary>
+	/// Reverse the order of the columns of a matrix.
+	/// </summary>
+	/// <param name="matrix">Original matrix.</param>
+	/// <returns>Reversed matrix.</returns>
+	public static double[,] ReverseColumns(this double[,] matrix)
+	{
+		double[,] reversed = new double[matrix.GetLength(0), matrix.GetLength(1)];
+		
+		for (int i = 0; i < matrix.GetLength(0); i++) {
+		for (int k = 0; k < matrix.GetLength(1); k++) {
+			reversed[i, matrix.GetLength(1) - k - 1] = matrix[i, k];
+		}
+		}
+
+		return reversed;
+	}
+
+	/// <summary>
 	/// Get a 2x2 rotation matrix of a specified angle.
 	/// </summary>
 	/// <param name="angle">Angle measured in radians, counterclockwise starting from (0, 1).</param>

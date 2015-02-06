@@ -24,7 +24,7 @@ namespace monorfs
 /// SLAM solver. It uses the PHD Filter.
 /// </summary>
 public class Navigator
-{/*
+{
 	/// <summary>
 	/// Landmark density expected on unexplored areas.
 	/// </summary>
@@ -33,8 +33,9 @@ public class Navigator
 	/// <summary>
 	/// Landmark density spread expected on unexplored areas
 	/// </summary>
-	public static readonly double[,] BirthCovariance = new double[2, 2] {{1e-2, 0},
-	                                                                     {0, 1e-2}};
+	public static readonly double[,] BirthCovariance = new double[3, 3] {{1e-2, 0, 0},
+	                                                                     {0, 1e-2, 0},
+	                                                                     {0, 0, 1e-2}};
 
 	/// <summary>
 	/// Amount of expected clutter (spuriousness) on the measurement process.
@@ -60,7 +61,7 @@ public class Navigator
 	/// Threshold use to decide if a new measurement is in unexplored territory.
 	/// If it is, it should be explored (birth of a new gaussian).
 	/// </summary>
-	public const double ExplorationThreshold = 1e-3;
+	public const double ExplorationThreshold = 1e-5;
 	//public const double ExplorationThreshold = 3;
 
 	/// <summary>
@@ -187,14 +188,17 @@ public class Navigator
 	/// Update the vehicle particles.
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
-	/// <param name="dx">Odometry forward movement.</param>
-	/// <param name="dy">Odometry perpendicular movement.</param>
-	/// <param name="dtheta">Odometry angular movement.</param>
-	public void Update(GameTime time, double dx, double dy, double dtheta)
+	/// <param name="dx">Moved distance from odometry in the local vertical movement-perpendicular direction since last timestep.</param>
+	/// <param name="dy">Moved distance from odometry in the local horizontal movement-perpendicular direction since last timestep.</param>
+	/// <param name="dz">Moved distance from odometry in the local depth movement-parallel direction since last timestep.</param>
+	/// <param name="dyaw">Angle variation from odometry in the yaw coordinate since last timestep.</param>
+	/// <param name="dpitch">Angle variation from odometry in the pitch coordinate since last timestep.</param>
+	/// <param name="droll">Angle variation from odometry in the roll coordinate since last timestep.</param>
+	public void Update(GameTime time, double dx, double dy, double dz, double dyaw, double dpitch, double droll)
 	{
 		if (!OnlyMapping) {
 			for (int i = 0; i < VehicleParticles.Length; i++) {
-				VehicleParticles[i].Update(time, dx, dy, dtheta);
+				VehicleParticles[i].Update(time, dx, dy, dz, dyaw, dpitch, droll);
 			}
 		}
 
@@ -353,7 +357,7 @@ public class Navigator
 
 		// measurement PHD update
 		double[,]   R  = pose.MeasurementCovariance;
-		double[,]   I  = Accord.Math.Matrix.Identity(2);
+		double[,]   I  = Accord.Math.Matrix.Identity(3);
 		double[][]  m  = new double  [model.Count][];
 		double[][,] H  = new double  [model.Count][,];
 		double[][,] P  = new double  [model.Count][,];
@@ -511,7 +515,7 @@ public class Navigator
 	/// <returns>True if the location has been explored.</returns>
 	public bool Explored(List<Gaussian> model, double[] x)
 	{
-		return EvaluateModel(model, x) > ExplorationThreshold;
+		return EvaluateModel(model, x) >= ExplorationThreshold;
 
 		/*foreach (Gaussian component in model) {
 			if (Mahalanobis(component, x) < ExplorationThreshold) {
@@ -519,7 +523,7 @@ public class Navigator
 			}
 		}
 
-		return false;* /
+		return false;*/
 	}
 	/// <summary>
 	/// Evaluate the Gaussian Mixture model of the map on a specified location.
@@ -560,35 +564,43 @@ public class Navigator
 	/// The graphics device must be ready, otherwise
 	/// the method will throw an exception.
 	/// </summary>
-	public void Render()
+	/// <param name="camera">Camera rotation matrix.</param>
+	public void Render(double[,] camera)
 	{
 		foreach (Gaussian component in MapModels[BestParticle]) {
-			RenderGaussian(component);
+			RenderGaussian(component, camera);
 		}
 	}
 
 	/// <summary>
-	/// Render the path that the vehicle has travelled so far.
+	/// Render the path that the vehicle has traveled so far.
 	/// </summary>
-	public void RenderTrajectory()
+	/// <param name="camera">Camera rotation matrix.</param>
+	public void RenderTrajectory(double[,] camera)
 	{
-		VertexPositionColor[] vertices = new VertexPositionColor[Waypoints.Count];
+		double[][] vertices = new double[Waypoints.Count][];
 		Color color = Color.Blue;
 
 		for (int i = 0; i < Waypoints.Count; i++) {
-			vertices[i] = new VertexPositionColor(new Vector3((float) Waypoints[i][0], (float) Waypoints[i][1], 0), color);
+			vertices[i] = camera.Multiply(Waypoints[i]);
 		}
 
 		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, false);
 	}
 
-	public void RenderGaussian(Gaussian gaussian)
+	/// <summary>
+	/// Render the n-sigma ellipse of gaussian.
+	/// </summary>
+	/// <param name="gaussian">Gaussian to be rendered.</param>
+	/// <param name="camera">Camera rotation matrix.</param>
+	public void RenderGaussian(Gaussian gaussian, double[,] camera)
 	{
-		Color innercolor = Color.DeepSkyBlue; innercolor.A = 200;
-		Color outercolor = Color.Blue;        outercolor.A = 200;
+		Color incolor  = Color.DeepSkyBlue; incolor.A  = 200;
+		Color outcolor = Color.Blue;        outcolor.A = 200;
 
-		var decomp = new EigenvalueDecomposition(gaussian.Covariance);
+		double[,] covariance = camera.Multiply(gaussian.Covariance).MultiplyByTranspose(camera).Submatrix(0, 1, 0, 1);
 
+		var       decomp = new EigenvalueDecomposition(covariance);
 		double[,] stddev = decomp.DiagonalMatrix;
 
 		for (int i = 0; i < stddev.GetLength(0); i++) {
@@ -598,11 +610,19 @@ public class Navigator
 		double[,] rotation = decomp.Eigenvectors;
 		double[,] linear   = rotation.Multiply(stddev);
 
+		double[,] recover = linear.Multiply(linear);
+
+		if (linear.Determinant() < 0) {
+			linear = linear.ReverseColumns();
+		}
+		
+		double[][] points = new double[pinterval.Length][];
 		VertexPositionColor[] vertices = new VertexPositionColor[pinterval.Length];
 
-		for (int i = 0; i < vertices.Length; i++) {
-			double[] position = linear.Multiply(pinterval[i]).Add(gaussian.Mean);
-			vertices[i] = new VertexPositionColor(new Vector3((float) position[0], (float) position[1], 0), innercolor);
+		for (int i = 0; i < points.Length; i++) {
+			points[i]    = linear.Multiply(pinterval[i]);
+			points[i]    = new double[3] {points[i][0], points[i][1], 0}.Add(camera.Multiply(gaussian.Mean));
+			vertices[i]  = new VertexPositionColor(points[i].ToVector3(), incolor);
 		}
 
 		short[] index = new short[vertices.Length];
@@ -616,9 +636,9 @@ public class Navigator
 		}
 
 		Graphics.DrawUserIndexedPrimitives(PrimitiveType.TriangleStrip, vertices, 0, vertices.Length, index, 0, vertices.Length - 2);
-		Graphics.DrawUser2DPolygon(vertices, 0.04f * (float) gaussian.Weight, outercolor, true);
+		Graphics.DrawUser2DPolygon(points, 0.04f * (float) gaussian.Weight, outcolor, true);
 	}
-*/}
+}
 
 /// <summary>
 /// Gaussian descriptor inside a gaussian mixture.

@@ -44,7 +44,7 @@ public class Simulation : Game
 	/// <summary>
 	/// SLAM solver.
 	/// </summary>
-	/*public Navigator Navigator { get; private set; }*/
+	public Navigator Navigator { get; private set; }
 
 	/// <summary>
 	/// Cached measurements from the update process for rendering purposes.
@@ -151,7 +151,7 @@ public class Simulation : Game
 			this.Landmarks.Add(maploc[i]);
 		}
 
-		/*this.Navigator = new Navigator(Explorer, 1, true);*/
+		this.Navigator = new Navigator(Explorer, 10, true);
 
 		// MonoGame-related construction
 		this.graphicsManager = new GraphicsDeviceManager(this);
@@ -205,7 +205,7 @@ public class Simulation : Game
 	{
 		this.graphics           = this.graphicsManager.GraphicsDevice;
 		this.Explorer .Graphics = this.graphics;
-		//this.Navigator.Graphics = this.graphics;
+		this.Navigator.Graphics = this.graphics;
 
 		this.graphics.BlendState        = BlendState.NonPremultiplied;
 		this.graphics.DepthStencilState = DepthStencilState.Default;
@@ -306,16 +306,15 @@ public class Simulation : Game
 		bool DoPrune   = !keyboard.IsKeyDown(Keys.Q);
 
 		Explorer.Update (time, 0, 0, ds, dyaw, dpitch, droll);
+		Navigator.Update(time, 0, 0, ds, dyaw, dpitch, droll);
 
 		camangle += dcam;
 		camera    = MatrixExtensions.CreateRotationX(camangle);
 
-		/*Navigator.Update(time, ds, 0, dtheta);*/
-
 		if (time.TotalGameTime.TotalMilliseconds - lastnavigationupdate.TotalGameTime.TotalMilliseconds > MeasurePeriod) {
 			List<double[]> measurements = Explorer.Measure(Landmarks);
 
-			/*Navigator.SlamUpdate(measurements, DoPredict, DoCorrect, DoPrune);*/
+			Navigator.SlamUpdate(measurements, DoPredict, DoCorrect, DoPrune);
 
 			lastnavigationupdate = new GameTime(time.TotalGameTime, time.ElapsedGameTime);
 
@@ -341,7 +340,7 @@ public class Simulation : Game
 			pass.Apply();
 			
 			Explorer .RenderFOV(camera);
-			/*Navigator.RenderTrajectory(camera);*/
+			Navigator.RenderTrajectory(camera);
 			Explorer .RenderTrajectory(camera);
 			
 
@@ -354,7 +353,7 @@ public class Simulation : Game
 			}
 
 			Explorer .RenderBody(camera);
-			/*Navigator.Render(camera);*/
+			Navigator.Render(camera);
 		}
 
 		graphics.SetRenderTarget(null);
