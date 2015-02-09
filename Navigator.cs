@@ -65,6 +65,11 @@ public class Navigator
 	//public const double ExplorationThreshold = 3;
 
 	/// <summary>
+	/// Reference vehicle. Only used if mapping mode is enabled (no SLAM).
+	/// </summary>
+	public Vehicle RefVehicle { get; private set; }
+
+	/// <summary>
 	/// Particle filter representation of the vehicle pose.
 	/// </summary>
 	public Vehicle[] VehicleParticles { get;  private set; }
@@ -146,28 +151,23 @@ public class Navigator
 		if (onlymapping) {
 			// a reference copy, which gives the navigator precise info about
 			// the real vehicle pose
-			this.VehicleParticles = new Vehicle       [1];
-			this.MapModels        = new List<Gaussian>[1];
-			this.VehicleWeights   = new double[1];
-
-			this.VehicleParticles[0] = vehicle;
-			this.MapModels       [0] = new List<Gaussian>();
-			this.VehicleWeights  [0] = 1;
+			this.RefVehicle = vehicle;
+			particlecount = 1;
 		}
-		else {	
-			// if doing SLAM, do a deep copy, so no real info flows
-			// into the navigator, only estimates
-			this.VehicleParticles = new Vehicle       [particlecount];
-			this.MapModels        = new List<Gaussian>[particlecount];
-			this.VehicleWeights   = new double        [particlecount];
 
-			for (int i = 0; i < particlecount; i++) {
-				this.VehicleParticles[i] = new Vehicle(vehicle);
-				this.MapModels       [i] = new List<Gaussian>();
-				this.VehicleWeights  [i] = 1.0 / particlecount;
-			}
+		// do a deep copy, so no real info flows
+		// into the navigator, only estimates, in SLAM.
+		// In mapping, info flows only through RefVehicle
+		this.VehicleParticles = new Vehicle       [particlecount];
+		this.MapModels        = new List<Gaussian>[particlecount];
+		this.VehicleWeights   = new double        [particlecount];
+
+		for (int i = 0; i < particlecount; i++) {
+			this.VehicleParticles[i] = new Vehicle(vehicle, 2.8, 2.8, 0.7);
+			this.MapModels       [i] = new List<Gaussian>();
+			this.VehicleWeights  [i] = 1.0 / particlecount;
 		}
-		
+
 		this.Mpredicted   = new double[VehicleParticles.Length];
 		this.Mcorrected   = new double[VehicleParticles.Length];
 		this.BestParticle = 0;
@@ -196,7 +196,10 @@ public class Navigator
 	/// <param name="droll">Angle variation from odometry in the roll coordinate since last timestep.</param>
 	public void Update(GameTime time, double dx, double dy, double dz, double dyaw, double dpitch, double droll)
 	{
-		if (!OnlyMapping) {
+		if (OnlyMapping) {
+			VehicleParticles[0].State = RefVehicle.State;
+		}
+		else {
 			for (int i = 0; i < VehicleParticles.Length; i++) {
 				VehicleParticles[i].Update(time, dx, dy, dz, dyaw, dpitch, droll);
 			}
@@ -597,6 +600,20 @@ public class Navigator
 	{
 		Color incolor  = Color.DeepSkyBlue; incolor.A  = 200;
 		Color outcolor = Color.Blue;        outcolor.A = 200;
+		
+		double weight;
+		
+		if (gaussian.Weight < 1.0) {
+			weight = 0.04 * gaussian.Weight;
+		}
+		else if (gaussian.Weight < 2.0) {
+			weight = 0.01 * (gaussian.Weight - 1) + 0.04;
+			outcolor = Color.Black;
+		}
+		else {
+			weight   = 0.04;
+			outcolor = Color.Red;
+		}
 
 		double[,] covariance = camera.Multiply(gaussian.Covariance).MultiplyByTranspose(camera).Submatrix(0, 1, 0, 1);
 
@@ -636,7 +653,7 @@ public class Navigator
 		}
 
 		Graphics.DrawUserIndexedPrimitives(PrimitiveType.TriangleStrip, vertices, 0, vertices.Length, index, 0, vertices.Length - 2);
-		Graphics.DrawUser2DPolygon(points, 0.04f * (float) gaussian.Weight, outcolor, true);
+		Graphics.DrawUser2DPolygon(points, (float) weight, outcolor, true);
 	}
 }
 

@@ -56,7 +56,7 @@ public class Vehicle
 	/// <summary>
 	/// Get the internal state as a vector.
 	/// </summary>
-	public double[] State { get; private set; }
+	public double[] State { get; set; }
 
 	/// <summary>
 	/// Get the location x-axis coordinate.
@@ -161,9 +161,9 @@ public class Vehicle
 	}
 
 	/// <summary>
-	/// Copy constructor. Performs a deep copy of another vehicle.
+	/// Copy constructor. Perform a deep copy of another vehicle.
 	/// </summary>
-	/// <param name="that">Copied vehicle</param>
+	/// <param name="that">Copied vehicle.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
 	public Vehicle(Vehicle that, bool copytrajectory = false)
 	{
@@ -182,6 +182,23 @@ public class Vehicle
 			this.Waypoints = new List<double[]>();
 			this.Waypoints.Add(that.Location);
 		}
+	}
+
+	/// <summary>
+	/// Copy constructor. Perform a deep copy of another vehicle,
+	/// scaling the covariance matrices and setting a new detection probability.
+	/// </summary>
+	/// <param name="that">Copied vehicle.</param>
+	/// <param name="motioncovmultiplier">Scalar multiplier for the motion covariance matrix.</param>
+	/// <param name="measurecovmultiplier">Scalar multiplier for the measurement covariance matrix.</param>
+	/// <param name="pdetection">Probability of detection.</param>
+	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
+	public Vehicle(Vehicle that, double motioncovmultiplier, double measurecovmultiplier, double pdetection, bool copytrajectory = false)
+	           : this(that, copytrajectory)
+	{
+		this.MotionCovariance      = motioncovmultiplier .Multiply(this.MotionCovariance);
+		this.MeasurementCovariance = measurecovmultiplier.Multiply(this.MeasurementCovariance);
+		this.detectionProbability  = pdetection;
 	}
 
 	/// <summary>
