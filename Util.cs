@@ -27,7 +27,7 @@ namespace monorfs
 public static class Util
 {
 	/// <summary>
-	/// Global gaussian random generator
+	/// Gaussian random generator.
 	/// </summary>
 	public static GaussianGenerator gaussian;
 

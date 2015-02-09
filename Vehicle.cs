@@ -20,6 +20,7 @@ using Microsoft.Xna.Framework;
 
 using U  = monorfs.Util;
 using ME = monorfs.MatrixExtensions;
+using Accord.Statistics.Distributions.Univariate;
 
 namespace monorfs
 {
@@ -52,6 +53,17 @@ public class Vehicle
 	/// Probability of detection.
 	/// </summary>
 	private readonly double detectionProbability = 0.85;
+
+	/// <summary>
+	/// Amount of expected clutter (spuriousness) on the measurement process.
+	/// </summary>
+	public readonly double ClutterDensity = 1e-6;
+
+	/// <summary>
+	/// Clutter density integral over the whole measurement space, i.e.
+	/// the expected number of clutter measurements.
+	/// </summary>
+	private readonly double ClutterCount;
 
 	/// <summary>
 	/// Get the internal state as a vector.
@@ -128,9 +140,15 @@ public class Vehicle
 	public const double VisionFocal = 480;
 
 	/// <summary>
-	/// 2D film clipping area (i.e. sensor size and offset).
+	/// 2D film clipping area (i.e. sensor size and offset) in pixel units.
 	/// </summary>
 	public readonly Rectangle FilmArea = new Rectangle(-320, -240, 640, 480); 
+
+	/// <summary>
+	/// Range clipping planes in meters.
+	/// </summary>
+	/// <remarks>For now, the range is twice the Kinect's, to mae it easier to debug.</remarks>
+	public readonly Range RangeClip = new Range(0.8f, 2*4f);
 
 	/// <summary>
 	/// Render output.
@@ -141,6 +159,11 @@ public class Vehicle
 	/// Trajectory through which the vehicle has moved.
 	/// </summary>
 	public List<double[]> Waypoints { get; private set; }
+
+	/// <summary>
+	/// Poisson distributed random generator with parameter lambda = ClutterCount.
+	/// </summary>
+	private PoissonDistribution clutterGen;
 
 	/// <summary>
 	/// Construct a new Vehicle object from its initial state.
@@ -155,8 +178,10 @@ public class Vehicle
 
 		axis.Divide(axis.Euclidean(), true);
 
-		this.State       = new double[7] {location[0], location[1], location[2], w, d * axis[0], d * axis[1], d * axis[2]};
-		this.Waypoints   = new List<double[]>();
+		this.State        = new double[7] {location[0], location[1], location[2], w, d * axis[0], d * axis[1], d * axis[2]};
+		this.ClutterCount = this.ClutterDensity * this.FilmArea.Height * this.FilmArea.Width * this.RangeClip.Length;
+		this.clutterGen   = new PoissonDistribution(this.ClutterCount);
+		this.Waypoints    = new List<double[]>();
 		this.Waypoints.Add(location);
 	}
 
@@ -171,6 +196,9 @@ public class Vehicle
 		that.State.CopyTo(this.State, 0);
 
 		this.detectionProbability  = that.detectionProbability;
+		this.ClutterDensity        = that.ClutterDensity;
+		this.ClutterCount          = that.ClutterCount;
+		this.clutterGen            = new PoissonDistribution(that.clutterGen.Mean);
 		this.MotionCovariance      = that.MotionCovariance.MemberwiseClone();
 		this.MeasurementCovariance = that.MeasurementCovariance.MemberwiseClone();
 		this.Graphics              = that.Graphics;
@@ -192,13 +220,17 @@ public class Vehicle
 	/// <param name="motioncovmultiplier">Scalar multiplier for the motion covariance matrix.</param>
 	/// <param name="measurecovmultiplier">Scalar multiplier for the measurement covariance matrix.</param>
 	/// <param name="pdetection">Probability of detection.</param>
+	/// <param name="clutter">Clutter density.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
-	public Vehicle(Vehicle that, double motioncovmultiplier, double measurecovmultiplier, double pdetection, bool copytrajectory = false)
+	public Vehicle(Vehicle that, double motioncovmultiplier, double measurecovmultiplier, double pdetection, double clutter, bool copytrajectory = false)
 	           : this(that, copytrajectory)
 	{
 		this.MotionCovariance      = motioncovmultiplier .Multiply(this.MotionCovariance);
 		this.MeasurementCovariance = measurecovmultiplier.Multiply(this.MeasurementCovariance);
 		this.detectionProbability  = pdetection;
+		this.ClutterDensity        = clutter;
+		this.ClutterCount          = this.ClutterDensity * this.FilmArea.Height * this.FilmArea.Width * this.RangeClip.Length;
+		this.clutterGen            = new PoissonDistribution(this.ClutterCount);
 	}
 
 	/// <summary>
@@ -310,6 +342,18 @@ public class Vehicle
 			}
 		}
 
+		// poisson distributed clutter measurement count
+		// a cap of 10 lambda is enforced because technically
+		// the number is unbounded so it could freeze the system
+		int nclutter = Math.Min(clutterGen.Generate(), (int)(ClutterCount * 10));
+
+		for (int i = 0; i < nclutter; i++) {
+			double px    = U.uniform.Next() * FilmArea.Width + FilmArea.Left;
+			double py    = U.uniform.Next() * FilmArea.Height + FilmArea.Top;
+			double range = U.uniform.Next() * RangeClip.Length + RangeClip.Min;
+			measurements.Add(new double[3] {px, py, range});
+		}
+
 		return measurements;
 	}
 
@@ -374,11 +418,10 @@ public class Vehicle
 		double px   = VisionFocal * local.X / local.Z;
 		double py   = VisionFocal * local.Y / local.Z;
 
-		if (local.Z <= 0) {
-			return false;
-		}
+		double range2 = local.LengthSquared();
 
-		return local.Z > 0 && FilmArea.Left < px && px < FilmArea.Right && FilmArea.Top < py && py < FilmArea.Bottom;
+		return local.Z > 0 && RangeClip.Min * RangeClip.Min < range2 && range2 < RangeClip.Max * RangeClip.Max &&
+		       FilmArea.Left < px && px < FilmArea.Right && FilmArea.Top < py && py < FilmArea.Bottom;
 	}
 
 	/// <summary>
@@ -389,8 +432,9 @@ public class Vehicle
 	/// <returns>True if the landmark is visible; false otherwise.</returns>
 	public bool VisibleM(double[] measurement)
 	{
-		return FilmArea.Left < measurement[1] && measurement[1] < FilmArea.Right &&
-		       FilmArea.Top  < measurement[2] && measurement[2] < FilmArea.Bottom;
+		return FilmArea.Left < measurement[0] && measurement[0] < FilmArea.Right &&
+		       FilmArea.Top  < measurement[1] && measurement[1] < FilmArea.Bottom &&
+		       RangeClip.Min < measurement[2] && measurement[2] < RangeClip.Max;
 	}
 
 	/// <summary>
@@ -526,55 +570,6 @@ public class Vehicle
 
 		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
 		Graphics.DrawUser2DPolygon(outvertices, 0.02f, Color.Red, true);
-
-		/*landmark = camera.Multiply(landmark);
-
-		VertexPositionColor[] invertices  = new VertexPositionColor[7];
-		VertexPositionColor[] outvertices = new VertexPositionColor[7];
-		double[][] vertpos = new double[7][];
-		
-		const double radius    = 0.08;
-		const double baseext   = 0.03;
-		const double basewidth = 0.035;
-		
-		Color innercolor =  Color.White;
-		Color outercolor =  Color.Black;
-		
-		double ct0 = Math.Cos(Theta);                   double st0 = Math.Sin(Theta);
-		double ct1 = Math.Cos(Theta + 2 * Math.PI / 3); double st1 = Math.Sin(Theta + 2 * Math.PI / 3);
-		double ct2 = Math.Cos(Theta - 2 * Math.PI / 3); double st2 = Math.Sin(Theta - 2 * Math.PI / 3);
-		
-		vertpos[0] = new double[2] {X + radius * ct0, Y + radius * st0};
-		vertpos[1] = new double[2] {X + radius * ct1, Y + radius * st1};
-		vertpos[2] = new double[2] {X + radius * ct2, Y + radius * st2};
-
-		double[] baseparallel = new double[2] {vertpos[2][0] - vertpos[1][0],
-		                                       vertpos[2][1] - vertpos[1][1]};
-
-		baseparallel.Divide(baseparallel.Euclidean(), true);
-
-		double[] baseperpendicular = new double[2] {baseparallel[1], -baseparallel[0]};
-		
-		vertpos[3] = vertpos[1].Subtract(baseext.Multiply(baseparallel));
-		vertpos[4] = vertpos[2].Add     (baseext.Multiply(baseparallel));
-
-		vertpos[5] = vertpos[3].Add(basewidth.Multiply(baseperpendicular));
-		vertpos[6] = vertpos[4].Add(basewidth.Multiply(baseperpendicular));
-		
-		for (int i = 0, k = 0; k < vertpos.Length; i++, k += 2) {
-			outvertices[i] = new VertexPositionColor(new Vector3((float) vertpos[k][0], (float) vertpos[k][1], 0), outercolor);
-		}
-
-		for (int i = vertpos.Length - 1, k = 1; k < vertpos.Length; i--, k += 2) {
-			outvertices[i] = new VertexPositionColor(new Vector3((float) vertpos[k][0], (float) vertpos[k][1], 0), outercolor);
-		}
-
-		for (int i = 0; i < vertpos.Length; i++) {
-			invertices[i] = new VertexPositionColor(new Vector3((float) vertpos[i][0], (float) vertpos[i][1], 0), innercolor);
-		}
-		
-		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
-		Graphics.DrawUser2DPolygon(outvertices, 0.02f, outercolor, true);*/
 	}
 
 	/// <summary>
@@ -583,19 +578,21 @@ public class Vehicle
 	/// <param name="camera">Camera rotation matrix.</param>
 	public void RenderFOV(double[,] camera)
 	{
-		const double depth = 10;
 		
 		Color incolorA = Color.LightGreen; incolorA.A = 30;
 		Color incolorB = Color.LightGreen; incolorB.A = 15;
 		Color outcolor = Color.DarkGreen;  outcolor.A = 30;
 
-		double[][] frustum = new double[5][];
+		double[][] frustum = new double[8][];
 		
-		frustum[0] = new double[3] {0, 0, 0};
-		frustum[1] = new double[3] {depth * FilmArea.Left  / VisionFocal, depth * FilmArea.Top    / VisionFocal, depth};
-		frustum[2] = new double[3] {depth * FilmArea.Right / VisionFocal, depth * FilmArea.Top    / VisionFocal, depth};
-		frustum[3] = new double[3] {depth * FilmArea.Right / VisionFocal, depth * FilmArea.Bottom / VisionFocal, depth};
-		frustum[4] = new double[3] {depth * FilmArea.Left  / VisionFocal, depth * FilmArea.Bottom / VisionFocal, depth};
+		frustum[0] = new double[3] {RangeClip.Min * FilmArea.Left  / VisionFocal, RangeClip.Min * FilmArea.Top    / VisionFocal, RangeClip.Min};
+		frustum[1] = new double[3] {RangeClip.Min * FilmArea.Right / VisionFocal, RangeClip.Min * FilmArea.Top    / VisionFocal, RangeClip.Min};
+		frustum[2] = new double[3] {RangeClip.Min * FilmArea.Right / VisionFocal, RangeClip.Min * FilmArea.Bottom / VisionFocal, RangeClip.Min};
+		frustum[3] = new double[3] {RangeClip.Min * FilmArea.Left  / VisionFocal, RangeClip.Min * FilmArea.Bottom / VisionFocal, RangeClip.Min};
+		frustum[4] = new double[3] {RangeClip.Max * FilmArea.Left  / VisionFocal, RangeClip.Max * FilmArea.Top    / VisionFocal, RangeClip.Max};
+		frustum[5] = new double[3] {RangeClip.Max * FilmArea.Right / VisionFocal, RangeClip.Max * FilmArea.Top    / VisionFocal, RangeClip.Max};
+		frustum[6] = new double[3] {RangeClip.Max * FilmArea.Right / VisionFocal, RangeClip.Max * FilmArea.Bottom / VisionFocal, RangeClip.Max};
+		frustum[7] = new double[3] {RangeClip.Max * FilmArea.Left  / VisionFocal, RangeClip.Max * FilmArea.Bottom / VisionFocal, RangeClip.Max};
 
 		for (int i = 0; i < frustum.Length; i++) {
 			Quaternion local = Orientation *
@@ -604,37 +601,60 @@ public class Vehicle
 			frustum[i][2] = -100;
 		}
 		
-		VertexPositionColor[] verticesA = new VertexPositionColor[6];
-		VertexPositionColor[] verticesB = new VertexPositionColor[6];
-		double[][]            wireA     = new double[3][];
-		double[][]            wireB     = new double[3][];
+		VertexPositionColor[] verticesA = new VertexPositionColor[8];
+		VertexPositionColor[] verticesB = new VertexPositionColor[8];
+		double[][]            wireA     = new double[4][];
+		double[][]            wireB     = new double[4][];
+		double[][]            wireC     = new double[4][];
+		double[][]            wireD     = new double[4][];
 		
-		wireA[0] = frustum[1];
-		wireA[1] = frustum[0];
-		wireA[2] = frustum[3];
+		wireA[0] = frustum[0];
+		wireA[1] = frustum[1];
+		wireA[2] = frustum[5];
+		wireA[3] = frustum[6];
 
-		wireB[0] = frustum[2];
-		wireB[1] = frustum[0];
-		wireB[2] = frustum[4];
+		wireB[0] = frustum[1];
+		wireB[1] = frustum[2];
+		wireB[2] = frustum[6];
+		wireB[3] = frustum[7];
+		
+		wireC[0] = frustum[2];
+		wireC[1] = frustum[3];
+		wireC[2] = frustum[7];
+		wireC[3] = frustum[4];
+
+		wireD[0] = frustum[3];
+		wireD[1] = frustum[0];
+		wireD[2] = frustum[4];
+		wireD[3] = frustum[5];
 
 		verticesA[0] = new VertexPositionColor(frustum[0].ToVector3(), incolorA);
-		verticesA[1] = new VertexPositionColor(frustum[1].ToVector3(), incolorA);
-		verticesA[2] = new VertexPositionColor(frustum[2].ToVector3(), incolorA);
-		verticesA[3] = new VertexPositionColor(frustum[0].ToVector3(), incolorA);
-		verticesA[4] = new VertexPositionColor(frustum[3].ToVector3(), incolorA);
-		verticesA[5] = new VertexPositionColor(frustum[4].ToVector3(), incolorA);
+		verticesA[1] = new VertexPositionColor(frustum[4].ToVector3(), incolorA);
+		verticesA[2] = new VertexPositionColor(frustum[1].ToVector3(), incolorA);
+		verticesA[3] = new VertexPositionColor(frustum[5].ToVector3(), incolorA);
+		verticesA[4] = new VertexPositionColor(frustum[2].ToVector3(), incolorA);
+		verticesA[5] = new VertexPositionColor(frustum[6].ToVector3(), incolorA);
+		verticesA[6] = new VertexPositionColor(frustum[3].ToVector3(), incolorA);
+		verticesA[7] = new VertexPositionColor(frustum[7].ToVector3(), incolorA);
 
-		verticesB[0] = new VertexPositionColor(frustum[0].ToVector3(), incolorB);
-		verticesB[1] = new VertexPositionColor(frustum[2].ToVector3(), incolorB);
-		verticesB[2] = new VertexPositionColor(frustum[3].ToVector3(), incolorB);
-		verticesB[3] = new VertexPositionColor(frustum[0].ToVector3(), incolorB);
-		verticesB[4] = new VertexPositionColor(frustum[4].ToVector3(), incolorB);
-		verticesB[5] = new VertexPositionColor(frustum[1].ToVector3(), incolorB);
+		verticesB[0] = new VertexPositionColor(frustum[1].ToVector3(), incolorB);
+		verticesB[1] = new VertexPositionColor(frustum[5].ToVector3(), incolorB);
+		verticesB[2] = new VertexPositionColor(frustum[2].ToVector3(), incolorB);
+		verticesB[3] = new VertexPositionColor(frustum[6].ToVector3(), incolorB);
+		verticesB[4] = new VertexPositionColor(frustum[3].ToVector3(), incolorB);
+		verticesB[5] = new VertexPositionColor(frustum[7].ToVector3(), incolorB);
+		verticesB[6] = new VertexPositionColor(frustum[0].ToVector3(), incolorB);
+		verticesB[7] = new VertexPositionColor(frustum[4].ToVector3(), incolorB);
 		
-		Graphics.DrawUserPrimitives(PrimitiveType.TriangleList, verticesA, 0, 2);
-		Graphics.DrawUserPrimitives(PrimitiveType.TriangleList, verticesB, 0, 2);
+		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, verticesA, 0, 2);
+		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, verticesA, 4, 2);
+		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, verticesB, 0, 2);
+		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, verticesB, 4, 2);
+		
 		Graphics.DrawUser2DPolygon(wireA, 0.02f, outcolor, false);
 		Graphics.DrawUser2DPolygon(wireB, 0.02f, outcolor, false);
+		Graphics.DrawUser2DPolygon(wireC, 0.02f, outcolor, false);
+		Graphics.DrawUser2DPolygon(wireD, 0.02f, outcolor, false);
 	}
 
 	/// <summary>

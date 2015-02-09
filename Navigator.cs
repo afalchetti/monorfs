@@ -33,14 +33,9 @@ public class Navigator
 	/// <summary>
 	/// Landmark density spread expected on unexplored areas
 	/// </summary>
-	public static readonly double[,] BirthCovariance = new double[3, 3] {{1e-2, 0, 0},
-	                                                                     {0, 1e-2, 0},
-	                                                                     {0, 0, 1e-2}};
-
-	/// <summary>
-	/// Amount of expected clutter (spuriousness) on the measurement process.
-	/// </summary>
-	public const double ClutterDensity = 1e-2;
+	public static readonly double[,] BirthCovariance = new double[3, 3] {{1e-3, 0, 0},
+	                                                                     {0, 1e-3, 0},
+	                                                                     {0, 0, 1e-3}};
 
 	/// <summary>
 	/// Minimum weight that is kept after a model prune.
@@ -163,7 +158,7 @@ public class Navigator
 		this.VehicleWeights   = new double        [particlecount];
 
 		for (int i = 0; i < particlecount; i++) {
-			this.VehicleParticles[i] = new Vehicle(vehicle, 2.8, 2.8, 0.7);
+			this.VehicleParticles[i] = new Vehicle(vehicle, 5.0, 5.0, 0.6, 1e-2);
 			this.MapModels       [i] = new List<Gaussian>();
 			this.VehicleWeights  [i] = 1.0 / particlecount;
 		}
@@ -396,7 +391,7 @@ public class Navigator
 			}
 
 			for (int i = 0; i < q.Length; i++) {
-				if (Mahalanobis(q[i], measurement) > 5) {
+				if (Mahalanobis(q[i], measurement) > 3) {
 					continue;
 				}
 
@@ -404,7 +399,7 @@ public class Navigator
 				double[]  mean       = m[i].Add(gain.Multiply(measurement.Subtract(pose.MeasurePerfect(m[i]))));
 				double[,] covariance = I.Subtract(gain.Multiply(H[i])).Multiply(P[i]);
 
-				double weight = PD * q[i].Weight * q[i].Evaluate(measurement) / (ClutterDensity + PD * weightsum);
+				double weight = PD * q[i].Weight * q[i].Evaluate(measurement) / (pose.ClutterDensity + PD * weightsum);
 
 				corrected.Add(new Gaussian(mean, covariance, weight));
 			}
@@ -604,7 +599,9 @@ public class Navigator
 		double weight;
 		
 		if (gaussian.Weight < 1.0) {
-			weight = 0.04 * gaussian.Weight;
+			weight     = 0.04 * gaussian.Weight;
+			incolor.A  = (byte) (200 * gaussian.Weight);
+			outcolor.A = (byte) (200 * gaussian.Weight);
 		}
 		else if (gaussian.Weight < 2.0) {
 			weight = 0.01 * (gaussian.Weight - 1) + 0.04;
@@ -674,9 +671,9 @@ public class Gaussian
 
 	private static readonly double[] tabulatedexp;
 
-	private const int tabgrid = 128;
+	private const int tabgrid = 32;
 
-	private const double tabdelta = 128 / 16;
+	private const double tabdelta = 32 / 16;
 
 	private const double tabmax = 16;
 

@@ -39,8 +39,9 @@
     <StartupObject>monorfs.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Accord, Version=2.13.1.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL" />
-    <Reference Include="Accord.Math, Version=2.13.1.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL" />
+    <Reference Include="Accord, Version=2.14.0.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL" />
+    <Reference Include="Accord.Math, Version=2.14.0.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL" />
+    <Reference Include="Accord.Statistics, Version=2.14.0.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL" />
     <Reference Include="AForge, Version=2.2.5.0, Culture=neutral, PublicKeyToken=c1db6ff4eaa06aeb, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\..\applications\AForge.NET\Framework\Release\AForge.dll</HintPath>
