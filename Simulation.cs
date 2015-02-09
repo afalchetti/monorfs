@@ -187,9 +187,9 @@ public class Simulation : Game
 			maploc.Add(landmark);
 		}
 
-		this.Explorer            = new Vehicle(location, angle, axis);
 		this.Landmarks           = new List<double[]>();
 		this.MeasurementReadings = new List<double[]>();
+		this.Explorer            = new Vehicle(location, angle, axis, this.Landmarks);
 
 		for (int i = 0; i < maploc.Count; i++) {
 			this.Landmarks.Add(maploc[i]);
@@ -362,7 +362,7 @@ public class Simulation : Game
 		camera    = MatrixExtensions.CreateRotationX(camangle);
 
 		if (time.TotalGameTime.TotalMilliseconds - lastnavigationupdate.TotalGameTime.TotalMilliseconds > MeasurePeriod) {
-			List<double[]> measurements = Explorer.Measure(Landmarks);
+			List<double[]> measurements = Explorer.Measure();
 
 			Navigator.SlamUpdate(measurements, DoPredict, DoCorrect, DoPrune);
 

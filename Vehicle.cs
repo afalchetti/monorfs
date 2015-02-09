@@ -135,6 +135,11 @@ public class Vehicle
 	}
 
 	/// <summary>
+	/// Landmark 3d locations against which the measurements are performed.
+	/// </summary>
+	public List<double[]> Landmarks;
+
+	/// <summary>
 	/// Vision camera focal length.
 	/// </summary>
 	public const double VisionFocal = 480;
@@ -171,7 +176,8 @@ public class Vehicle
 	/// <param name="location">Spatial coordinates.</param>
 	/// <param name="theta">Orientation angle.</param>
 	/// <param name="axis">Orientation rotation axis.</param>
-	public Vehicle(double[] location, double theta, double[] axis)
+	/// <param name="landmarks">Landmark 3d locations against which the measurements are performed.</param>
+	public Vehicle(double[] location, double theta, double[] axis, List<double[]> landmarks)
 	{
 		double w = Math.Cos(theta / 2);
 		double d = Math.Sin(theta / 2);
@@ -181,6 +187,8 @@ public class Vehicle
 		this.State        = new double[7] {location[0], location[1], location[2], w, d * axis[0], d * axis[1], d * axis[2]};
 		this.ClutterCount = this.ClutterDensity * this.FilmArea.Height * this.FilmArea.Width * this.RangeClip.Length;
 		this.clutterGen   = new PoissonDistribution(this.ClutterCount);
+		this.Landmarks    = landmarks;
+
 		this.Waypoints    = new List<double[]>();
 		this.Waypoints.Add(location);
 	}
@@ -194,7 +202,8 @@ public class Vehicle
 	{
 		this.State                 = new double[7];
 		that.State.CopyTo(this.State, 0);
-
+		
+		this.Landmarks             = that.Landmarks;
 		this.detectionProbability  = that.detectionProbability;
 		this.ClutterDensity        = that.ClutterDensity;
 		this.ClutterCount          = that.ClutterCount;
@@ -259,8 +268,7 @@ public class Vehicle
 
 		// note that the framework uses Yaw = Y, Pitch = X, Roll = Z => YXZ Tait-Bryan parametrization
 		// this is equivalent to a plane pointing upwards with its wings on the X direction
-		Quaternion dorientation = Quaternion.CreateFromYawPitchRoll((float) dyaw, (float) dpitch, (float) droll);
-
+		Quaternion dorientation   = Quaternion.CreateFromYawPitchRoll((float) dyaw, (float) dpitch, (float) droll);
 		Quaternion neworientation = Orientation * dorientation;
 		Quaternion midrotation    = Quaternion.Slerp(Orientation, neworientation, 0.5f);
 		Quaternion dlocation      = midrotation * new Quaternion((float) dx, (float) dy, (float) dz, 0) * Quaternion.Conjugate(midrotation);
@@ -276,6 +284,27 @@ public class Vehicle
 		if (Location.Subtract(Waypoints[Waypoints.Count - 1]).SquareEuclidean() >= 1e-2f) {
 			Waypoints.Add(Location);
 		}
+	}
+	
+	/// <summary>
+	/// Obtain a measurement from the hidden state.
+	/// It does not use any randomness or misdetection, 
+	/// as it is designed to be used with UKF filters.
+	/// </summary>
+	/// <param name="landmark">Landmark 3d location against which the measurement is performed.</param>
+	/// <returns>Pixel-range measurements.</returns>
+	
+	public double[] MeasurePerfect(double[] landmark)
+	{
+		double[]   diff  = landmark.Subtract(this.Location);
+		Quaternion local = Quaternion.Conjugate(Orientation) *
+			                    new Quaternion((float) diff[0], (float) diff[1], (float) diff[2], 0) * Orientation;
+
+		double range  = diff.Euclidean();
+		double px     = VisionFocal * local.X / local.Z;
+		double py     = VisionFocal * local.Y / local.Z;
+
+		return new double[3] {px, py, range};
 	}
 
 	/// <summary>
@@ -302,14 +331,13 @@ public class Vehicle
 	/// This method always detects the landmark (misdetection
 	/// probability is ignored).
 	/// </summary>
-	/// <param name="landmarks">Landmark 3d locations against which the measurements are performed.</param>
 	/// <returns>Pixel-range measurements.</returns>
-	public double[][] MeasureDetected(List<double[]> landmarks)
+	public double[][] MeasureDetected()
 	{
-		double[][] measurements = new double[landmarks.Count][];
+		double[][] measurements = new double[Landmarks.Count][];
 
-		for (int i = 0; i < landmarks.Count; i++) {
-			measurements[i] = MeasureDetected(landmarks[i]);
+		for (int i = 0; i < Landmarks.Count; i++) {
+			measurements[i] = MeasureDetected(Landmarks[i]);
 		}
 
 		return measurements;
@@ -319,26 +347,17 @@ public class Vehicle
 	/// Obtain several measurements from the hidden state.
 	/// Ladmarks may be misdetected.
 	/// </summary>
-	/// <param name="landmarks">Landmark 3d locations against which the measurements are performed.</param>
 	/// <returns>Pixel-range measurements.</returns>
-	public List<double[]> Measure(List<double[]> landmarks)
+	public List<double[]> Measure()
 	{
 		List<double[]> measurements = new List<double[]>();
-		List<double[]> landmarklist = new List<double[]>();
-		double[][]     measurementlist;
-
-		foreach (double[] landmark in landmarks) {
-			if (Visible(landmark)) {
-				landmarklist.Add(landmark);
-			}
-		}
-
-		measurementlist = MeasureDetected(landmarklist);
 
 		// add every measurement with probability = DetectionProbbility
-		for (int i = 0; i < landmarklist.Count; i++) {
-			if (U.uniform.Next() < detectionProbability) {
-				measurements.Add(measurementlist[i]);
+		for (int i = 0; i < Landmarks.Count; i++) {
+			if (Visible(Landmarks[i])) {
+				if (U.uniform.Next() < detectionProbability) {
+					measurements.Add(MeasureDetected(Landmarks[i]));
+				}
 			}
 		}
 
@@ -381,27 +400,6 @@ public class Vehicle
 		double[,] jrotation = ME.MatrixFromQuaternion(Orientation);
 
 		return jprojection.Multiply(jrotation);
-	}
-	
-	/// <summary>
-	/// Obtain a measurement from the hidden state.
-	/// It does not use any randomness or misdetection, 
-	/// as it is designed to be used with UKF filters.
-	/// </summary>
-	/// <param name="landmark">Landmark 3d location against which the measurement is performed.</param>
-	/// <returns>Pixel-range measurements.</returns>
-	
-	public double[] MeasurePerfect(double[] landmark)
-	{
-		double[]   diff  = landmark.Subtract(this.Location);
-		Quaternion local = Quaternion.Conjugate(Orientation) *
-			                    new Quaternion((float) diff[0], (float) diff[1], (float) diff[2], 0) * Orientation;
-
-		double range  = diff.Euclidean();
-		double px     = VisionFocal * local.X / local.Z;
-		double py     = VisionFocal * local.Y / local.Z;
-
-		return new double[3] {px, py, range};
 	}
 
 	/// <summary>
