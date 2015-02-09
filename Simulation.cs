@@ -105,14 +105,58 @@ public class Simulation : Game
 	private GameTime lastnavigationupdate = new GameTime();
 
 	/// <summary>
+	/// Automatic simulation command input.
+	/// </summary>
+	private CircularBuffer<double[]> Commands;
+
+	/// <summary>
 	/// Construct a simulation from a formatted desccription file.
 	/// </summary>
-	/// <param name="filename">Scene descriptor file.</param>
-	public Simulation(string filename)
+	/// <param name="scene">Scene descriptor filename.</param>
+	/// <param name="commands">Vehicle input command instructions filename. Can be empty (no automatic instructions).</param>
+	/// <param name="trajectories">Output filename for the trajectories. Can be empty (no output).</param>
+	/// <param name="map">Output file for the map estimates. Can be empty (no output).</param>
+	public Simulation(string scene, string commands, string trajectories, string map)
 	{
-		string descriptor = File.ReadAllText(filename);
+		initScene(File.ReadAllText(scene));
 
-		Dictionary<string, List<string>> dict = Util.ParseDictionary(descriptor);
+		this.Navigator = new Navigator(Explorer, 5, false);
+
+		try {
+			initCommands(File.ReadAllLines(commands));
+		}
+		catch (FileNotFoundException) {
+			Commands = new CircularBuffer<double[]>(1);
+			Commands.Add(new double[5] {0, 0, 0, 0, 0});
+		}
+
+		// MonoGame-related construction
+		this.graphicsManager = new GraphicsDeviceManager(this);
+
+		this.Content.RootDirectory = "Content";
+		this.IsMouseVisible        = true;
+
+		this.graphicsManager.PreferredBackBufferWidth  = (int)(800*1.2);
+		this.graphicsManager.PreferredBackBufferHeight = (int)(450*1.2);
+		this.graphicsManager.PreferMultiSampling       = true;
+		this.graphicsManager.IsFullScreen              = false;
+
+
+		this.bufferdest = clipCenter(graphicsManager.PreferredBackBufferWidth,
+		                             graphicsManager.PreferredBackBufferHeight,
+		                             (mapclip[1] - mapclip[0]) / (mapclip[3] - mapclip[2]));
+
+		camangle = 0;
+		camera   = Accord.Math.Matrix.Identity(3);
+	}
+
+	/// <summary>
+	/// Initialize the scene.
+	/// </summary>
+	/// <param name="scene">Scene descriptor text.</param>
+	private void initScene(string scene)
+	{
+		Dictionary<string, List<string>> dict = Util.ParseDictionary(scene);
 
 		this.mapclip = Accord.Math.Matrix.ToSingle(ParseDoubleList(dict["world"][0]));
 
@@ -150,27 +194,24 @@ public class Simulation : Game
 		for (int i = 0; i < maploc.Count; i++) {
 			this.Landmarks.Add(maploc[i]);
 		}
+	}
 
-		this.Navigator = new Navigator(Explorer, 10, true);
+	/// <summary>
+	/// Read and initialize the command list.
+	/// </summary>
+	/// <param name="commands">Command descriptor array.</param>
+	private void initCommands(string[] commandstr)
+	{
+		if (commandstr.Length < 1) {
+			commandstr = new string[1] {"0 0 0 0 0"};
+		}
 
-		// MonoGame-related construction
-		this.graphicsManager = new GraphicsDeviceManager(this);
+		Commands = new CircularBuffer<double[]>(commandstr.Length);
 
-		this.Content.RootDirectory = "Content";
-		this.IsMouseVisible        = true;
-
-		this.graphicsManager.PreferredBackBufferWidth  = (int)(800*1.2);
-		this.graphicsManager.PreferredBackBufferHeight = (int)(450*1.2);
-		this.graphicsManager.PreferMultiSampling       = true;
-		this.graphicsManager.IsFullScreen              = false;
-
-
-		this.bufferdest = clipCenter(graphicsManager.PreferredBackBufferWidth,
-		                             graphicsManager.PreferredBackBufferHeight,
-		                             (mapclip[1] - mapclip[0]) / (mapclip[3] - mapclip[2]));
-
-		camangle = 0;
-		camera   = Accord.Math.Matrix.Identity(3);
+		for (int i = 0; i < commandstr.Length; i++) {
+			Commands.Add(ParseDoubleList(commandstr[i]));
+			// the item structure is {ds, dyaw, dpitch, droll, dcamera}
+		}
 	}
 
 	/// <summary>
@@ -246,6 +287,7 @@ public class Simulation : Game
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	protected override void Update(GameTime time)
 	{
+		// TODO : force framerate constant
 		KeyboardState keyboard = Keyboard.GetState();
 
 		double ds     = 0;
@@ -300,6 +342,14 @@ public class Simulation : Game
 		if (keyboard.IsKeyDown(Keys.V)) {
 			dcam -= 0.06 * multiplier;
 		}
+
+		double[] autocmd = Commands.Next();
+		
+		ds     += autocmd[0];
+		dyaw   += autocmd[1];
+		dpitch += autocmd[2];
+		droll  += autocmd[3];
+		dcam   += autocmd[4];
 		
 		bool DoPredict = !keyboard.IsKeyDown(Keys.P);
 		bool DoCorrect = !keyboard.IsKeyDown(Keys.C);

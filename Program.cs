@@ -25,7 +25,7 @@ public class Program
 	//[STAThread]
 	static void Main(string[] args)
 	{
-		Simulation sim = new Simulation("simulation.sim");
+		Simulation sim = new Simulation("map.world", "movements.in", "trajectories.out", "map.out");
 
 		sim.Run();
 	}

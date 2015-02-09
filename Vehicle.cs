@@ -57,7 +57,7 @@ public class Vehicle
 	/// <summary>
 	/// Amount of expected clutter (spuriousness) on the measurement process.
 	/// </summary>
-	public readonly double ClutterDensity = 1e-6;
+	public readonly double ClutterDensity = 3e-7;
 
 	/// <summary>
 	/// Clutter density integral over the whole measurement space, i.e.
