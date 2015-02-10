@@ -10,6 +10,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 
 namespace monorfs
 {
@@ -25,9 +26,12 @@ public class Program
 	//[STAThread]
 	static void Main(string[] args)
 	{
-		Simulation sim = new Simulation("map.world", "movements.in", "trajectories.out", "map.out");
+		Simulation sim = new Simulation("map.world", "movements.in");
 
 		sim.Run();
+		
+		File.WriteAllText("trajectories.out", sim.SerializedTrajectories);
+		File.WriteAllText("maps.out",         sim.SerializedMaps);
 	}
 }
 }

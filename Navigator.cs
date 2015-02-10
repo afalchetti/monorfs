@@ -8,10 +8,9 @@
 // work via any medium is strictly forbidden without
 // express written consent from the author.
 
-// TODO navigator shouldn't know the exact measurement/model noise variances, should give them on the constructor
-
 using System;
 using System.Collections.Generic;
+using System.Text;
 using Accord.Math;
 using Accord.Math.Decompositions;
 using AForge;
@@ -134,6 +133,11 @@ public class Navigator
 	}
 
 	/// <summary>
+	/// Best map history.
+	/// </summary>
+	public List<Tuple<double, List<Gaussian>>> WayMaps { get; private set; }
+
+	/// <summary>
 	/// Construct a Navigator using the indicated vehicle as a reference.
 	/// </summary>
 	/// <param name="vehicle">Vehicle to track.</param>
@@ -168,7 +172,10 @@ public class Navigator
 		this.BestParticle = 0;
 
 		this.Waypoints = new List<double[]>();
-		this.Waypoints.Add(vehicle.Location);
+		this.Waypoints.Add(new double[4] {0, vehicle.X, vehicle.Y, vehicle.Z});
+
+		this.WayMaps = new List<Tuple<double, List<Gaussian>>>();
+		this.WayMaps.Add(new Tuple<double, List<Gaussian>>(0, new List<Gaussian>()));
 
 		const int segments = 32;
 		this.pinterval = new double[segments][];
@@ -200,8 +207,14 @@ public class Navigator
 			}
 		}
 
-		if (VehicleParticles[BestParticle].Location.Subtract(Waypoints[Waypoints.Count - 1]).SquareEuclidean() >= 1e-2f) {
-			Waypoints.Add(VehicleParticles[BestParticle].Location);
+		Vehicle best = VehicleParticles[BestParticle];
+		
+		double[] prevloc = new double[3] {Waypoints[Waypoints.Count - 1][1],
+		                                  Waypoints[Waypoints.Count - 1][2],
+		                                  Waypoints[Waypoints.Count - 1][3]};
+
+		if (best.Location.Subtract(prevloc).SquareEuclidean() >= 1e-2f) {
+			Waypoints.Add(new double[4] {time.TotalGameTime.TotalSeconds, best.X, best.Y, best.Z});
 		}
 	}
 
@@ -210,11 +223,12 @@ public class Navigator
 	/// This means doing a model prediction and a measurement update.
 	/// This method is the core of the whole program.
 	/// </summary>
+	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <param name="measurements">Sensor measurements in range-bearing  form.</param>
 	/// <param name="predict">Predict flag; if false, no prediction step is done.</param>
 	/// <param name="correct">Correct flag; if false, no correction step is done.</param>
 	/// <param name="prune">Prune flag; if false, no prune step is done.</param>
-	public void SlamUpdate(List<double[]> measurements, bool predict, bool correct, bool prune)
+	public void SlamUpdate(GameTime time, List<double[]> measurements, bool predict, bool correct, bool prune)
 	{
 		// map update
 		Parallel.For (0, VehicleParticles.Length, i => {
@@ -231,6 +245,8 @@ public class Navigator
 			UpdateParticleWeights(Mpredicted, Mcorrected);
 			ResampleParticles();
 		}
+
+		WayMaps.Add(new Tuple<double, List<Gaussian>>(time.TotalGameTime.TotalSeconds, MapModels[BestParticle]));
 	}
 
 	/// <summary>
@@ -580,7 +596,7 @@ public class Navigator
 		Color color = Color.Blue;
 
 		for (int i = 0; i < Waypoints.Count; i++) {
-			vertices[i] = camera.Multiply(Waypoints[i]);
+			vertices[i] = camera.Multiply(new double[3] {Waypoints[i][1], Waypoints[i][2], Waypoints[i][3]});
 		}
 
 		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, false);
@@ -704,11 +720,41 @@ public class Gaussian
 
 	public double ApproximateNegExp(double x)
 	{
-		if (x <= tabmax) {
+		if (0 <= x && x <= tabmax) {
 			return tabulatedexp[(int)(tabdelta * x)];
+		}
+		else if (-tabmax <= x && x < 0) {
+			return 1.0/tabulatedexp[(int)(tabdelta * -x)];
 		}
 		else {
 			return 0;
+		}
+	}
+
+	public string LinearSerialization
+	{
+		get
+		{
+			StringBuilder serialized = new StringBuilder();
+
+			serialized.Append(Weight.ToString("F6"));
+			serialized.Append(";");
+
+			for (int i = 0; i < Mean.Length; i++) {
+				serialized.Append(" ");
+				serialized.Append(Mean[i].ToString("F6"));
+			}
+
+			serialized.Append(";");
+			
+			for (int i = 0; i < Covariance.GetLength(0); i++) {
+			for (int k = 0; k < Covariance.GetLength(1); k++) {
+				serialized.Append(" ");
+				serialized.Append(Covariance[i, k].ToString("F6"));
+			}
+			}
+
+			return serialized.ToString();
 		}
 	}
 }

@@ -162,6 +162,8 @@ public class Vehicle
 
 	/// <summary>
 	/// Trajectory through which the vehicle has moved.
+	/// The first argument per item is a timestamp, the
+	/// next three are 3D coordinates.
 	/// </summary>
 	public List<double[]> Waypoints { get; private set; }
 
@@ -190,7 +192,7 @@ public class Vehicle
 		this.Landmarks    = landmarks;
 
 		this.Waypoints    = new List<double[]>();
-		this.Waypoints.Add(location);
+		this.Waypoints.Add(new double[4] {0, X, Y,  Z});
 	}
 
 	/// <summary>
@@ -217,7 +219,7 @@ public class Vehicle
 		}
 		else {
 			this.Waypoints = new List<double[]>();
-			this.Waypoints.Add(that.Location);
+			this.Waypoints.Add(new double[4] {0, that.X, that.Y, that.Z});
 		}
 	}
 
@@ -281,8 +283,12 @@ public class Vehicle
 		                                  U.RandomGaussianVector(new double[7] {0, 0, 0, 0, 0, 0, 0}, MotionCovariance)));
 		Orientation = Quaternion.Normalize(this.Orientation);
 
-		if (Location.Subtract(Waypoints[Waypoints.Count - 1]).SquareEuclidean() >= 1e-2f) {
-			Waypoints.Add(Location);
+		double[] prevloc = new double[3] {Waypoints[Waypoints.Count - 1][1],
+		                                  Waypoints[Waypoints.Count - 1][2],
+		                                  Waypoints[Waypoints.Count - 1][3]};
+
+		if (Location.Subtract(prevloc).SquareEuclidean() >= 1e-2f) {
+			Waypoints.Add(new double[4] {time.TotalGameTime.TotalSeconds, X, Y, Z});
 		}
 	}
 	
@@ -665,7 +671,7 @@ public class Vehicle
 		Color      color    = Color.Yellow;
 
 		for (int i = 0; i < Waypoints.Count; i++) {
-			vertices[i] = camera.Multiply(Waypoints[i]);
+			vertices[i] = camera.Multiply(new double[3] {Waypoints[i][1], Waypoints[i][2], Waypoints[i][3]});
 		}
 
 		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, false);

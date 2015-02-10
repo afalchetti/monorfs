@@ -17,6 +17,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 
 using Accord.Math;
+using System.Text;
 
 namespace monorfs
 {
@@ -110,13 +111,44 @@ public class Simulation : Game
 	private CircularBuffer<double[]> Commands;
 
 	/// <summary>
+	/// Get a string representation of the trajectories of the vehicle and the
+	/// most likely particle (which may jump when the best particle changes).
+	/// </summary>
+	public string SerializedTrajectories
+	{
+		get
+		{
+			return string.Join("\n", Explorer.Waypoints.ConvertAll(p => p[0].ToString("F6") + " " +
+			                                                            p[1].ToString("F6") + " " +
+			                                                            p[2].ToString("F6") + " " +
+			                                                            p[3].ToString("F6"))) +
+			       "\n|\n" +
+			       string.Join("\n", Navigator.Waypoints.ConvertAll(p => p[0].ToString("F6") + " " +
+			                                                             p[1].ToString("F6") + " " +
+			                                                             p[2].ToString("F6") + " " +
+			                                                             p[3].ToString("F6")));
+		}
+	}
+
+	/// <summary>
+	/// Get a string representation of the map models of the best particle;
+	/// may jump along with the best particle.
+	/// </summary>
+	public string SerializedMaps
+	{
+		get
+		{
+			return string.Join("\n|\n", Navigator.WayMaps.ConvertAll(m => m.Item1.ToString("F6") + "\n" + string.Join("\n",
+			                                                             m.Item2.ConvertAll(g => g.LinearSerialization))));
+		}
+	}
+
+	/// <summary>
 	/// Construct a simulation from a formatted desccription file.
 	/// </summary>
 	/// <param name="scene">Scene descriptor filename.</param>
 	/// <param name="commands">Vehicle input command instructions filename. Can be empty (no automatic instructions).</param>
-	/// <param name="trajectories">Output filename for the trajectories. Can be empty (no output).</param>
-	/// <param name="map">Output file for the map estimates. Can be empty (no output).</param>
-	public Simulation(string scene, string commands, string trajectories, string map)
+	public Simulation(string scene, string commands)
 	{
 		initScene(File.ReadAllText(scene));
 
@@ -364,7 +396,7 @@ public class Simulation : Game
 		if (time.TotalGameTime.TotalMilliseconds - lastnavigationupdate.TotalGameTime.TotalMilliseconds > MeasurePeriod) {
 			List<double[]> measurements = Explorer.Measure();
 
-			Navigator.SlamUpdate(measurements, DoPredict, DoCorrect, DoPrune);
+			Navigator.SlamUpdate(time, measurements, DoPredict, DoCorrect, DoPrune);
 
 			lastnavigationupdate = new GameTime(time.TotalGameTime, time.ElapsedGameTime);
 
