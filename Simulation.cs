@@ -72,7 +72,7 @@ public class Simulation : Game
 	/// <summary>
 	/// Double buffer.
 	/// </summary>
-	private RenderTarget2D buffer;
+	public RenderTarget2D Buffer { get; private set; }
 
 	/// <summary>
 	/// Double batch flipper.
@@ -294,7 +294,7 @@ public class Simulation : Game
 		this.effect.LightingEnabled    = false;
 		this.effect.VertexColorEnabled = true;
 
-		this.buffer = new RenderTarget2D(graphics, 2 * bufferdest.Width, 2 * bufferdest.Height,
+		this.Buffer = new RenderTarget2D(graphics, 2 * bufferdest.Width, 2 * bufferdest.Height,
 		                                 false, SurfaceFormat.Color, DepthFormat.Depth16,
 		                                 0, RenderTargetUsage.DiscardContents);
 
@@ -415,7 +415,7 @@ public class Simulation : Game
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	protected override void Draw(GameTime time)
 	{
-		this.graphics.SetRenderTarget(buffer);
+		this.graphics.SetRenderTarget(Buffer);
 		this.graphics.Clear(Color.DarkSeaGreen);
 
 		foreach (EffectPass pass in effect.CurrentTechnique.Passes) {
@@ -440,9 +440,9 @@ public class Simulation : Game
 
 		graphics.SetRenderTarget(null);
 		flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
-			DepthStencilState.Default, RasterizerState.CullNone);
+		           DepthStencilState.Default, RasterizerState.CullNone);
 
-		flip.Draw(buffer, bufferdest, Color.White);
+		flip.Draw(Buffer, bufferdest, Color.White);
 
 		//Console.WriteLine(1.0/time.ElapsedGameTime.TotalSeconds);
 
