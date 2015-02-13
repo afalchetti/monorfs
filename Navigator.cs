@@ -80,6 +80,11 @@ public class Navigator
 	public List<Gaussian>[] MapModels { get; private set; }
 
 	/// <summary>
+	/// previous frame unexplored particles (delayed birth avoids spurious measurement super-certainty)
+	/// </summary>
+	private List<double[]>[] toexplore;
+
+	/// <summary>
 	/// Expected number of landmarks after the prediction step.
 	/// </summary>
 	public double[] Mpredicted;
@@ -160,12 +165,16 @@ public class Navigator
 		this.VehicleParticles = new Vehicle       [particlecount];
 		this.MapModels        = new List<Gaussian>[particlecount];
 		this.VehicleWeights   = new double        [particlecount];
+		this.toexplore        = new List<double[]>[particlecount];
 
 		for (int i = 0; i < particlecount; i++) {
 			this.VehicleParticles[i] = new Vehicle(vehicle, 1.8, 1.8, 0.7, 5e-7);
 			this.MapModels       [i] = new List<Gaussian>();
 			this.VehicleWeights  [i] = 1.0 / particlecount;
+			this.toexplore       [i] = new List<double[]>();
 		}
+
+		
 
 		this.Mpredicted   = new double[VehicleParticles.Length];
 		this.Mcorrected   = new double[VehicleParticles.Length];
@@ -224,7 +233,7 @@ public class Navigator
 	/// This method is the core of the whole program.
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
-	/// <param name="measurements">Sensor measurements in range-bearing  form.</param>
+	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
 	/// <param name="predict">Predict flag; if false, no prediction step is done.</param>
 	/// <param name="correct">Correct flag; if false, no correction step is done.</param>
 	/// <param name="prune">Prune flag; if false, no prune step is done.</param>
@@ -234,7 +243,7 @@ public class Navigator
 		Parallel.For (0, VehicleParticles.Length, i => {
 			List<Gaussian> predicted, corrected;
 
-			if (predict) { predicted = PredictConditional(measurements, VehicleParticles[i], MapModels[i]); }
+			if (predict) { predicted = PredictConditional(measurements, VehicleParticles[i], MapModels[i], toexplore[i]); }
 			else         { predicted = MapModels[i]; }
 
 			if (correct) { corrected = CorrectConditional(measurements, VehicleParticles[i], predicted); }
@@ -260,6 +269,11 @@ public class Navigator
 	/// Update the weights of each vehicle using the sequential importance sampling technique.
 	/// It uses the empty map technique for now as it is simple and gives reasonable results.
 	/// </summary>
+	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
+	/// <param name="predicted">Predicted map model.</param>
+	/// <param name="corrected">Corrected map model.</param>
+	/// <param name="pose">Vehicle pose.</param>
+	/// <returns>Total likelihood weight.</returns>
 	public double WeightAlpha(List<double[]> measurements, List<Gaussian> predicted, List<Gaussian> corrected, Vehicle pose)
 	{
 		// using the one-feature-map trick, the new weight follows approximately the formula
@@ -274,13 +288,21 @@ public class Navigator
 
 		// the less uncertain feature m is used
 		// to find it, the determinants are compared (|C| = multiplication of eigenvalues = multiplication of orthogonal variances)
-		double[] m      = new double[3];
-		double   mindet = double.MaxValue;
+		// and 
+		double[] m         = new double[3];
+		double   mindet    = double.MaxValue;
+		double   maxweight = double.MinValue;
 
 		foreach (Gaussian component in corrected) {
-			if (component.Covariance.Determinant() < mindet) {
-				m = component.Mean;
-				mindet = component.Covariance.Determinant();
+			if (!pose.Visible(component.Mean)) {
+				continue;
+			}
+
+			// only update if the weight is "close enough" and the uncertainty is better
+			if (component.Weight > maxweight * 0.7 && component.Covariance.Determinant() < mindet) {
+				m         = component.Mean;
+				mindet    = component.Covariance.Determinant();
+				maxweight = Math.Max(component.Weight, maxweight);
 			}
 		}
 
@@ -354,27 +376,27 @@ public class Navigator
 	/// To diminish the computational time, only the areas near the new measurements are
 	/// used (i.e. the same measurements). This is equivalent to artificially increasing
 	/// belief on the new measurements (when in a new area).</remarks>
-	public List<Gaussian> PredictConditional(List<double[]> measurements, Vehicle pose, List<Gaussian> model)
+	public List<Gaussian> PredictConditional(List<double[]> measurements, Vehicle pose, List<Gaussian> model, List<double[]> unexplored)
 	{
 		// gaussian are born on any unexplored areas,
 		// as something is expected to be there.
 		// but this is too resource-intensive so
 		// here's a little cheat: only do it on areas
-		// there will be a new measurement soon.
-		List<double[]> unexplored = new List<double[]>();
+		// there was be a new measurement lately.
+		List<Gaussian> predicted = new List<Gaussian>(model);
+		
+		// birth RFS
+		foreach (double[] candidate in unexplored) {
+			predicted.Add(new Gaussian(candidate, BirthCovariance, BirthWeight));
+		}
+
+		unexplored.Clear();
 
 		foreach (double[] measurement in measurements) {
 			double[] candidate = pose.MeasureToMap(measurement);
 			if (!Explored(model, candidate)) {
 				unexplored.Add(candidate);
 			}
-		}
-
-		List<Gaussian> predicted = new List<Gaussian>(model);
-
-		// birth RFS
-		foreach (double[] candidate in unexplored) {
-			predicted.Add(new Gaussian(candidate, BirthCovariance, BirthWeight));
 		}
 
 		return predicted;
