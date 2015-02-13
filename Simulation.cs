@@ -152,7 +152,7 @@ public class Simulation : Game
 	{
 		initScene(File.ReadAllText(scene));
 
-		this.Navigator = new Navigator(Explorer, 5, false);
+		this.Navigator = new Navigator(Explorer, 50, true);
 
 		try {
 			initCommands(File.ReadAllLines(commands));

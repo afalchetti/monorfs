@@ -34,25 +34,25 @@ public class Vehicle
 	/// <summary>
 	/// Motion model covariance matrix.
 	/// </summary>
-	public readonly double[,] MotionCovariance = new double[7, 7] {{5e-3, 0, 0, 0, 0, 0, 0},
-	                                                               {0, 5e-3, 0, 0, 0, 0, 0},
-	                                                               {0, 0, 5e-3, 0, 0, 0, 0},
-	                                                               {0, 0, 0, 5e-3, 0, 0, 0},
-	                                                               {0, 0, 0, 0, 5e-3, 0, 0},
-	                                                               {0, 0, 0, 0, 0, 5e-3, 0},
-	                                                               {0, 0, 0, 0, 0, 0, 5e-3}};
+	public readonly double[,] MotionCovariance = new double[7, 7] {{4e-3, 0, 0, 0, 0, 0, 0},
+	                                                               {0, 4e-3, 0, 0, 0, 0, 0},
+	                                                               {0, 0, 4e-3, 0, 0, 0, 0},
+	                                                               {0, 0, 0, 4e-3, 0, 0, 0},
+	                                                               {0, 0, 0, 0, 4e-3, 0, 0},
+	                                                               {0, 0, 0, 0, 0, 4e-3, 0},
+	                                                               {0, 0, 0, 0, 0, 0, 4e-3}};
 
 	/// <summary>
 	/// Measurement model covariance matrix.
 	/// </summary>
-	public readonly double[,] MeasurementCovariance = new double[3, 3] {{2e0,  0, 0},
-	                                                                    {0,  2e0, 0},
-	                                                                    {0, 0, 2e-3}};
+	public readonly double[,] MeasurementCovariance = new double[3, 3] {{2e-0,  0, 0},
+	                                                                    {0,  2e-0, 0},
+	                                                                    {0, 0, 1e-3}};
 
 	/// <summary>
 	/// Probability of detection.
 	/// </summary>
-	private readonly double detectionProbability = 0.85;
+	private readonly double detectionProbability = 0.9;
 
 	/// <summary>
 	/// Amount of expected clutter (spuriousness) on the measurement process.
@@ -63,7 +63,7 @@ public class Vehicle
 	/// Clutter density integral over the whole measurement space, i.e.
 	/// the expected number of clutter measurements.
 	/// </summary>
-	private readonly double ClutterCount;
+	public readonly double ClutterCount;
 
 	/// <summary>
 	/// Get the internal state as a vector.
@@ -370,7 +370,15 @@ public class Vehicle
 		// poisson distributed clutter measurement count
 		// a cap of 10 lambda is enforced because technically
 		// the number is unbounded so it could freeze the system
-		int nclutter = Math.Min(clutterGen.Generate(), (int)(ClutterCount * 10));
+		int nclutter;
+		try {
+			// the poisson generator may underflow if lambda is too small
+			nclutter = Math.Min(clutterGen.Generate(), (int)(ClutterCount * 10));
+		}
+		catch (ArithmeticException)
+		{
+			nclutter = 0;
+		}
 
 		for (int i = 0; i < nclutter; i++) {
 			double px    = U.uniform.Next() * FilmArea.Width + FilmArea.Left;

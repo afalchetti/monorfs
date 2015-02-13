@@ -27,7 +27,7 @@ public class Navigator
 	/// <summary>
 	/// Landmark density expected on unexplored areas.
 	/// </summary>
-	public const double BirthWeight = 0.1;
+	public const double BirthWeight = 0.05;
 
 	/// <summary>
 	/// Landmark density spread expected on unexplored areas
@@ -162,7 +162,7 @@ public class Navigator
 		this.VehicleWeights   = new double        [particlecount];
 
 		for (int i = 0; i < particlecount; i++) {
-			this.VehicleParticles[i] = new Vehicle(vehicle, 5.0, 5.0, 0.6, 1e-2);
+			this.VehicleParticles[i] = new Vehicle(vehicle, 1.8, 1.8, 0.7, 5e-7);
 			this.MapModels       [i] = new List<Gaussian>();
 			this.VehicleWeights  [i] = 1.0 / particlecount;
 		}
@@ -232,17 +232,24 @@ public class Navigator
 	{
 		// map update
 		Parallel.For (0, VehicleParticles.Length, i => {
-			if (predict) { MapModels[i] = PredictConditional(measurements, VehicleParticles[i], MapModels[i]); }
-			Mpredicted[i] = ExpectedSize(MapModels[i]);
+			List<Gaussian> predicted, corrected;
 
-			if (correct) { MapModels[i] = CorrectConditional(measurements, VehicleParticles[i], MapModels[i]); }
-			if (prune)   { MapModels[i] = PruneModel(MapModels[i]); }
-			Mcorrected[i] = ExpectedSize(MapModels[i]);
+			if (predict) { predicted = PredictConditional(measurements, VehicleParticles[i], MapModels[i]); }
+			else         { predicted = MapModels[i]; }
+
+			if (correct) { corrected = CorrectConditional(measurements, VehicleParticles[i], predicted); }
+			else         { corrected = predicted; }
+
+			if (prune)   { corrected = PruneModel(corrected); }
+
+			if (!OnlyMapping) { VehicleWeights[i] *= WeightAlpha(measurements, predicted, corrected, VehicleParticles[i]); }
+
+			MapModels[i]  = corrected;
 		});
 
 		// localization update
 		if (!OnlyMapping) {
-			UpdateParticleWeights(Mpredicted, Mcorrected);
+			VehicleWeights = VehicleWeights.Divide(VehicleWeights.Sum());
 			ResampleParticles();
 		}
 
@@ -253,20 +260,44 @@ public class Navigator
 	/// Update the weights of each vehicle using the sequential importance sampling technique.
 	/// It uses the empty map technique for now as it is simple and gives reasonable results.
 	/// </summary>
-	public void UpdateParticleWeights(double[] Mpredicted, double[] Mcorrected)
+	public double WeightAlpha(List<double[]> measurements, List<Gaussian> predicted, List<Gaussian> corrected, Vehicle pose)
 	{
-		for (int i = 0; i < VehicleWeights.Length; i++) {
-			// using the empty-map trick, the new weight follows approximately the formula
-			// w' = k^|Z| exp(|Mcorrected| - |Mpredicted| - integral of k) w, where
-			// k   is the clutter density,
-			// |Z| is the number of measurements
-			// |M| is the expected number of landmarks (integral of the map model)
-			// interestingly, given k a constant density, k^|Z| and the integral of k are constant too
-			// so there's no real need to use them (as they will drop after the renormalization)
-			VehicleWeights[i] *= Math.Exp(Mcorrected[i] - Mpredicted[i]);
+		// using the one-feature-map trick, the new weight follows approximately the formula
+		// w' = 1/gama [(1 - PD) k^|Z| + PD sum of (k^(|Z|-1) v_corr(m)) for every measurement] v_pred(m) w, where
+		// gamma is the factor e^(|Mpredicted| - |Mcorrected| + |Clutter measurements|) v_corr(m) 
+		// m is a particular map feature (any one is good)
+		// k   is the clutter density,
+		// |Z| is the number of measurements
+		// |M| is the expected number of landmarks (integral of the map model)
+		// interestingly, given k a constant density, the clutter count is constant
+		// so there's no real need to use it (as it will drop after the renormalization)
+
+		// the less uncertain feature m is used
+		// to find it, the determinants are compared (|C| = multiplication of eigenvalues = multiplication of orthogonal variances)
+		double[] m      = new double[3];
+		double   mindet = double.MaxValue;
+
+		foreach (Gaussian component in corrected) {
+			if (component.Covariance.Determinant() < mindet) {
+				m = component.Mean;
+				mindet = component.Covariance.Determinant();
+			}
 		}
 
-		VehicleWeights = VehicleWeights.Divide(VehicleWeights.Sum());
+		double gamma = Math.Exp(ExpectedSize(predicted) - ExpectedSize(corrected)) * EvaluateModel(corrected, m);
+		double PD    = pose.DetectionProbability(m);
+		double kz    = Math.Pow(pose.ClutterDensity, measurements.Count);
+		double kz1   = Math.Pow(pose.ClutterDensity, measurements.Count - 1);
+		double sum   = 0;
+		Gaussian g   = new Gaussian(pose.MeasurePerfect(m), pose.MeasurementCovariance, 1);
+
+		foreach (double[] z in measurements) {
+			sum += g.Evaluate(z);
+		}
+
+		sum *= kz1;
+
+		return 1/gamma * ((1 - PD) * kz + PD * sum) * EvaluateModel(predicted, m);
 	}
 
 	/// <summary>
