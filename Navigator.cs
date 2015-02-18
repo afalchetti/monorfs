@@ -267,7 +267,7 @@ public class Navigator
 
 	/// <summary>
 	/// Update the weights of each vehicle using the sequential importance sampling technique.
-	/// It uses the empty map technique for now as it is simple and gives reasonable results.
+	/// It uses most-probable-components approximation to solve the problem in polynomial time.
 	/// </summary>
 	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
 	/// <param name="predicted">Predicted map model.</param>
@@ -276,50 +276,65 @@ public class Navigator
 	/// <returns>Total likelihood weight.</returns>
 	public double WeightAlpha(List<double[]> measurements, List<Gaussian> predicted, List<Gaussian> corrected, Vehicle pose)
 	{
-		// using the one-feature-map trick, the new weight follows approximately the formula
-		// w' = 1/gama [(1 - PD) k^|Z| + PD sum of (k^(|Z|-1) v_corr(m)) for every measurement] v_pred(m) w, where
-		// gamma is the factor e^(|Mpredicted| - |Mcorrected| + |Clutter measurements|) v_corr(m) 
-		// m is a particular map feature (any one is good)
-		// k   is the clutter density,
-		// |Z| is the number of measurements
-		// |M| is the expected number of landmarks (integral of the map model)
-		// interestingly, given k a constant density, the clutter count is constant
-		// so there's no real need to use it (as it will drop after the renormalization)
+		List<Gaussian> visible = corrected.FindAll(g => pose.Visible(g.Mean) && g.Weight > 0.8);
 
-		// the less uncertain feature m is used
-		// to find it, the determinants are compared (|C| = multiplication of eigenvalues = multiplication of orthogonal variances)
-		// and 
-		double[] m         = new double[3];
-		double   mindet    = double.MaxValue;
-		double   maxweight = double.MinValue;
+		// exact calculation if there are few components/measurements;
+		// use the most probable components approximation otherwise
+		SparseMatrix probabilities = new SparseMatrix(visible.Count + measurements.Count, visible.Count + measurements.Count);
 
-		foreach (Gaussian component in corrected) {
-			if (!pose.Visible(component.Mean)) {
-				continue;
+		double     logPD  = (visible.Count > 0) ? Math.Log(pose.DetectionProbability(visible[0].Mean)) : 0;
+		Gaussian[] zprobs = new Gaussian[visible.Count];
+
+
+		for (int i = 0; i < visible.Count; i++) {
+			zprobs[i] = new Gaussian(pose.MeasurePerfect(visible[i].Mean), pose.MeasurementCovariance, 1); 
+		}
+
+		for (int i = 0; i < zprobs.Length;      i++) {
+		for (int k = 0; k < measurements.Count; k++) {
+			double d = Mahalanobis(zprobs[i], measurements[k]);
+			if (d < 3) {
+				// prob = log (pD * zprob(measurement))
+				// this way multiplying probabilities equals to adding (negative) profits
+				probabilities[i, k] = logPD + Math.Log(zprobs[i].multiplier) + 0.5 * d * d;
+			}
+		}
+		}
+		
+		for (int i = 0; i < visible.Count; i++) {
+			probabilities[i, measurements.Count + i] = logPD;
+		}
+
+		for (int i = 0; i < measurements.Count; i++) {
+			probabilities[visible.Count + i, i] = pose.ClutterDensity;
+		}
+
+		List<SparseMatrix> components = GraphCombinatorics.ConnectedComponents(probabilities);
+		double             total      = 0;
+
+		foreach (SparseMatrix component in components) {
+			IEnumerable<int[]> assignments; 
+			if (component.Rows.Count <= 8) {
+				assignments = GraphCombinatorics.LexicographicalPairing(component, visible.Count);
+
+			}
+			else {
+				assignments = GraphCombinatorics.MurtyPairing(component);
 			}
 
-			// only update if the weight is "close enough" and the uncertainty is better
-			if (component.Weight > maxweight * 0.7 && component.Covariance.Determinant() < mindet) {
-				m         = component.Mean;
-				mindet    = component.Covariance.Determinant();
-				maxweight = Math.Max(component.Weight, maxweight);
+			int h = 0;
+			foreach (int[] assignment in assignments) {
+				if (h >= 20) {
+					break;
+				}
+
+				total += Math.Exp(GraphCombinatorics.AssignmentValue(probabilities, assignment));
+
+				h++;
 			}
 		}
 
-		double gamma = Math.Exp(ExpectedSize(predicted) - ExpectedSize(corrected)) * EvaluateModel(corrected, m);
-		double PD    = pose.DetectionProbability(m);
-		double kz    = Math.Pow(pose.ClutterDensity, measurements.Count);
-		double kz1   = Math.Pow(pose.ClutterDensity, measurements.Count - 1);
-		double sum   = 0;
-		Gaussian g   = new Gaussian(pose.MeasurePerfect(m), pose.MeasurementCovariance, 1);
-
-		foreach (double[] z in measurements) {
-			sum += g.Evaluate(z);
-		}
-
-		sum *= kz1;
-
-		return 1/gamma * ((1 - PD) * kz + PD * sum) * EvaluateModel(predicted, m);
+		return total;
 	}
 
 	/// <summary>
@@ -569,6 +584,18 @@ public class Navigator
 	/// <param name="point">Point in R^N space.</param>
 	/// <returns>Distance between distribution and point.</returns>
 	private double Mahalanobis(Gaussian distribution, double[] point)
+	{
+		double[] diff = distribution.Mean.Subtract(point);
+		return Math.Sqrt(Accord.Math.Matrix.InnerProduct(diff, distribution.CovarianceInverse.Multiply(diff)));
+	}
+
+	/// <summary>
+	/// Obtain the squared Mahalanobis distance between a gaussian distribution and a point.
+	/// </summary>
+	/// <param name="distribution">Gaussian distribution in R^N space.</param>
+	/// <param name="point">Point in R^N space.</param>
+	/// <returns>Distance between distribution and point.</returns>
+	private double MahalanobisSquared(Gaussian distribution, double[] point)
 	{
 		double[] diff = distribution.Mean.Subtract(point);
 		return Accord.Math.Matrix.InnerProduct(diff, distribution.CovarianceInverse.Multiply(diff));

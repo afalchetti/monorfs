@@ -63,6 +63,7 @@
     <Reference Include="Tao.Sdl, Version=1.2.13.0, Culture=neutral, PublicKeyToken=9c7a200e36c0094e, processorArchitecture=MSIL" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ArrayExtensions.cs" />
     <Compile Include="CircularBuffer.cs" />
     <Compile Include="GraphicsDeviceExtension.cs" />
     <Compile Include="MatrixExtensions.cs" />
@@ -70,6 +71,8 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Simulation.cs" />
+    <Compile Include="GraphCombinatorics.cs" />
+    <Compile Include="SparseMatrix.cs" />
     <Compile Include="Util.cs" />
     <Compile Include="Vehicle.cs" />
   </ItemGroup>
