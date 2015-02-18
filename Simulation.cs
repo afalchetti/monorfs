@@ -30,7 +30,25 @@ public class Simulation : Game
 	/// Measure cycle period in miliseconds. Every this
 	/// amount of time the SLAM solver is invoked.
 	/// </summary>
-	public const double MeasurePeriod = 100;
+	public const double MeasurePeriod = 1.0/10;
+
+	/// <summary>
+	/// Simulation frame period (frames per second inverse).
+	/// </summary>
+	public readonly TimeSpan FrameElapsed = new TimeSpan(10000000/60);
+
+	/// <summary>
+	/// If true, the calculations are bound by realtime constraints,
+	/// i.e. if it takes too long, the vehicle will move proportionally.
+	/// Otherwise, the simulated timestep is always the same, regardless of
+	/// how long the operations take.
+	/// </summary>
+	public const bool Realtime = false;
+
+	/// <summary>
+	/// Simulated time.
+	/// </summary>
+	private GameTime simtime = new GameTime();
 
 	/// <summary>
 	/// Main vehicle.
@@ -319,6 +337,8 @@ public class Simulation : Game
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	protected override void Update(GameTime time)
 	{
+		simtime = Realtime ? time : new GameTime(simtime.TotalGameTime.Add(FrameElapsed), FrameElapsed);
+
 		// TODO : force framerate constant
 		KeyboardState keyboard = Keyboard.GetState();
 
@@ -387,18 +407,18 @@ public class Simulation : Game
 		bool DoCorrect = !keyboard.IsKeyDown(Keys.C);
 		bool DoPrune   = !keyboard.IsKeyDown(Keys.Q);
 
-		Explorer.Update (time, 0, 0, ds, dyaw, dpitch, droll);
-		Navigator.Update(time, 0, 0, ds, dyaw, dpitch, droll);
+		Explorer.Update (simtime, 0, 0, ds, dyaw, dpitch, droll);
+		Navigator.Update(simtime, 0, 0, ds, dyaw, dpitch, droll);
 
 		camangle += dcam;
 		camera    = MatrixExtensions.CreateRotationX(camangle);
 
-		if (time.TotalGameTime.TotalMilliseconds - lastnavigationupdate.TotalGameTime.TotalMilliseconds > MeasurePeriod) {
+		if (simtime.TotalGameTime.TotalSeconds - lastnavigationupdate.TotalGameTime.TotalSeconds > MeasurePeriod) {
 			List<double[]> measurements = Explorer.Measure();
 
-			Navigator.SlamUpdate(time, measurements, DoPredict, DoCorrect, DoPrune);
+			Navigator.SlamUpdate(simtime, measurements, DoPredict, DoCorrect, DoPrune);
 
-			lastnavigationupdate = new GameTime(time.TotalGameTime, time.ElapsedGameTime);
+			lastnavigationupdate = new GameTime(simtime.TotalGameTime, simtime.ElapsedGameTime);
 
 			MeasurementReadings = new List<double[]>();
 			foreach (double[] z in measurements) {
