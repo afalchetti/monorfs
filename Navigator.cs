@@ -16,6 +16,7 @@ using Accord.Math.Decompositions;
 using AForge;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using NUnit.Framework;
 
 namespace monorfs
 {
@@ -280,7 +281,7 @@ public class Navigator
 
 		// exact calculation if there are few components/measurements;
 		// use the most probable components approximation otherwise
-		SparseMatrix probabilities = new SparseMatrix(visible.Count + measurements.Count, visible.Count + measurements.Count);
+		SparseMatrix logprobs = new SparseMatrix(visible.Count + measurements.Count, visible.Count + measurements.Count, double.NegativeInfinity);
 
 		double     logPD  = (visible.Count > 0) ? Math.Log(pose.DetectionProbability(visible[0].Mean)) : 0;
 		Gaussian[] zprobs = new Gaussian[visible.Count];
@@ -296,21 +297,21 @@ public class Navigator
 			if (d < 3) {
 				// prob = log (pD * zprob(measurement))
 				// this way multiplying probabilities equals to adding (negative) profits
-				probabilities[i, k] = logPD + Math.Log(zprobs[i].multiplier) + 0.5 * d * d;
+				logprobs[i, k] = logPD + Math.Log(zprobs[i].multiplier) + 0.5 * d * d;
 			}
 		}
 		}
 		
 		for (int i = 0; i < visible.Count; i++) {
-			probabilities[i, measurements.Count + i] = logPD;
+			logprobs[i, measurements.Count + i] = logPD;
 		}
 
 		for (int i = 0; i < measurements.Count; i++) {
-			probabilities[visible.Count + i, i] = pose.ClutterDensity;
+			logprobs[visible.Count + i, i] = pose.ClutterDensity;
 		}
 
-		List<SparseMatrix> components = GraphCombinatorics.ConnectedComponents(probabilities);
-		double             total      = 0;
+		List<SparseMatrix> components = GraphCombinatorics.ConnectedComponents(logprobs).ConvertAll(c => c.Compact());
+		double             total      = 1.0;
 
 		foreach (SparseMatrix component in components) {
 			IEnumerable<int[]> assignments; 
@@ -322,16 +323,21 @@ public class Navigator
 				assignments = GraphCombinatorics.MurtyPairing(component);
 			}
 
-			int h = 0;
+			int    h         = 0;
+			double comptotal = 0;
+			double prev      = 0;
 			foreach (int[] assignment in assignments) {
-				if (h >= 20) {
+				comptotal += Math.Exp(GraphCombinatorics.AssignmentValue(logprobs, assignment));
+
+				if (h >= 200 || comptotal / prev < 1.001) {
 					break;
 				}
 
-				total += Math.Exp(GraphCombinatorics.AssignmentValue(probabilities, assignment));
-
+				prev = comptotal;
 				h++;
 			}
+
+			total *= comptotal;
 		}
 
 		return total;

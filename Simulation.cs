@@ -27,7 +27,7 @@ namespace monorfs
 public class Simulation : Game
 {
 	/// <summary>
-	/// Measure cycle period in miliseconds. Every this
+	/// Measure cycle period in seconds. Every this
 	/// amount of time the SLAM solver is invoked.
 	/// </summary>
 	public const double MeasurePeriod = 1.0/10;

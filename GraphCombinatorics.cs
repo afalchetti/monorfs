@@ -43,6 +43,9 @@ class GraphCombinatorics
 	/// <returns>Dense assignment list.</returns>
 	private static int[] Hungarian(SparseMatrix matrix)
 	{
+		//Console.WriteLine(matrix.ToStringFull());
+		//Console.WriteLine("");
+
 		// initial feasible labeling
 		var      rowmax = matrix.FoldRows((cum, mi) => Math.Max(cum, mi), 0);
 		double[] labelx = new double[matrix.Height];
@@ -51,81 +54,157 @@ class GraphCombinatorics
 		int   [] matchx = new int   [labelx.Length];
 		int   [] matchy = new int   [labelx.Length];
 
-		bool  [] S      = new bool  [labelx.Length];  // set represented by its indicator function
-		bool  [] T      = new bool  [labely.Length];  // idem
+		bool  [] visitx = new bool  [labelx.Length];  // set represented by its indicator function
+		bool  [] visity = new bool  [labely.Length];  // idem
 
 		double[] slack  = new double[labely.Length];
 		int   [] parent = new int   [labely.Length];
 		int      root   = -1;
 
+		int    iminslack = int.MaxValue;
+		double delta     = double.PositiveInfinity;
+
 		foreach (var item in rowmax) {
 			labelx[item.Key] = item.Value;
 		}
+		
+		AE.Fill(matchx, -1);
+		AE.Fill(matchy, -1);
+
+		//Action tellme = () =>
+		//{
+		//	Console.WriteLine("labelx: [" + string.Join(", ", Array.ConvertAll(labelx, x => x.ToString("F2"))) + "]");
+		//	Console.WriteLine("labely: [" + string.Join(", ", Array.ConvertAll(labely, x => x.ToString("F2"))) + "]");
+			
+		//	Console.WriteLine("matchx: [" + string.Join(", ", Array.ConvertAll(matchx, x => x.ToString())) + "]");
+		//	Console.WriteLine("matchy: [" + string.Join(", ", Array.ConvertAll(matchy, x => x.ToString())) + "]");
+
+		//	Console.WriteLine("visitx: [" + string.Join(", ", Array.ConvertAll(visitx, x => x ? "1" : "0")) + "]");
+		//	Console.WriteLine("visity: [" + string.Join(", ", Array.ConvertAll(visity, x => x ? "1" : "0")) + "]");
+			
+		//	Console.WriteLine("slack:  [" + string.Join(", ", Array.ConvertAll(slack,  x => x.ToString())) + "]");
+		//	Console.WriteLine("parent: [" + string.Join(", ", Array.ConvertAll(parent, x => x.ToString())) + "]");
+			
+		//	Console.WriteLine("root:   " + root);
+		//	Console.WriteLine("");
+		//};
 
 		// find an unmatched worker to start building a tree
+		//int h = 0;
 		while ((root = Array.IndexOf(matchx, -1)) != -1) {
-
 			// annotate all its slacks
 			AE.Fill(parent, root);
-			AE.Fill(slack, i => labelx[root] + labely[i] - matrix[root, i]);
+			AE.Fill(slack, i => matrix.Defines(root, i) ? labelx[root] + labely[i] - matrix[root, i] : double.PositiveInfinity);
+			
+			Array.Clear(visitx, 0, visitx.Length);
+			Array.Clear(visity, 0, visity.Length);
+			visitx[root] = true;
 
-			bool done = false;
-			while (!done) {
+			//Console.WriteLine("Iteration " + h++ + "\n-----------------");
+			//tellme();
+
+			bool found = false;
+			//int m = 0;
+			while (!found) {
 				// find the minimal slack where "y is in T"
-				int iminslack = int.MaxValue;
-				double delta  = 0;
+				iminslack = int.MaxValue;
+				delta     = double.PositiveInfinity;
+
+				//Console.WriteLine("    Sub-iteration " + m++ + "\n    ---------------------");
 
 				for (int i = 0; i < slack.Length; i++) {
-					if (T[i] == false && slack[i] < iminslack) {
+					if (visity[i] == false && slack[i] < delta) {
 						iminslack = i;
 						delta    = slack[i];
 					}
 				}
 
+				if (delta == double.PositiveInfinity) {
+					return null;  // there is no solution
+				}
+				
+				//Console.WriteLine("    iminslack: " + iminslack);
+				//Console.WriteLine("    delta:     " + delta);
+
 				// change the labels to tighten the slacks
+				// {
 				for (int i = 0; i < labelx.Length; i++) {
-					labelx[i] -= delta;
+					if (visitx[i] == true) {
+						labelx[i] -= delta;
+					}
 				}
 
 				for (int i = 0; i < labely.Length; i++) {
-					if (T[i] == true) {
+					if (visity[i] == true) {
 						labely[i] += delta;
 					}
 					else {
 						slack[i] -= delta;
 					}
 				}
+				// }
 
-				T[iminslack] = true;
+				visity[iminslack] = true;
+
+				//Console.WriteLine("\n    Tightened______");
+				//Console.WriteLine("    labelx: [" + string.Join(", ", Array.ConvertAll(labelx, x => x.ToString("F2"))) + "]");
+				//Console.WriteLine("    labely: [" + string.Join(", ", Array.ConvertAll(labely, x => x.ToString("F2"))) + "]");
+				//Console.WriteLine("    slack:  [" + string.Join(", ", Array.ConvertAll(slack,  x => x.ToString()))     + "]");
+				//Console.WriteLine("    ");
+				//Console.WriteLine("    visity: [" + string.Join(", ", Array.ConvertAll(visity, x => x ? "1" : "0")) + "]");
+				//Console.WriteLine("    ");
 
 				// for matched minimal slack, expand tree
 				if (matchy[iminslack] != -1) {
 					int match = matchy[iminslack];
-					S[match]  = true;
+					visitx[match]  = true;
+
+					//Console.WriteLine("    matched leaf:");
 
 					for (int i = 0; i < labely.Length; i++) {
-						if (!T[i]) {
-							double mslack = labelx[match] + labely[i] - matrix[match, i];
-							if (mslack < slack[i]) {
-								slack [i] = mslack;
+						if (!visity[i]) {
+							double mdelta = matrix.Defines(match, i) ? labelx[match] + labely[i] - matrix[match, i] : double.PositiveInfinity;
+							if (mdelta < slack[i]) {
+								slack [i] = mdelta;
 								parent[i] = match;
 							}
 						}
 					}
+					
+					//Console.WriteLine("    visitx: [" + string.Join(", ", Array.ConvertAll(visitx, x => x ? "1" : "0")) + "]");
+					//Console.WriteLine("    slack:  [" + string.Join(", ", Array.ConvertAll(slack,  x => x.ToString())) + "]");
+					//Console.WriteLine("    parent: [" + string.Join(", ", Array.ConvertAll(parent, x => x.ToString())) + "]");
 				}
 				// for unmatched minimal slack, the tree has an augmenting branch,
 				// follow it and invert every edge
 				else {
-					for (int py = iminslack, px = parent[py], ty; matchx[px] != -1; py = ty, px = parent[py]) {
-						ty = matchx[px];
-						matchx[px] = py;
-						matchy[py] = px;
+					found = true;
 
-					}
-
-					done = true;
+					//Console.WriteLine("    free leaf");
 				}
+
+				//Console.WriteLine("    ");
 			}
+
+			// invert augmenting branch
+			// {
+			//Console.WriteLine("following branch...");
+			int px, py, ty;
+			for (py = iminslack, px = parent[py]; px != root; py = ty, px = parent[py]) {
+				ty = matchx[px];
+				matchx[px] = py;
+				matchy[py] = px;
+
+				//Console.WriteLine(px + "->" + py);
+
+			}
+
+			matchx[px] = py;
+			matchy[py] = px;
+			//Console.WriteLine(px + "->" + py);
+			// }
+			
+			//Console.WriteLine("");
 		}
 
 		return matchx;
@@ -139,6 +218,11 @@ class GraphCombinatorics
 	/// <returns>Total profit.</returns>
 	public static double AssignmentValue(SparseMatrix profit, int[] matches)
 	{
+		// null means no solution
+		if (matches == null) {
+			return double.NegativeInfinity;
+		}
+
 		double total = 0;
 
 		for (int i = 0; i < matches.Length; i++) {
@@ -171,7 +255,7 @@ class GraphCombinatorics
 		reduced.RemoveColumns(removecols);
 		
 		foreach (MatrixKey force in reducer.Forced) {
-			reduced[force.I, force.K] = 2.0;  // "infinity" in probabilities
+			reduced[force.I, force.K] = 1;  // "infinity" against removed edges
 		}
 
 		foreach (MatrixKey force in reducer.Eliminated) {
@@ -192,16 +276,28 @@ class GraphCombinatorics
 		MurtyNode first    = new MurtyNode();
 		first.Assignment   = LinearAssignment(profit);
 
+		//Console.WriteLine(profit.ToStringFull());
+
 		frontier.Add(AssignmentValue(profit, first.Assignment), first);
 
 		while (frontier.Count > 0) {
+			//Console.WriteLine(frontier.Count);
 			MurtyNode best = frontier.Pop();
+			//Console.WriteLine(frontier.Count);
+			//Console.WriteLine(best);
 
 			yield return best.Assignment;
 
+			//Console.WriteLine("children___");
 			foreach (MurtyNode child in best.Children) {
-				best.Assignment = LinearAssignment(reduceprofit(profit, best));
-				frontier.Add(AssignmentValue(profit, best.Assignment), best);
+				child.Assignment = LinearAssignment(reduceprofit(profit, child));
+				//Console.WriteLine(child);
+				//Console.WriteLine(reduceprofit(profit, child).ToStringFull());
+				//Console.WriteLine(AssignmentValue(reduceprofit(profit, child), child.Assignment));
+
+				if (child.Assignment != null) {
+					frontier.Add(AssignmentValue(profit, child.Assignment), child);
+				}
 			}
 		}
 	}
@@ -223,24 +319,32 @@ class GraphCombinatorics
 		}
 
 		Array.Sort(permutation);
+		//Console.WriteLine(string.Join(", ", Array.ConvertAll(permutation, i => i.ToString())));
 
+		int measurestart = permutation.Length;
 		for (int i = 0; i < permutation.Length; i++) {
-			if (permutation[i] >= modelsize) {
-				permutation[i] = -permutation[i];
+			if (permutation[i] >=  modelsize) {
+				measurestart = i;
+				break;
 			}
 		}
+		
+		// to avoid equivalent permutations, all the measurement nodes are reversed
+		// so only one permutation of this segment is used
+		Array.Reverse(permutation, measurestart, permutation.Length - measurestart);
+		yield return permutation;
 
 		while (!lastpermutation(permutation)) {
-			// find lowest a such that p[a - 1] > p[a]
-			for (a = 1; a < permutation.Length; a++) {
-				if (permutation[a - 1] > permutation[a]) {
+			// find last a such that p[a] < p[a + 1]
+			for (a = permutation.Length - 2; a > 0; a--) {
+				if (permutation[a] < permutation[a + 1]) {
 					break;
 				}
 			}
 
-			// find lowest b < a such tha p[b] > p[a]
-			for (b = 0; b < a; b++) {
-				if (permutation[b] > permutation[b]) {
+			// find last b > a such tha p[a] < p[b]
+			for (b = permutation.Length - 1; b > a; b--) {
+				if (permutation[a] < permutation[b]) {
 					break;
 				}
 			}
@@ -251,31 +355,11 @@ class GraphCombinatorics
 			permutation[b] = temp;
 
 			// and reverse the tail
-			for (int k = 0; k < a - 1; k++) {
-				temp                   = permutation[k];
-				permutation[k]         = permutation[a - 1 - k];
-				permutation[a - 1 - k] = temp;
-			}
+			Array.Reverse(permutation, a + 1, permutation.Length - (a + 1));
 
-			/*
-			 * TODO all of this should be outside the combinatorics class... too specific
-			// convert to model/measurement pairing
-			var pairing = new List<Tuple<Gaussian, double[]>>();
-
-			// paired model + misdetected
-			for (int i = 0; i < model.Count; i++) {
-				pairing.Add(new Tuple<Gaussian, double[]>(model[i], (permutation[i] != -1) ? measurements[permutation[i]] : null));
-			}
-
-			// clutter
-			// TODO this may be speedable (by assuming all clutter permutation indices are next to each other => break somewhere)
-			for (int i = 0; i < measurements.Count; i++) {
-				if (permutation[i + measurements.Count] != -1) {
-					pairing.Add(new Tuple<Gaussian, double[]>(model[i], measurements[permutation[i + measurements.Count]]));
-				}
-			}
-			 * */
-
+			// to avoid equivalent permutations, all the measurement nodes are reversed
+			// so only one permutation of this segment is used
+			Array.Reverse(permutation, measurestart, permutation.Length - measurestart);
 			yield return permutation;
 		}
 	}
@@ -288,7 +372,7 @@ class GraphCombinatorics
 	private static bool lastpermutation(int[] permutation)
 	{
 		for (int i = 1; i < permutation.Length; i++) {
-			if (permutation[i - 1] > permutation[i]) {
+			if (permutation[i - 1] < permutation[i]) {
 				return false;
 			}
 		}
@@ -314,15 +398,22 @@ class GraphCombinatorics
 			bool[] rowvisited = new bool[complete.Height];
 			bool[] colvisited = new bool[complete.Width];
 
-			SparseMatrix component = new SparseMatrix();
+			SparseMatrix component = new SparseMatrix(complete.Width, complete.Height);
 			SparseItem   element   = complete.Any;
 			rowstack.Add(element.I);
 			colstack.Add(element.K);
 
 			while (rowstack.Count > 0 || colstack.Count > 0) {
+				//Console.WriteLine("|------");
+				//Console.WriteLine("rowstack: [" + string.Join(", ", rowstack.ConvertAll(i => i.ToString())) + "]");
+				//Console.WriteLine("colstack: [" + string.Join(", ", rowstack.ConvertAll(i => i.ToString())) + "]");
+				//Console.WriteLine("");
+
 				while  (rowstack.Count > 0) {
 					int nextrow = rowstack[rowstack.Count - 1];
 					rowstack.RemoveAt(rowstack.Count - 1);
+
+					//Console.WriteLine("nextrow: " + nextrow);
 
 					if (rowvisited[nextrow] == true) {
 						continue;
@@ -334,10 +425,15 @@ class GraphCombinatorics
 
 					component.AddRow(nextrow, row);
 					complete.RemoveRow(nextrow);
+					
+					//Console.WriteLine("row =\n" + "[" + string.Join(", ", row.Select(i => i.Key + ": " + i.Value)) + "]");
+					//Console.WriteLine("component =\n" + component.ToStringFull());
+					//Console.WriteLine("complete =\n" + complete.ToStringFull());
 
 					foreach (var k in row.Keys) {
-						if (colvisited[k] == false) {
+						if (colvisited[k] == false && colstack.IndexOf(k) == -1) {
 							colstack.Add(k);
+							//Console.WriteLine("colstack add: " + k);
 						}
 					}
 				}
@@ -345,6 +441,8 @@ class GraphCombinatorics
 				while (colstack.Count > 0) {
 					int nextcol = colstack[colstack.Count - 1];
 					colstack.RemoveAt(colstack.Count - 1);
+
+					//Console.WriteLine("nextcol: " + nextcol);
 
 					if (colvisited[nextcol] == true) {
 						continue;
@@ -355,11 +453,16 @@ class GraphCombinatorics
 					var col = complete.Column(nextcol);
 
 					component.AddColumn(nextcol, col);
-					complete.RemoveRow(nextcol);
+					complete.RemoveColumn(nextcol);
+					
+					//Console.WriteLine("col =\n" + "[" + string.Join(", ", col.Select(i => i.Key + ": " + i.Value)) + "]");
+					//Console.WriteLine("component =\n" + component.ToStringFull());
+					//Console.WriteLine("complete =\n" + complete.ToStringFull());
 
 					foreach (var i in col.Keys) {
-						if (rowvisited[i] == false) {
+						if (rowvisited[i] == false && rowstack.IndexOf(i) == -1) {
 							rowstack.Add(i);
+							//Console.WriteLine("rowstack add: " + i);
 						}
 					}
 				}
@@ -410,7 +513,8 @@ public class MurtyNode
 
 	/// <summary>
 	/// Get children nodes at run-time.
-	/// Assignment must have been pre-obtained for these to be meaningful.
+	/// Assignment must have been pre-obtained for these to be meaningful;
+	/// if it is null, it is considered that no solution exists => no children.
 	/// </summary>
 	public MurtyNode[] Children
 	{
@@ -430,24 +534,79 @@ public class MurtyNode
 
 			List<MurtyNode> children = new List<MurtyNode>();
 
-			for (int i = 0; i < iremaining.Count; i++) {
-				MatrixKey[] eliminated = new MatrixKey[Eliminated.Length + 1];
-				MatrixKey[] forced     = new MatrixKey[Forced    .Length + i];
+			for (int i = 0; i < iremaining.Count - 1; i++) {
+				if (Array.IndexOf(Forced, iremaining[i]) == -1) {
+					MatrixKey[] eliminated = new MatrixKey[Eliminated.Length + 1];
+					MatrixKey[] forced     = new MatrixKey[Forced    .Length + i];
 				
-				Eliminated.CopyTo(eliminated, 0);
-				Forced    .CopyTo(forced,     0);
+					Eliminated.CopyTo(eliminated, 0);
+					Forced    .CopyTo(forced,     0);
 
-				eliminated[Eliminated.Length] = iremaining[i];
+					eliminated[Eliminated.Length] = iremaining[i];
 
-				for (int k = 0; k < i; k++) {
-					forced[Forced.Length + k] = iremaining[k];
+					for (int k = 0; k < i; k++) {
+						if (Array.IndexOf(Forced, iremaining[k]) == -1) {
+							forced[Forced.Length + k] = iremaining[k];
+						}
+					}
+
+					children.Add(new MurtyNode(forced, eliminated));
 				}
-
-				children.Add(new MurtyNode(eliminated, forced));
 			}
 
 			return children.ToArray();
 		}
+	}
+	
+	/// <summary>
+	/// Efficient equality comparer with other MurtyNode.
+	/// </summary>
+	/// <param name="that">Compared node.</param>
+	/// <returns>True if both nodes are structurally identical.
+	/// This implies having the same field values and the same defined order for each field.</returns>
+	public bool Equals(MurtyNode that)
+	{
+		return Eliminated.SequenceEqual(that.Eliminated) &&
+		       Forced.SequenceEqual(that.Forced) &&
+		       (Assignment != null ? Assignment.SequenceEqual(that.Assignment) : that.Assignment == null);
+	}
+	
+	/// <summary>
+	/// Compares this object with another.
+	/// </summary>
+	/// <param name="that">Compared object.</param>
+	/// <returns>True if the objects are equal.</returns>
+	public override bool Equals(object that)
+	{
+		return that is MurtyNode && this.Equals(that as MurtyNode);
+	}
+
+	/// <summary>
+	/// Get a unique code that is equal for any two equal MurtyNodes.
+	/// </summary>
+	/// <returns>Hash code.</returns>
+	public override int GetHashCode()
+	{
+		int hash = 17;
+		hash = unchecked(37 * hash + Eliminated.GetHashCode());
+		hash = unchecked(37 * hash + Forced    .GetHashCode());
+
+		if (Assignment != null) {
+			hash = unchecked(37 * hash + Assignment.GetHashCode());
+		}
+
+		return hash;
+	}
+
+	/// <summary>
+	/// Get a string representation of the node.
+	/// </summary>
+	/// <returns>String representation.</returns>
+	public override string ToString()
+	{
+		return "{\n    eliminated: " + string.Join(", ", Array.ConvertAll(Eliminated, i => i.ToString())) + "\n" +
+		          "    forced:     " + string.Join(", ", Array.ConvertAll(Forced,     i => i.ToString())) + "\n" +
+		          "    assignment: " + ((Assignment != null) ? string.Join(", ", Array.ConvertAll(Assignment, i => i.ToString())) : "null") + "\n}";
 	}
 }
 
@@ -547,6 +706,31 @@ public class MatrixKey
 	{
 		I = i;
 		K = k;
+	}
+
+	public bool Equals(MatrixKey that)
+	{
+		return this.I == that.I && this.K == that.K;
+	}
+
+	public override bool Equals(object that)
+	{
+		return that is MatrixKey && this.Equals(that as MatrixKey);
+	}
+
+	public override int GetHashCode()
+	{
+		int hash = 17;
+
+		hash = unchecked(37 * hash + I);
+		hash = unchecked(37 * hash + K);
+
+		return hash;
+	}
+
+	public override string ToString()
+	{
+		return "(" + I + ", " + K + ")";
 	}
 }
 }
