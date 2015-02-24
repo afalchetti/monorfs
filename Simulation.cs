@@ -53,7 +53,7 @@ public class Simulation : Game
 	/// <summary>
 	/// Main vehicle.
 	/// </summary>
-	public Vehicle Explorer { get; private set; }
+	public SimulatedVehicle Explorer { get; private set; }
 
 	/// <summary>
 	/// Map description through points of interest
@@ -64,11 +64,6 @@ public class Simulation : Game
 	/// SLAM solver.
 	/// </summary>
 	public Navigator Navigator { get; private set; }
-
-	/// <summary>
-	/// Cached measurements from the update process for rendering purposes.
-	/// </summary>
-	public List<double[]> MeasurementReadings;
 
 	// MonoGame-related Fields
 
@@ -237,9 +232,8 @@ public class Simulation : Game
 			maploc.Add(landmark);
 		}
 
-		this.Landmarks           = new List<double[]>();
-		this.MeasurementReadings = new List<double[]>();
-		this.Explorer            = new Vehicle(location, angle, axis, this.Landmarks);
+		this.Landmarks = new List<double[]>();
+		this.Explorer  = new SimulatedVehicle(location, angle, axis, this.Landmarks);
 
 		for (int i = 0; i < maploc.Count; i++) {
 			this.Landmarks.Add(maploc[i]);
@@ -419,11 +413,6 @@ public class Simulation : Game
 			Navigator.SlamUpdate(simtime, measurements, DoPredict, DoCorrect, DoPrune);
 
 			lastnavigationupdate = new GameTime(simtime.TotalGameTime, simtime.ElapsedGameTime);
-
-			MeasurementReadings = new List<double[]>();
-			foreach (double[] z in measurements) {
-				MeasurementReadings.Add(Explorer.MeasureToMap(z));
-			}
 		}
 
 		base.Update(time);
@@ -441,20 +430,7 @@ public class Simulation : Game
 		foreach (EffectPass pass in effect.CurrentTechnique.Passes) {
 			pass.Apply();
 			
-			Explorer .RenderFOV(camera);
-			Navigator.RenderTrajectory(camera);
-			Explorer .RenderTrajectory(camera);
-			
-
-			foreach (double[] landmark in Landmarks) {
-				RenderLandmark(landmark, camera);
-			}
-
-			foreach (double[] measure in MeasurementReadings) {
-				RenderMeasure(measure, camera);
-			}
-
-			Explorer .RenderBody(camera);
+			Explorer .Render(camera);
 			Navigator.Render(camera);
 		}
 
@@ -469,63 +445,6 @@ public class Simulation : Game
 		flip.End();
 
 		base.Draw(time);
-	}
-
-	/// <summary>
-	/// Simple point landmark rendering.
-	/// </summary>
-	/// <param name="landmark">Point landmark position.</param>
-	/// <param name="camera">Camera rotation matrix.</param>
-	private void RenderLandmark(double[] landmark, double[,] camera)
-	{
-		const float halflen = 0.024f;
-		
-		Color innercolor =  Color.LightGray;
-		Color outercolor =  Color.Black;
-
-		landmark = camera.Multiply(landmark);
-		
-		VertexPositionColor[] invertices  = new VertexPositionColor[4];
-		double[][]            outvertices = new double[4][];
-
-		outvertices[0] = new double[] {landmark[0] - halflen, landmark[1] - halflen, landmark[2]};
-		outvertices[1] = new double[] {landmark[0] - halflen, landmark[1] + halflen, landmark[2]};
-		outvertices[2] = new double[] {landmark[0] + halflen, landmark[1] + halflen, landmark[2]};
-		outvertices[3] = new double[] {landmark[0] + halflen, landmark[1] - halflen, landmark[2]};
-
-		invertices[0] = new VertexPositionColor(outvertices[0].ToVector3(), innercolor);
-		invertices[1] = new VertexPositionColor(outvertices[1].ToVector3(), innercolor);
-		invertices[2] = new VertexPositionColor(outvertices[3].ToVector3(), innercolor);
-		invertices[3] = new VertexPositionColor(outvertices[2].ToVector3(), innercolor);
-
-		graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
-		graphics.DrawUser2DPolygon(outvertices, 0.02f, outercolor, true);
-	}
-
-	/// <summary>
-	/// Simple point measurement rendering.
-	/// </summary>
-	/// <param name="measurement">Point measurement position.</param>
-	/// <param name="camera">Camera rotation matrix.</param>
-	private void RenderMeasure(double[] measurement, double[,] camera)
-	{
-		const float halflen = 0.03f;
-		
-		Color color =  Color.Crimson;
-
-		measurement = camera.Multiply(measurement);
-		
-		double[][] vertices = new double[2][];
-
-		vertices[0] = new double[] {measurement[0] - halflen, measurement[1] - halflen, measurement[2]};
-		vertices[1] = new double[] {measurement[0] + halflen, measurement[1] + halflen, measurement[2]};
-		
-		graphics.DrawUser2DPolygon(vertices, 0.01f, color, true);
-
-		vertices[0] = new double[] {measurement[0] - halflen, measurement[1] + halflen, measurement[2]};
-		vertices[1] = new double[] {measurement[0] + halflen, measurement[1] - halflen, measurement[2]};
-
-		graphics.DrawUser2DPolygon(vertices, 0.01f, color, true);
 	}
 
 	/// <summary>

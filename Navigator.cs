@@ -67,7 +67,7 @@ public class Navigator
 	/// <summary>
 	/// Particle filter representation of the vehicle pose.
 	/// </summary>
-	public Vehicle[] VehicleParticles { get;  private set; }
+	public SimulatedVehicle[] VehicleParticles { get;  private set; }
 
 	/// <summary>
 	/// Weight associated to each vehicle particle.
@@ -163,13 +163,13 @@ public class Navigator
 		// do a deep copy, so no real info flows
 		// into the navigator, only estimates, in SLAM.
 		// In mapping, info flows only through RefVehicle
-		this.VehicleParticles = new Vehicle       [particlecount];
-		this.MapModels        = new List<Gaussian>[particlecount];
-		this.VehicleWeights   = new double        [particlecount];
-		this.toexplore        = new List<double[]>[particlecount];
+		this.VehicleParticles = new SimulatedVehicle[particlecount];
+		this.MapModels        = new List<Gaussian>  [particlecount];
+		this.VehicleWeights   = new double          [particlecount];
+		this.toexplore        = new List<double[]>  [particlecount];
 
 		for (int i = 0; i < particlecount; i++) {
-			this.VehicleParticles[i] = new Vehicle(vehicle, 1.8, 1.8, 0.7, 5e-7);
+			this.VehicleParticles[i] = new SimulatedVehicle(vehicle, 1.8, 1.8, 0.7, 5e-7);
 			this.MapModels       [i] = new List<Gaussian>();
 			this.VehicleWeights  [i] = 1.0 / particlecount;
 			this.toexplore       [i] = new List<double[]>();
@@ -275,7 +275,7 @@ public class Navigator
 	/// <param name="corrected">Corrected map model.</param>
 	/// <param name="pose">Vehicle pose.</param>
 	/// <returns>Total likelihood weight.</returns>
-	public double WeightAlpha(List<double[]> measurements, List<Gaussian> predicted, List<Gaussian> corrected, Vehicle pose)
+	public double WeightAlpha(List<double[]> measurements, List<Gaussian> predicted, List<Gaussian> corrected, SimulatedVehicle pose)
 	{
 		List<Gaussian> visible = corrected.FindAll(g => pose.Visible(g.Mean) && g.Weight > 0.8);
 
@@ -354,11 +354,11 @@ public class Navigator
 	/// </summary>
 	public void ResampleParticles()
 	{
-		double           random    = (double) Util.uniform.Next() / VehicleWeights.Length;
-		double[]         weights   = new double[VehicleWeights.Length];
-		Vehicle[]        particles = new Vehicle[VehicleParticles.Length];
-		List<Gaussian>[] models    = new List<Gaussian>[MapModels.Length];
-		double           maxweight = 0;
+		double             random    = (double) Util.uniform.Next() / VehicleWeights.Length;
+		double[]           weights   = new double[VehicleWeights.Length];
+		SimulatedVehicle[] particles = new SimulatedVehicle[VehicleParticles.Length];
+		List<Gaussian>[]   models    = new List<Gaussian>[MapModels.Length];
+		double             maxweight = 0;
 
 		for (int i = 0, k = 0; i < weights.Length; i++) {
 			// k should never be out of range, but because of floating point arithmetic,
@@ -368,7 +368,7 @@ public class Navigator
 				random -= VehicleWeights[k];
 			}
 			
-			particles[i] = new Vehicle(VehicleParticles[k - 1]);
+			particles[i] = new SimulatedVehicle(VehicleParticles[k - 1]);
 			models   [i] = new List<Gaussian>(MapModels[k - 1]);
 			weights  [i] = 1.0 / weights.Length;
 			random      += 1.0 / weights.Length;
@@ -397,7 +397,7 @@ public class Navigator
 	/// To diminish the computational time, only the areas near the new measurements are
 	/// used (i.e. the same measurements). This is equivalent to artificially increasing
 	/// belief on the new measurements (when in a new area).</remarks>
-	public List<Gaussian> PredictConditional(List<double[]> measurements, Vehicle pose, List<Gaussian> model, List<double[]> unexplored)
+	public List<Gaussian> PredictConditional(List<double[]> measurements, SimulatedVehicle pose, List<Gaussian> model, List<double[]> unexplored)
 	{
 		// gaussian are born on any unexplored areas,
 		// as something is expected to be there.
@@ -431,7 +431,7 @@ public class Navigator
 	/// <param name="pose">Vehicle pose that conditions the mapping.</param>
 	/// <param name="model">Associated map model.</param>
 	/// <returns>Corrected map model.</returns>
-	public List<Gaussian> CorrectConditional(List<double[]> measurements, Vehicle pose, List<Gaussian> model)
+	public List<Gaussian> CorrectConditional(List<double[]> measurements, SimulatedVehicle pose, List<Gaussian> model)
 	{
 		List<Gaussian> corrected = new List<Gaussian>();
 
@@ -660,13 +660,22 @@ public class Navigator
 	}
 
 	/// <summary>
-	/// Render the navigation HUD on the graphics device.
+	/// Render the navigation HUD and the trajectory on the graphics device.
 	/// The graphics device must be ready, otherwise
 	/// the method will throw an exception.
 	/// </summary>
 	/// <param name="camera">Camera rotation matrix.</param>
 	public void Render(double[,] camera)
 	{
+		RenderTrajectory(camera);
+		RenderEstimate(camera);
+	}
+
+	/// <summary>
+	/// Render the navigation HUD.
+	/// </summary>
+	/// <param name="camera">Camera rotation matrix.</param>
+	public void RenderEstimate(double[,] camera) {
 		foreach (Gaussian component in MapModels[BestParticle]) {
 			RenderGaussian(component, camera);
 		}
