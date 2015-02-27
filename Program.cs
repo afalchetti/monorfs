@@ -78,14 +78,21 @@ public class Program
 	//[STAThread]
 	public static void Main(string[] args)
 	{
-		Simulation sim = new Simulation("map.world", "movements.in");
+		if (!KinectVehicle.Initialize()) {
+			KinectVehicle.Shutdown();
+			Environment.Exit(1);
+		}
 
-		sim.Run();
+		using (Simulation sim = new Simulation("map.world"/*, "movements.in"*/)) {
+			sim.Run();
 		
-		File.WriteAllText("trajectories.out", sim.SerializedTrajectories);
-		File.WriteAllText("maps.out",         sim.SerializedMaps);
+			File.WriteAllText("trajectories.out", sim.SerializedTrajectories);
+			File.WriteAllText("maps.out",         sim.SerializedMaps);
 
-		SaveAsPng(sim.Buffer, "final.png");
+			SaveAsPng(sim.SceneBuffer, "final.png");
+		}
+
+		KinectVehicle.Shutdown();
 	}
 }
 }

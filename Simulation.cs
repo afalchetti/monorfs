@@ -53,7 +53,7 @@ public class Simulation : Game
 	/// <summary>
 	/// Main vehicle.
 	/// </summary>
-	public SimulatedVehicle Explorer { get; private set; }
+	public Vehicle Explorer { get; private set; }
 
 	/// <summary>
 	/// Map description through points of interest
@@ -81,21 +81,31 @@ public class Simulation : Game
 	/// Rendering shader definition.
 	/// </summary>
 	private BasicEffect effect;
+	
+	/// <summary>
+	/// Scene double buffer.
+	/// </summary>
+	public RenderTarget2D SceneBuffer { get; private set; }
 
 	/// <summary>
-	/// Double buffer.
+	/// Sidebar double buffer.
 	/// </summary>
-	public RenderTarget2D Buffer { get; private set; }
+	public RenderTarget2D SideBuffer { get; private set; }
 
 	/// <summary>
 	/// Double batch flipper.
 	/// </summary>
 	private SpriteBatch flip;
+	
+	/// <summary>
+	/// Scene double buffer flipping destination rectangle.
+	/// </summary>
+	private Rectangle scenedest;
 
 	/// <summary>
-	/// Double buffer flipping destination rectangle.
+	/// Sidebar double buffer flipping destination rectangle.
 	/// </summary>
-	private Rectangle bufferdest;
+	private Rectangle sidedest;
 
 	/// <summary>
 	/// Map clipping area.
@@ -109,7 +119,7 @@ public class Simulation : Game
 	private double camangle;
 
 	/// <summary>
-	/// Cmaera matrix.
+	/// Camera matrix.
 	/// </summary>
 	private double[,] camera;
 	
@@ -160,17 +170,23 @@ public class Simulation : Game
 	/// Construct a simulation from a formatted desccription file.
 	/// </summary>
 	/// <param name="scene">Scene descriptor filename.</param>
-	/// <param name="commands">Vehicle input command instructions filename. Can be empty (no automatic instructions).</param>
-	public Simulation(string scene, string commands)
+	/// <param name="commands">Vehicle input command instructions filename. Can be null or empty (no automatic instructions).</param>
+	public Simulation(string scene, string commands = "")
 	{
 		initScene(File.ReadAllText(scene));
 
-		this.Navigator = new Navigator(Explorer, 50, false);
+		this.Navigator = new Navigator(Explorer, 1, false);
 
 		try {
-			initCommands(File.ReadAllLines(commands));
+			if (!string.IsNullOrEmpty(commands)) {
+				initCommands(File.ReadAllLines(commands));
+			}
 		}
 		catch (FileNotFoundException) {
+			commands = null;
+		}
+
+		if (string.IsNullOrEmpty(commands)) {
 			Commands = new CircularBuffer<double[]>(1);
 			Commands.Add(new double[5] {0, 0, 0, 0, 0});
 		}
@@ -181,15 +197,22 @@ public class Simulation : Game
 		this.Content.RootDirectory = "Content";
 		this.IsMouseVisible        = true;
 
-		this.graphicsManager.PreferredBackBufferWidth  = (int)(800*1.2);
+		this.graphicsManager.PreferredBackBufferWidth  = (int)(1000*1.2);
 		this.graphicsManager.PreferredBackBufferHeight = (int)(450*1.2);
 		this.graphicsManager.PreferMultiSampling       = true;
 		this.graphicsManager.IsFullScreen              = false;
 
+		const double screencut = 0.3;
 
-		this.bufferdest = clipCenter(graphicsManager.PreferredBackBufferWidth,
-		                             graphicsManager.PreferredBackBufferHeight,
-		                             (mapclip[1] - mapclip[0]) / (mapclip[3] - mapclip[2]));
+		this.scenedest = clipCenter((int)(graphicsManager.PreferredBackBufferWidth * screencut),
+		                            graphicsManager.PreferredBackBufferHeight,
+		                            (mapclip[1] - mapclip[0]) / (mapclip[3] - mapclip[2]));
+
+		this.sidedest = clipCenter((int)(graphicsManager.PreferredBackBufferWidth * (1 - screencut)),
+		                           graphicsManager.PreferredBackBufferHeight,
+		                           (float) Explorer.SidebarWidth / Explorer.SidebarHeight);
+
+		this.sidedest.X += (int)(graphicsManager.PreferredBackBufferWidth * screencut);
 
 		camangle = 0;
 		camera   = Accord.Math.Matrix.Identity(3);
@@ -233,7 +256,8 @@ public class Simulation : Game
 		}
 
 		this.Landmarks = new List<double[]>();
-		this.Explorer  = new SimulatedVehicle(location, angle, axis, this.Landmarks);
+		//this.Explorer  = new SimulatedVehicle(location, angle, axis, this.Landmarks);
+		this.Explorer  = new KinectVehicle(Directory.GetCurrentDirectory() + @"\first.oni");
 
 		for (int i = 0; i < maploc.Count; i++) {
 			this.Landmarks.Add(maploc[i]);
@@ -305,12 +329,21 @@ public class Simulation : Game
 
 		this.effect.LightingEnabled    = false;
 		this.effect.VertexColorEnabled = true;
+		
+		this.SceneBuffer = new RenderTarget2D(graphics, 2 * scenedest.Width, 2 * scenedest.Height,
+		                                      false, SurfaceFormat.Color, DepthFormat.Depth16,
+		                                      0, RenderTargetUsage.DiscardContents);
 
-		this.Buffer = new RenderTarget2D(graphics, 2 * bufferdest.Width, 2 * bufferdest.Height,
-		                                 false, SurfaceFormat.Color, DepthFormat.Depth16,
-		                                 0, RenderTargetUsage.DiscardContents);
+		this.SideBuffer = new RenderTarget2D(graphics, sidedest.Width, sidedest.Height,
+		                                     false, SurfaceFormat.Color, DepthFormat.Depth16,
+		                                     0, RenderTargetUsage.DiscardContents);
 
-		//this.IsFixedTimeStep = false;
+		if (!Realtime) {
+			this.TargetElapsedTime = FrameElapsed;
+		}
+		else {
+			this.IsFixedTimeStep = false;
+		}
 
 		base.Initialize();
 	}
@@ -321,7 +354,8 @@ public class Simulation : Game
 	/// </summary>
 	protected override void LoadContent()
 	{
-		this.flip = new SpriteBatch(this.graphics);
+		this.flip          = new SpriteBatch(this.graphics);
+		this.Explorer.Flip = this.flip;
 	}
 
 	/// <summary>
@@ -333,7 +367,6 @@ public class Simulation : Game
 	{
 		simtime = Realtime ? time : new GameTime(simtime.TotalGameTime.Add(FrameElapsed), FrameElapsed);
 
-		// TODO : force framerate constant
 		KeyboardState keyboard = Keyboard.GetState();
 
 		double ds     = 0;
@@ -409,7 +442,7 @@ public class Simulation : Game
 
 		if (simtime.TotalGameTime.TotalSeconds - lastnavigationupdate.TotalGameTime.TotalSeconds > MeasurePeriod) {
 			List<double[]> measurements = Explorer.Measure();
-
+			
 			Navigator.SlamUpdate(simtime, measurements, DoPredict, DoCorrect, DoPrune);
 
 			lastnavigationupdate = new GameTime(simtime.TotalGameTime, simtime.ElapsedGameTime);
@@ -424,7 +457,8 @@ public class Simulation : Game
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	protected override void Draw(GameTime time)
 	{
-		this.graphics.SetRenderTarget(Buffer);
+		// scene panel
+		this.graphics.SetRenderTarget(SceneBuffer);
 		this.graphics.Clear(Color.DarkSeaGreen);
 
 		foreach (EffectPass pass in effect.CurrentTechnique.Passes) {
@@ -434,15 +468,28 @@ public class Simulation : Game
 			Navigator.Render(camera);
 		}
 
+		// sidebar
+		graphics.SetRenderTarget(SideBuffer);
+		graphics.Clear(Color.Black);
+
+		flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
+		           DepthStencilState.Default, RasterizerState.CullNone);
+
+		Explorer.RenderSide();
+
+		flip.End();
+
+		// to window
 		graphics.SetRenderTarget(null);
 		flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
 		           DepthStencilState.Default, RasterizerState.CullNone);
 
-		flip.Draw(Buffer, bufferdest, Color.White);
+		flip.Draw(SceneBuffer, scenedest, Color.White);
+		flip.Draw(SideBuffer,  sidedest,  Color.White);
+		
+		flip.End();
 
 		//Console.WriteLine(1.0/time.ElapsedGameTime.TotalSeconds);
-
-		flip.End();
 
 		base.Draw(time);
 	}
@@ -466,6 +513,21 @@ public class Simulation : Game
 		}
 
 		return point;
+	}
+
+	/// <summary>
+	/// Dispose any resources.
+	/// </summary>
+	/// <param name="disposing">Mask. If false, nothing is done.</param>
+	protected override void Dispose(bool disposing)
+	{
+		if (disposing) {
+			if (Explorer != null) {
+				Explorer.Dispose();
+			}
+
+			base.Dispose(disposing);
+		}
 	}
 }
 }

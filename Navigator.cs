@@ -801,7 +801,7 @@ public class Gaussian
 	{
 		this.Mean              = mean;
 		this.Covariance        = covariance;
-		this.Weight            = weight;
+		this.Weight            = (!double.IsNaN(weight)) ? weight : 0;
 		this.multiplier        = Math.Pow(2 * Math.PI, -mean.Length / 2) / Math.Sqrt(covariance.Determinant());
 		this.CovarianceInverse = covariance.Inverse();
 	}

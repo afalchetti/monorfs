@@ -24,7 +24,7 @@ namespace monorfs
 /// <summary>
 /// Vehicle model.
 /// </summary>
-public abstract class Vehicle
+public abstract class Vehicle : IDisposable
 {
 	/// <summary>
 	/// Get the internal state as a vector.
@@ -109,11 +109,26 @@ public abstract class Vehicle
 	/// Range clipping planes in meters.
 	/// </summary>
 	public Range RangeClip { get; private set; }
-
+	
 	/// <summary>
 	/// Render output.
 	/// </summary>
-	public GraphicsDevice Graphics { get; set; }
+	public virtual GraphicsDevice Graphics { get; set; }
+
+	/// <summary>
+	/// Render bitmap renderer.
+	/// </summary>
+	public virtual SpriteBatch Flip { get; set; }
+
+	/// <summary>
+	/// Reference sidebar drawing width.
+	/// </summary>
+	public int SidebarWidth { get; protected set; }
+
+	/// <summary>
+	/// Reference sidebar drawing height.
+	/// </summary>
+	public int SidebarHeight { get; protected set; }
 
 	/// <summary>
 	/// Trajectory through which the vehicle has moved.
@@ -121,34 +136,78 @@ public abstract class Vehicle
 	/// next three are 3D coordinates.
 	/// </summary>
 	public List<double[]> Waypoints { get; protected set; }
+	
+	/// <summary>
+	/// Cached measurements from the update process for rendering purposes.
+	/// </summary>
+	protected List<double[]> MappedMeasurements { get; set; }
 
 	/// <summary>
 	/// Construct a vehicle with default constants.
 	/// </summary>
-	public Vehicle() : this(480, new Rectangle(-320, -240, 640, 480), new Range(0.8f, 2*4f)) {}
+	public Vehicle() : this(new double[3] {0, 0, 0}, 0, new double[3] {1, 0, 0}) {}
 
 	/// <summary>
-	/// Construct a vehicle with given constants.
+	/// Construct a new Vehicle object from its initial state.
 	/// </summary>
+	/// <param name="location">Spatial coordinates.</param>
+	/// <param name="theta">Orientation angle.</param>
+	/// <param name="axis">Orientation rotation axis.</param>
+	public Vehicle(double[] location, double theta, double[] axis)
+		: this(location, theta, axis, 240, new Rectangle(-160, -120, 320, 240), new Range(0.8f, 2*4f)) {}
+
+	/// <summary>
+	/// Construct a new Vehicle object from its initial state and appropiate constants.
+	/// </summary>
+	/// <param name="location">Spatial coordinates.</param>
+	/// <param name="theta">Orientation angle.</param>
+	/// <param name="axis">Orientation rotation axis.</param>
 	/// <param name="focal">Focal lenghth.</param>
 	/// <param name="film">Film area.</param>
 	/// <param name="clip">Range clipping area.</param>
-	public Vehicle(double focal, Rectangle film, Range clip)
+	public Vehicle(double[] location, double theta, double[] axis, double focal, Rectangle film, Range clip)
 	{
+		double w = Math.Cos(theta / 2);
+		double d = Math.Sin(theta / 2);
+
+		axis.Divide(axis.Euclidean(), true);
+		
+		State       = new double[7] {location[0], location[1], location[2], w, d * axis[0], d * axis[1], d * axis[2]};
 		VisionFocal = focal;
 		FilmArea    = film;
 		RangeClip   = clip;
+
+		MappedMeasurements = new List<double[]>();
+
+		Waypoints = new List<double[]>();
+		Waypoints.Add(new double[4] {0, X, Y, Z});
+	}
+
+	/// <summary>
+	/// Perform a deep copy of another general vehicle.
+	/// </summary>
+	/// <param name="that">Copied general vehicle.</param>
+	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
+	public Vehicle(Vehicle that, bool copytrajectory = false)
+		: this(that.Location, 0, new double[3] {0, 0, 0})
+	{
+		this.Orientation        = that.Orientation;
+		this.Graphics           = that.Graphics;
+		this.SidebarWidth       = that.SidebarWidth;
+		this.SidebarHeight      = that.SidebarHeight;
+		this.MappedMeasurements = that.MappedMeasurements;
+
+		if (copytrajectory) {
+			this.Waypoints = new List<double[]>(that.Waypoints);
+		}
+		else {
+			this.Waypoints = new List<double[]>();
+			this.Waypoints.Add(new double[4] {0, that.X, that.Y, that.Z});
+		}
 	}
 	
 	/// <summary>
-	/// Apply the motion model to the vehicle. It corresponds to a
-	/// 3D odometry model following the equation:
-	/// 
-	/// x = x + q dx q* + N(0, Q)
-	/// o = dq o dq* + N(0, Q')
-	/// 
-	/// where q is the midrotation quaternion (halfway between the old and new orientations) and N(a, b) is a normal function
-	/// with mean 'a' and covariance matrix 'b'.
+	/// Apply the motion model to the vehicle.
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <param name="dx">Moved distance from odometry in the local vertical movement-perpendicular direction since last timestep.</param>
@@ -158,11 +217,9 @@ public abstract class Vehicle
 	/// <param name="dpitch">Angle variation from odometry in the pitch coordinate since last timestep.</param>
 	/// <param name="droll">Angle variation from odometry in the roll coordinate since last timestep.</param>
 	public abstract void Update(GameTime time, double dx, double dy, double dz, double dyaw, double dpitch, double droll);
-	
 
 	/// <summary>
 	/// Obtain several measurements from the hidden state.
-	/// Ladmarks may be misdetected.
 	/// </summary>
 	/// <returns>Pixel-range measurements.</returns>
 	public abstract List<double[]> Measure();
@@ -171,13 +228,17 @@ public abstract class Vehicle
 	/// Render the vehicle on the graphics device.
 	/// The graphics device must be ready, otherwise
 	/// the method will throw an exception.
-	/// <param name="camera">Camera rotation matrix.</param>
 	/// </summary>
+	/// <param name="camera">Camera rotation matrix.</param>
 	public virtual void Render(double[,] camera)
 	{
 		RenderFOV(camera);
 		RenderTrajectory(camera);
 		RenderBody(camera);
+
+		foreach (double[] measure in MappedMeasurements) {
+			RenderMeasure(measure, camera);
+		}
 	}
 
 	/// <summary>
@@ -358,5 +419,41 @@ public abstract class Vehicle
 
 		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, false);
 	}
+
+	/// <summary>
+	/// Simple point measurement rendering.
+	/// </summary>
+	/// <param name="measurement">Point measurement position.</param>
+	/// <param name="camera">Camera rotation matrix.</param>
+	private void RenderMeasure(double[] measurement, double[,] camera)
+	{
+		const float halflen = 0.03f;
+		
+		Color color =  Color.Crimson;
+
+		measurement = camera.Multiply(measurement);
+		
+		double[][] vertices = new double[2][];
+
+		vertices[0] = new double[] {measurement[0] - halflen, measurement[1] - halflen, measurement[2]};
+		vertices[1] = new double[] {measurement[0] + halflen, measurement[1] + halflen, measurement[2]};
+		
+		Graphics.DrawUser2DPolygon(vertices, 0.01f, color, true);
+
+		vertices[0] = new double[] {measurement[0] - halflen, measurement[1] + halflen, measurement[2]};
+		vertices[1] = new double[] {measurement[0] + halflen, measurement[1] - halflen, measurement[2]};
+
+		Graphics.DrawUser2DPolygon(vertices, 0.01f, color, true);
+	}
+
+	/// <summary>
+	/// Render the sidebar info screen (extra interesting data).
+	/// </summary>
+	public abstract void RenderSide();
+
+	/// <summary>
+	/// Dispose of any resources.
+	/// </summary>
+	public virtual void Dispose() {}
 }
 }

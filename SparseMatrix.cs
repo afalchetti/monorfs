@@ -400,10 +400,10 @@ public class SparseMatrix : IEnumerable<SparseItem>
 	/// Apply a function iteratively on every item of a row (for each row)
 	/// and obtain the accumulated results.
 	/// </summary>
-	/// <param name="reducer">Applied function. The first parameter is the cumulative reuslt,
+	/// <param name="reducer">Applied function. The first parameter is the cumulative result,
 	/// the second parameter is the new entry.</param>
 	/// <param name="initvalue">Initial value for the accumulation.</param>
-	/// <returns>Sparse list of the resultl of applying the recursive accumulator to each row on the matrix.
+	/// <returns>Sparse list of the result of applying the recursive accumulator to each row on the matrix.
 	/// Each result is compound of the row index and the accumulator.</returns>
 	public Dictionary<int, double> FoldRows(Func<double, double, double> reducer, double initvalue)
 	{
@@ -422,13 +422,33 @@ public class SparseMatrix : IEnumerable<SparseItem>
 	}
 
 	/// <summary>
+	/// Apply a function iteratively on every item of the matrix
+	/// and obtain the accumulated result.
+	/// </summary>
+	/// <param name="reducer">Applied function. The first parameter is the cumulative result,
+	/// the second parameter is the new entry.</param>
+	/// <param name="initvalue">Initial value for the accumulation.</param>
+	/// <returns>Result of applying the recursive accumulator to each item on the matrix.
+	/// Note that the order in which the items are reduced is undeterminate.</returns>
+	public double FoldMatrix(Func<double, double, double> reducer, double initvalue)
+	{
+		double fold = initvalue;
+		
+		foreach (var item in this) {
+			fold = reducer(fold, item.Value);
+		}
+
+		return fold;
+	}
+
+	/// <summary>
 	/// Apply a function iteratively on every item of a column (for each column)
 	/// and obtain the accumulated results.
 	/// </summary>
-	/// <param name="reducer">Applied function. The first parameter is the cumulative reuslt,
+	/// <param name="reducer">Applied function. The first parameter is the cumulative result,
 	/// the second parameter is the new entry. It must return the new accumulation.</param>
 	/// <param name="initvalue">Initial value for the accumulation.</param>
-	/// <returns>Sparse list of the resultl of applying the recursive accumulator to each column on the matrix.
+	/// <returns>Sparse list of the result of applying the recursive accumulator to each column on the matrix.
 	/// Each result is compound of the column index and the accumulator.</returns>
 	public Dictionary<int, double> FoldColumns(Func<double, double, double> reducer, double initvalue)
 	{

@@ -74,11 +74,6 @@ public class SimulatedVehicle : Vehicle
 	/// Poisson distributed random generator with parameter lambda = ClutterCount.
 	/// </summary>
 	private PoissonDistribution clutterGen;
-	
-	/// <summary>
-	/// Cached measurements from the update process for rendering purposes.
-	/// </summary>
-	private List<double[]> MappedMeasurements;
 
 	/// <summary>
 	/// Construct a new Vehicle object from its initial state.
@@ -88,20 +83,13 @@ public class SimulatedVehicle : Vehicle
 	/// <param name="axis">Orientation rotation axis.</param>
 	/// <param name="landmarks">Landmark 3d locations against which the measurements are performed.</param>
 	public SimulatedVehicle(double[] location, double theta, double[] axis, List<double[]> landmarks)
+		: base(location, theta, axis)
 	{
-		double w = Math.Cos(theta / 2);
-		double d = Math.Sin(theta / 2);
-
-		axis.Divide(axis.Euclidean(), true);
-
-		this.State              = new double[7] {location[0], location[1], location[2], w, d * axis[0], d * axis[1], d * axis[2]};
 		this.ClutterCount       = this.ClutterDensity * this.FilmArea.Height * this.FilmArea.Width * this.RangeClip.Length;
 		this.clutterGen         = new PoissonDistribution(this.ClutterCount);
 		this.Landmarks          = landmarks;
-		this.MappedMeasurements = new List<double[]>();
-
-		this.Waypoints          = new List<double[]>();
-		this.Waypoints.Add(new double[4] {0, X, Y,  Z});
+		this.SidebarWidth       = 1;
+		this.SidebarHeight      = 1;
 	}
 
 	/// <summary>
@@ -110,10 +98,8 @@ public class SimulatedVehicle : Vehicle
 	/// <param name="that">Copied simulated vehicle.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
 	public SimulatedVehicle(SimulatedVehicle that, bool copytrajectory = false)
+		: this((Vehicle) that, copytrajectory)
 	{
-		this.State                 = new double[7];
-		that.State.CopyTo(this.State, 0);
-		
 		this.Landmarks             = that.Landmarks;
 		this.detectionProbability  = that.detectionProbability;
 		this.ClutterDensity        = that.ClutterDensity;
@@ -121,17 +107,6 @@ public class SimulatedVehicle : Vehicle
 		this.clutterGen            = new PoissonDistribution(that.clutterGen.Mean);
 		this.MotionCovariance      = that.MotionCovariance.MemberwiseClone();
 		this.MeasurementCovariance = that.MeasurementCovariance.MemberwiseClone();
-		this.Graphics              = that.Graphics;
-
-		this.MappedMeasurements    = that.MappedMeasurements;
-
-		if (copytrajectory) {
-			this.Waypoints = new List<double[]>(that.Waypoints);
-		}
-		else {
-			this.Waypoints = new List<double[]>();
-			this.Waypoints.Add(new double[4] {0, that.X, that.Y, that.Z});
-		}
 	}
 
 	/// <summary>
@@ -140,19 +115,7 @@ public class SimulatedVehicle : Vehicle
 	/// <param name="that">Copied general vehicle.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
 	public SimulatedVehicle(Vehicle that, bool copytrajectory = false)
-		: this(that.Location, 0, new double[3] {0, 0, 0}, new List<double[]>())
-	{
-		this.Orientation = that.Orientation;
-		this.Graphics    = that.Graphics;
-
-		if (copytrajectory) {
-			this.Waypoints = new List<double[]>(that.Waypoints);
-		}
-		else {
-			this.Waypoints = new List<double[]>();
-			this.Waypoints.Add(new double[4] {0, that.X, that.Y, that.Z});
-		}
-	}
+		: base(that, copytrajectory) {}
 
 	/// <summary>
 	/// Perform a deep copy of another general vehicle,
@@ -437,19 +400,11 @@ public class SimulatedVehicle : Vehicle
 	/// </summary>
 	public override void Render(double[,] camera)
 	{
-		RenderFOV(camera);
-		RenderTrajectory(camera);
-			
+		base.Render(camera);
 
 		foreach (double[] landmark in Landmarks) {
 			RenderLandmark(landmark, camera);
 		}
-
-		foreach (double[] measure in MappedMeasurements) {
-			RenderMeasure(measure, camera);
-		}
-
-		RenderBody(camera);
 	}
 
 	/// <summary>
@@ -484,29 +439,11 @@ public class SimulatedVehicle : Vehicle
 	}
 
 	/// <summary>
-	/// Simple point measurement rendering.
+	/// Render the sidebar info screen.
+	/// It shows the world from the point of view of the vehicle.
 	/// </summary>
-	/// <param name="measurement">Point measurement position.</param>
-	/// <param name="camera">Camera rotation matrix.</param>
-	private void RenderMeasure(double[] measurement, double[,] camera)
+	public override void RenderSide()
 	{
-		const float halflen = 0.03f;
-		
-		Color color =  Color.Crimson;
-
-		measurement = camera.Multiply(measurement);
-		
-		double[][] vertices = new double[2][];
-
-		vertices[0] = new double[] {measurement[0] - halflen, measurement[1] - halflen, measurement[2]};
-		vertices[1] = new double[] {measurement[0] + halflen, measurement[1] + halflen, measurement[2]};
-		
-		Graphics.DrawUser2DPolygon(vertices, 0.01f, color, true);
-
-		vertices[0] = new double[] {measurement[0] - halflen, measurement[1] + halflen, measurement[2]};
-		vertices[1] = new double[] {measurement[0] + halflen, measurement[1] - halflen, measurement[2]};
-
-		Graphics.DrawUser2DPolygon(vertices, 0.01f, color, true);
 	}
 }
 }
