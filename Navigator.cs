@@ -799,11 +799,11 @@ public class Gaussian
 
 	public Gaussian(double[] mean, double[,] covariance, double weight)
 	{
-		this.Mean              = mean;
-		this.Covariance        = covariance;
-		this.Weight            = (!double.IsNaN(weight)) ? weight : 0;
-		this.multiplier        = Math.Pow(2 * Math.PI, -mean.Length / 2) / Math.Sqrt(covariance.Determinant());
-		this.CovarianceInverse = covariance.Inverse();
+		Mean              = mean;
+		Covariance        = covariance;
+		Weight            = (!double.IsNaN(weight)) ? weight : 0;
+		multiplier        = Math.Pow(2 * Math.PI, -mean.Length / 2) / Math.Sqrt(covariance.Determinant());
+		CovarianceInverse = covariance.Inverse();
 	}
 
 	public double Evaluate(double[] x)

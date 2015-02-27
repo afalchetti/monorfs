@@ -85,11 +85,11 @@ public class SimulatedVehicle : Vehicle
 	public SimulatedVehicle(double[] location, double theta, double[] axis, List<double[]> landmarks)
 		: base(location, theta, axis)
 	{
-		this.ClutterCount       = this.ClutterDensity * this.FilmArea.Height * this.FilmArea.Width * this.RangeClip.Length;
-		this.clutterGen         = new PoissonDistribution(this.ClutterCount);
-		this.Landmarks          = landmarks;
-		this.SidebarWidth       = 1;
-		this.SidebarHeight      = 1;
+		ClutterCount       = ClutterDensity * FilmArea.Height * FilmArea.Width * RangeClip.Length;
+		clutterGen         = new PoissonDistribution(ClutterCount);
+		Landmarks          = landmarks;
+		SidebarWidth       = 1;
+		SidebarHeight      = 1;
 	}
 
 	/// <summary>
@@ -173,9 +173,9 @@ public class SimulatedVehicle : Vehicle
 		Orientation = neworientation;
 
 		// Do a better noise (radial), though it seems to work just fine
-		State       = this.State.Add(time.ElapsedGameTime.TotalSeconds.Multiply(
-		                                  U.RandomGaussianVector(new double[7] {0, 0, 0, 0, 0, 0, 0}, MotionCovariance)));
-		Orientation = Quaternion.Normalize(this.Orientation);
+		State       = State.Add(time.ElapsedGameTime.TotalSeconds.Multiply(
+		                             U.RandomGaussianVector(new double[7] {0, 0, 0, 0, 0, 0, 0}, MotionCovariance)));
+		Orientation = Quaternion.Normalize(Orientation);
 
 		double[] prevloc = new double[3] {Waypoints[Waypoints.Count - 1][1],
 		                                  Waypoints[Waypoints.Count - 1][2],
@@ -196,7 +196,7 @@ public class SimulatedVehicle : Vehicle
 	
 	public double[] MeasurePerfect(double[] landmark)
 	{
-		double[]   diff  = landmark.Subtract(this.Location);
+		double[]   diff  = landmark.Subtract(Location);
 		Quaternion local = Quaternion.Conjugate(Orientation) *
 			                    new Quaternion((float) diff[0], (float) diff[1], (float) diff[2], 0) * Orientation;
 
@@ -318,7 +318,7 @@ public class SimulatedVehicle : Vehicle
 	/// <returns>Measurement model linearization jacobian.</returns>
 	public double[,] MeasurementJacobian(double[] landmark)
 	{
-		double[]   diff  = landmark.Subtract(this.Location);
+		double[]   diff  = landmark.Subtract(Location);
 		Quaternion local = Quaternion.Conjugate(Orientation) *
 			                    new Quaternion((float) diff[0], (float) diff[1], (float) diff[2], 0) * Orientation;
 
@@ -343,7 +343,7 @@ public class SimulatedVehicle : Vehicle
 	/// <returns>True if the landmark is visible; false otherwise.</returns>
 	public bool Visible(double[] landmark)
 	{
-		double[]   diff  = landmark.Subtract(this.Location);
+		double[]   diff  = landmark.Subtract(Location);
 		Quaternion local = Quaternion.Conjugate(Orientation) *
 			                    new Quaternion((float) diff[0], (float) diff[1], (float) diff[2], 0) * Orientation;
 

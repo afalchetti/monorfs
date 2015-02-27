@@ -230,7 +230,7 @@ public class SparseMatrix : IEnumerable<SparseItem>
 	/// <returns>Matrix transpose.</returns>
 	public SparseMatrix Transpose()
 	{
-		SparseMatrix transpose = new SparseMatrix(this.Height, this.Width);
+		SparseMatrix transpose = new SparseMatrix(Height, Width);
 
 		foreach (var item in this) {
 			transpose[item.K, item.I] = item.Value;
@@ -566,7 +566,7 @@ public class SparseMatrix : IEnumerable<SparseItem>
 	/// i.e. they can answer the question "mat.Defines(i, k)" differently.</returns>
 	public bool Equals(SparseMatrix that)
 	{
-		if (this.Count != that.Count || this.DefaultValue != that.DefaultValue || this.Width != that.Width || this.Height != that.Height) {
+		if (Count != that.Count || DefaultValue != that.DefaultValue || Width != that.Width || Height != that.Height) {
 			return false;
 		}
 

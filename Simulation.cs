@@ -175,7 +175,7 @@ public class Simulation : Game
 	{
 		initScene(File.ReadAllText(scene));
 
-		this.Navigator = new Navigator(Explorer, 1, false);
+		Navigator = new Navigator(Explorer, 1, false);
 
 		try {
 			if (!string.IsNullOrEmpty(commands)) {
@@ -192,27 +192,27 @@ public class Simulation : Game
 		}
 
 		// MonoGame-related construction
-		this.graphicsManager = new GraphicsDeviceManager(this);
+		graphicsManager = new GraphicsDeviceManager(this);
 
-		this.Content.RootDirectory = "Content";
-		this.IsMouseVisible        = true;
+		Content.RootDirectory = "Content";
+		IsMouseVisible        = true;
 
-		this.graphicsManager.PreferredBackBufferWidth  = (int)(1000*1.2);
-		this.graphicsManager.PreferredBackBufferHeight = (int)(450*1.2);
-		this.graphicsManager.PreferMultiSampling       = true;
-		this.graphicsManager.IsFullScreen              = false;
+		graphicsManager.PreferredBackBufferWidth  = (int)(1000*1.2);
+		graphicsManager.PreferredBackBufferHeight = (int)(450*1.2);
+		graphicsManager.PreferMultiSampling       = true;
+		graphicsManager.IsFullScreen              = false;
 
 		const double screencut = 0.3;
 
-		this.scenedest = clipCenter((int)(graphicsManager.PreferredBackBufferWidth * screencut),
-		                            graphicsManager.PreferredBackBufferHeight,
-		                            (mapclip[1] - mapclip[0]) / (mapclip[3] - mapclip[2]));
+		scenedest = clipCenter((int)(graphicsManager.PreferredBackBufferWidth * screencut),
+		                       graphicsManager.PreferredBackBufferHeight,
+		                       (mapclip[1] - mapclip[0]) / (mapclip[3] - mapclip[2]));
 
-		this.sidedest = clipCenter((int)(graphicsManager.PreferredBackBufferWidth * (1 - screencut)),
-		                           graphicsManager.PreferredBackBufferHeight,
-		                           (float) Explorer.SidebarWidth / Explorer.SidebarHeight);
+		sidedest = clipCenter((int)(graphicsManager.PreferredBackBufferWidth * (1 - screencut)),
+		                      graphicsManager.PreferredBackBufferHeight,
+		                      (float) Explorer.SidebarWidth / Explorer.SidebarHeight);
 
-		this.sidedest.X += (int)(graphicsManager.PreferredBackBufferWidth * screencut);
+		sidedest.X += (int)(graphicsManager.PreferredBackBufferWidth * screencut);
 
 		camangle = 0;
 		camera   = Accord.Math.Matrix.Identity(3);
@@ -226,7 +226,7 @@ public class Simulation : Game
 	{
 		Dictionary<string, List<string>> dict = Util.ParseDictionary(scene);
 
-		this.mapclip = Accord.Math.Matrix.ToSingle(ParseDoubleList(dict["world"][0]));
+		mapclip = Accord.Math.Matrix.ToSingle(ParseDoubleList(dict["world"][0]));
 
 		if (mapclip.Length != 4) {
 			throw new FormatException("The map clipping area must be specified by four elements: left, right, bottom, top");
@@ -255,12 +255,12 @@ public class Simulation : Game
 			maploc.Add(landmark);
 		}
 
-		this.Landmarks = new List<double[]>();
-		//this.Explorer  = new SimulatedVehicle(location, angle, axis, this.Landmarks);
-		this.Explorer  = new KinectVehicle(Directory.GetCurrentDirectory() + @"\first.oni");
+		Landmarks = new List<double[]>();
+		//Explorer  = new SimulatedVehicle(location, angle, axis, this.Landmarks);
+		Explorer  = new KinectVehicle(Directory.GetCurrentDirectory() + @"\first.oni");
 
 		for (int i = 0; i < maploc.Count; i++) {
-			this.Landmarks.Add(maploc[i]);
+			Landmarks.Add(maploc[i]);
 		}
 	}
 
@@ -312,37 +312,37 @@ public class Simulation : Game
 	/// </summary>
 	protected override void Initialize()
 	{
-		this.graphics           = this.graphicsManager.GraphicsDevice;
-		this.Explorer .Graphics = this.graphics;
-		this.Navigator.Graphics = this.graphics;
+		graphics           = graphicsManager.GraphicsDevice;
+		Explorer .Graphics = graphics;
+		Navigator.Graphics = graphics;
 
-		this.graphics.BlendState        = BlendState.NonPremultiplied;
-		this.graphics.DepthStencilState = DepthStencilState.Default;
-		this.graphics.RasterizerState   = RasterizerState.CullNone;
-		this.graphics.SamplerStates[0]  = SamplerState.LinearClamp;
+		graphics.BlendState        = BlendState.NonPremultiplied;
+		graphics.DepthStencilState = DepthStencilState.Default;
+		graphics.RasterizerState   = RasterizerState.CullNone;
+		graphics.SamplerStates[0]  = SamplerState.LinearClamp;
 
-		this.effect            = new BasicEffect(this.graphics);
-		this.effect.Alpha      = 1.0f;
-		this.effect.View       = Microsoft.Xna.Framework.Matrix.Identity;
-		this.effect.World      = Microsoft.Xna.Framework.Matrix.Identity;
-		this.effect.Projection = Microsoft.Xna.Framework.Matrix.CreateOrthographicOffCenter(mapclip[0], mapclip[1], mapclip[2], mapclip[3], -100, 100);
+		effect            = new BasicEffect(graphics);
+		effect.Alpha      = 1.0f;
+		effect.View       = Microsoft.Xna.Framework.Matrix.Identity;
+		effect.World      = Microsoft.Xna.Framework.Matrix.Identity;
+		effect.Projection = Microsoft.Xna.Framework.Matrix.CreateOrthographicOffCenter(mapclip[0], mapclip[1], mapclip[2], mapclip[3], -100, 100);
 
-		this.effect.LightingEnabled    = false;
-		this.effect.VertexColorEnabled = true;
+		effect.LightingEnabled    = false;
+		effect.VertexColorEnabled = true;
 		
-		this.SceneBuffer = new RenderTarget2D(graphics, 2 * scenedest.Width, 2 * scenedest.Height,
-		                                      false, SurfaceFormat.Color, DepthFormat.Depth16,
-		                                      0, RenderTargetUsage.DiscardContents);
+		SceneBuffer = new RenderTarget2D(graphics, 2 * scenedest.Width, 2 * scenedest.Height,
+		                                 false, SurfaceFormat.Color, DepthFormat.Depth16,
+		                                 0, RenderTargetUsage.DiscardContents);
 
-		this.SideBuffer = new RenderTarget2D(graphics, sidedest.Width, sidedest.Height,
-		                                     false, SurfaceFormat.Color, DepthFormat.Depth16,
-		                                     0, RenderTargetUsage.DiscardContents);
+		SideBuffer = new RenderTarget2D(graphics, sidedest.Width, sidedest.Height,
+		                                false, SurfaceFormat.Color, DepthFormat.Depth16,
+		                                0, RenderTargetUsage.DiscardContents);
 
 		if (!Realtime) {
-			this.TargetElapsedTime = FrameElapsed;
+			TargetElapsedTime = FrameElapsed;
 		}
 		else {
-			this.IsFixedTimeStep = false;
+			IsFixedTimeStep = false;
 		}
 
 		base.Initialize();
@@ -354,8 +354,8 @@ public class Simulation : Game
 	/// </summary>
 	protected override void LoadContent()
 	{
-		this.flip          = new SpriteBatch(this.graphics);
-		this.Explorer.Flip = this.flip;
+		flip          = new SpriteBatch(graphics);
+		Explorer.Flip = this.flip;
 	}
 
 	/// <summary>
@@ -458,8 +458,8 @@ public class Simulation : Game
 	protected override void Draw(GameTime time)
 	{
 		// scene panel
-		this.graphics.SetRenderTarget(SceneBuffer);
-		this.graphics.Clear(Color.DarkSeaGreen);
+		graphics.SetRenderTarget(SceneBuffer);
+		graphics.Clear(Color.DarkSeaGreen);
 
 		foreach (EffectPass pass in effect.CurrentTechnique.Passes) {
 			pass.Apply();

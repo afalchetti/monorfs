@@ -134,7 +134,7 @@ public class KinectVehicle : Vehicle
 	/// <param name="droll">Angle variation from odometry in the roll coordinate since last timestep.</param>
 	public override void Update(GameTime time, double dx, double dy, double dz, double dyaw, double dpitch, double droll)
 	{
-		// no update logic since a real vehicle doesn't have accurate localization
+		// no update logic since a real vehicle doesn't have meaningful localization
 	}
 	
 	/// <summary>
@@ -156,9 +156,9 @@ public class KinectVehicle : Vehicle
 
 				CoordinateConverter.ConvertDepthToWorld(depth, interest[i].I, interest[i].K, (int) bitmap[interest[i].I, interest[i].K], out x, out y, out z);
 
+				// depth in OpenNI is the processed z-axis, not the range and its measured in millimeters
 				double range = Math.Sqrt(x * x + y * y + z * z) / 1000;
 
-				// depth in OpenNI is the processed z-axis, not the range and its measured in millimeters
 				measurements.Add(new double[3] {interest[i].I, interest[i].K, range});
 			}
 		
@@ -297,17 +297,9 @@ public class KinectVehicle : Vehicle
 		for (int k = 0; k < matrix.GetLength(1); k++) {
 		for (int i = 0; i < matrix.GetLength(0); i++) {
 			int gray = (int)((matrix[i, k] - minval) / (maxval - minval) * 255);
-			//data[h++] = new Microsoft.Xna.Framework.Color((int)((float) i / matrix.GetLength(0) * 255), (int)((float) k / matrix.GetLength(1) * 255), 255);
 			data[h++] = new Microsoft.Xna.Framework.Color(gray, gray, gray);
 		}
 		}
-
-		//for (int k = 0; k < 10; k++) {
-		//for (int i = 0; i < 10; i++) {
-		//	Console.Write(matrix[i,k] + ", ");
-		//}
-		//	Console.WriteLine("");
-		//}
 
 		return data;
 	}
@@ -341,7 +333,7 @@ public class KinectVehicle : Vehicle
 	/// </summary>
 	public override void RenderSide()
 	{
-		Flip.Draw(sensed, new Vector2(0, 0));
+		Flip.Draw(sensed,   new Vector2(0, 0));
 		Flip.Draw(features, new Vector2(0, depth.VideoMode.Resolution.Height));
 	}
 
