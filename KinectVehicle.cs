@@ -42,12 +42,12 @@ public class KinectVehicle : Vehicle
 	/// <summary>
 	/// Cached history depth maps.
 	/// </summary>
-	private Queue<float[,]> cachedmaps;
+	private Queue<float[][]> cachedmaps;
 
 	/// <summary>
 	/// Cached history processed depth map for feature extraction visualization.
 	/// </summary>
-	private Queue<float[,]> cachedprocessed;
+	private Queue<float[][]> cachedprocessed;
 
 	/// <summary>
 	/// Cached history extracted features.
@@ -141,13 +141,13 @@ public class KinectVehicle : Vehicle
 			depth = device.CreateVideoStream(Device.SensorType.Depth);
 			depth.Start();
 
-			cachedmaps      = new Queue<float[,]>();
-			cachedprocessed = new Queue<float[,]>();
+			cachedmaps      = new Queue<float[][]>();
+			cachedprocessed = new Queue<float[][]>();
 			cachedfeatures  = new Queue<List<SparseItem>>();
 			
 			if (device.IsFile) {
 				device.PlaybackControl.Speed = -1;
-				Cache(30 * 10);
+				Cache(30 * 5);
 			}
 			else {
 				depth.VideoMode = new VideoMode { DataPixelFormat = VideoMode.PixelFormat.Depth1Mm,
@@ -196,21 +196,21 @@ public class KinectVehicle : Vehicle
 	{
 		List<double[]> measurements = new List<double[]>();
 
-		float[,]         frame;
-		float[,]         processed;
+		float[][]        frame;
+		float[][]        processed;
 		List<SparseItem> interest;
 
 		NextFrame(out frame, out processed, out interest);
 
 		for (int i = 0; i < interest.Count; i++) {
-			float range = GetDepth(interest[i].I, interest[i].K, frame[interest[i].I, interest[i].K]);
+			float range = GetDepth(interest[i].I, interest[i].K, frame[interest[i].I][interest[i].K]);
 
 			measurements.Add(new double[3] {interest[i].I, interest[i].K, range});
 		}
 		
 		if (sensed != null && features != null) {
-			sensed  .SetData(MatrixToTextureData(frame));
-			features.SetData(MatrixToTextureData(processed));
+			MatrixToTexture(sensed,   frame);
+			MatrixToTexture(features, processed);
 		}
 
 		return measurements;
@@ -222,7 +222,7 @@ public class KinectVehicle : Vehicle
 	/// <param name="frame">Out. Sensor output.</param>
 	/// <param name="processed">Out. Processed representation (for displaying purposes).</param>
 	/// <param name="interest">Out. List of interest points extracted from the map.</param>
-	private void NextFrame(out float[,] frame, out float[,] processed, out List<SparseItem> interest)
+	private void NextFrame(out float[][] frame, out float[][] processed, out List<SparseItem> interest)
 	{
 		if (cachedmaps.Count > 0) {
 			frame     = cachedmaps     .Dequeue();
@@ -248,8 +248,8 @@ public class KinectVehicle : Vehicle
 				break;
 			}
 			
-			float[,]         bitmap;
-			float[,]         processed;
+			float[][]        bitmap;
+			float[][]        processed;
 			List<SparseItem> interest;
 
 			ReadProcessFrame(out bitmap, out processed, out interest);
@@ -266,16 +266,12 @@ public class KinectVehicle : Vehicle
 	/// <param name="frame">Out. Sensor output.</param>
 	/// <param name="processed">Out. Processed representation (for displaying purposes).</param>
 	/// <param name="interest">Out. List of interest points extracted from the map.</param>
-	private void ReadProcessFrame(out float[,] frame, out float[,] processed, out List<SparseItem> interest)
+	private void ReadProcessFrame(out float[][] frame, out float[][] processed, out List<SparseItem> interest)
 	{
 		using (VideoFrameRef frameref = depth.ReadFrame()) {
-			frame              = FrameToArray(frameref);
-			float[,] curvature = CalculateCurvature(frame);
-			interest           = LocalMax(curvature, 0.8f, 25);
-			
-			// interest = Subsample(bitmap, 10, 10);
-			// interest = new List<SparseItem>();
-
+			frame               = FrameToArray(frameref);
+			float[][] curvature = CalculateCurvature(frame);
+			interest            = LocalMax(curvature, 0.8f, 25);
 			processed           = curvature;
 		}
 	}
@@ -285,18 +281,22 @@ public class KinectVehicle : Vehicle
 	/// </summary>
 	/// <param name="image">Original image.</param>
 	/// <returns>Image data array.</returns>
-	private float[,] FrameToArray(VideoFrameRef image)
+	private float[][] FrameToArray(VideoFrameRef image)
 	{
 		IntPtr    data  = image.Data;
-		float[,] array = new float[image.VideoMode.Resolution.Width, image.VideoMode.Resolution.Height];
+		float[][] array = new float[image.VideoMode.Resolution.Width][];
+		
+		for (int i = 0; i < array.Length; i++) {
+			array[i] = new float[image.VideoMode.Resolution.Height];
+		}
 
-		short[] copy = new short[array.GetLength(0) * array.GetLength(1)];
+		short[] copy = new short[array.Length * array[0].Length];
 		Marshal.Copy(data, copy, 0, copy.Length);
 		
 		int h = 0;
-		for (int k = 0; k < array.GetLength(1); k++) {
-		for (int i = 0; i < array.GetLength(0); i++) {
-			array[i, k] = copy[h++];
+		for (int k = 0; k < array[0].Length; k++) {
+		for (int i = 0; i < array   .Length; i++) {
+			array[i][k] = copy[h++];
 		}
 		}
 
@@ -310,25 +310,25 @@ public class KinectVehicle : Vehicle
 	/// <param name="threshold">Minimum fraction of the maximum value.</param>
 	/// <param name="maxcount">Maximum number of interest points. The highest values are chosen.</param>
 	/// <returns>Local maxima list.</returns>
-	private List<SparseItem> LocalMax(float[,] image, float threshold, int maxcount)
+	private List<SparseItem> LocalMax(float[][] image, float threshold, int maxcount)
 	{
 		List<SparseItem> list = new List<SparseItem>();
 
 		float maxval = image.Max();
 
-		for (int i = 1; i < image.GetLength(0) - 1; i++) {
-		for (int k = 1; k < image.GetLength(1) - 1; k++) {
-			bool localmax = image[i, k] > image[i - 1, k] &&
-			                image[i, k] > image[i + 1, k] &&
-			                image[i, k] > image[i,     k - 1] &&
-			                image[i, k] > image[i,     k + 1] &&
-			                image[i, k] > image[i + 1, k - 1] &&
-			                image[i, k] > image[i + 1, k + 1] &&
-			                image[i, k] > image[i - 1, k - 1] &&
-			                image[i, k] > image[i - 1, k + 1];
+		for (int i = 1; i < image   .Length - 1; i++) {
+		for (int k = 1; k < image[0].Length - 1; k++) {
+			bool localmax = image[i][k] > image[i - 1][k    ] &&
+			                image[i][k] > image[i + 1][k    ] &&
+			                image[i][k] > image[i    ][k - 1] &&
+			                image[i][k] > image[i    ][k + 1] &&
+			                image[i][k] > image[i + 1][k - 1] &&
+			                image[i][k] > image[i + 1][k + 1] &&
+			                image[i][k] > image[i - 1][k - 1] &&
+			                image[i][k] > image[i - 1][k + 1];
 
-			if ((image[i, k] > threshold * maxval) && localmax) {
-				list.Add(new SparseItem(i, k, image[i, k]));
+			if ((image[i][k] > threshold * maxval) && localmax) {
+				list.Add(new SparseItem(i, k, image[i][k]));
 			}
 		}
 		}
@@ -347,20 +347,24 @@ public class KinectVehicle : Vehicle
 	/// </summary>
 	/// <param name="image">Original image.</param>
 	/// <returns>Curvature.</returns>
-	private float[,] CalculateCurvature(float[,] image)
+	private float[][] CalculateCurvature(float[][] image)
 	{
-		float[,] curvature = new float[image.GetLength(0), image.GetLength(1)];
+		float[][] curvature = new float[image.Length][];
 		
-		for (int i = 1; i < image.GetLength(0) - 1; i++) {
-		for (int k = 1; k < image.GetLength(1) - 1; k++) {
-			float fx  = 0.5f * (image[i + 1, k] - image[i - 1, k]);
-			float fy  = 0.5f * (image[i, k + 1] - image[i, k - 1]);
-			float fxx = image[i + 1, k] - 2 * image[i, k] + image[i - 1, k];
-			float fyy = image[i, k + 1] - 2 * image[i, k] + image[i, k - 1];
-			float fxy = 0.25f * (image[i + 1, k + 1] + image[i - 1, k - 1] - image[i - 1, k + 1] - image[i + 1, k - 1]);
+		for (int i = 0; i < curvature.Length; i++) {
+			curvature[i] = new float[image[0].Length];
+		}
+		
+		for (int i = 1; i < image   .Length - 1; i++) {
+		for (int k = 1; k < image[0].Length - 1; k++) {
+			float fx  = 0.5f * (image[i + 1][k] - image[i - 1][k]);
+			float fy  = 0.5f * (image[i][k + 1] - image[i][k - 1]);
+			float fxx = image[i + 1][k] - 2 * image[i][k] + image[i - 1][k];
+			float fyy = image[i][k + 1] - 2 * image[i][k] + image[i][k - 1];
+			float fxy = 0.25f * (image[i + 1][k + 1] + image[i - 1][k - 1] - image[i - 1][k + 1] - image[i + 1][k - 1]);
 
-			float denom = (1 + fx * fx + fy * fy);
-			curvature[i, k] = (fxx * fyy - fxy * fxy) / (denom * denom);
+			float denom     = (1 + fx * fx + fy * fy);
+			curvature[i][k] = (fxx * fyy - fxy * fxy) / (denom * denom);
 		}
 		}
 
@@ -374,15 +378,15 @@ public class KinectVehicle : Vehicle
 	/// <param name="xcount">New matrix width.</param>
 	/// <param name="ycount">Mew matrix height.</param>
 	/// <returns>Subsampled matrix as a sparse entry list.</returns>
-	private List<SparseItem> Subsample(float[,] image, int xcount, int ycount)
+	private List<SparseItem> Subsample(float[][] image, int xcount, int ycount)
 	{
 		List<SparseItem> subsampled = new List<SparseItem>();
 
 		for (int i = 0; i < xcount; i++) {
 		for (int k = 0; k < ycount; k++) {
-			int imgX = (int)((i + 0.5) * image.GetLength(0) / xcount);
-			int imgY = (int)((k + 0.5) * image.GetLength(1) / ycount);
-			subsampled.Add(new SparseItem(imgX, imgY, image[imgX, imgY]));
+			int imgX = (int)((i + 0.5) * image   .Length / xcount);
+			int imgY = (int)((k + 0.5) * image[0].Length / ycount);
+			subsampled.Add(new SparseItem(imgX, imgY, image[imgX][imgY]));
 		}
 		}
 
@@ -393,47 +397,49 @@ public class KinectVehicle : Vehicle
 	/// Obtain a data stream for a Texture2D object from
 	/// a bidimensional matrix.
 	/// </summary>
+	/// <param name="target">Render target.</param>
 	/// <param name="matrix">Original matrix.</param>
 	/// <returns>Color data stream.</returns>
-	private Microsoft.Xna.Framework.Color[] MatrixToTextureData(float[,] matrix)
+	private void MatrixToTexture(Texture2D target, float[][] matrix)
 	{
-		var data = new Microsoft.Xna.Framework.Color[matrix.GetLength(0) * matrix.GetLength(1)];
+		var data = new Color[matrix.Length * matrix[0].Length];
 
 		float maxval = matrix.Max();
 		float minval = matrix.Min();
 
 		int h = 0;
-		for (int k = 0; k < matrix.GetLength(1); k++) {
-		for (int i = 0; i < matrix.GetLength(0); i++) {
-			int gray = (int)((matrix[i, k] - minval) / (maxval - minval) * 255);
-			data[h++] = new Microsoft.Xna.Framework.Color(gray, gray, gray);
+		for (int k = 0; k < matrix[0].Length; k++) {
+		for (int i = 0; i < matrix   .Length; i++) {
+			int gray = (int)((matrix[i][k] - minval) / (maxval - minval) * 255);
+			data[h++] = new Color(gray, gray, gray);
 		}
 		}
 
-		return data;
+		target.SetData(data);
 	}
 
 	/// <summary>
 	/// Obtain a data stream for a Texture2D object from
 	/// a bidimensional matrix expressed as a sparse matrix.
 	/// </summary>
+	/// <param name="target">Render target.</param>
 	/// <param name="list">Original matrix represented as a list of matrix entries.</param>
 	/// <param name="width">Output image width.</param>
 	/// <param name="height">Output image height.</param>
 	/// <returns>Color data stream.</returns>
-	private Microsoft.Xna.Framework.Color[] ListToTextureData(IEnumerable<SparseItem> list, int width, int height)
+	private void ListToTextureData(Texture2D target, IEnumerable<SparseItem> list, int width, int height)
 	{
-		var data = new Microsoft.Xna.Framework.Color[width * height];
+		var data = new Color[width * height];
 
 		double maxval = list.Aggregate(double.NegativeInfinity, (cum, item) => Math.Max(cum, item.Value));
 		double minval = list.Aggregate(double.PositiveInfinity, (cum, item) => Math.Min(cum, item.Value));
 		
 		foreach (var item in list) {
 			int gray = (int)((item.Value - minval) / (maxval - minval) * 255);
-			data[width * item.K + item.I] = new Microsoft.Xna.Framework.Color(gray, gray, gray);
+			data[width * item.K + item.I] = new Color(gray, gray, gray);
 		}
-
-		return data;
+		
+		target.SetData(data);
 	}
 
 	private float GetDepth(int px, int py, float z)
