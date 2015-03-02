@@ -170,12 +170,24 @@ public class Simulation : Game
 	/// Construct a simulation from a formatted desccription file.
 	/// </summary>
 	/// <param name="scene">Scene descriptor filename.</param>
-	/// <param name="commands">Vehicle input command instructions filename. Can be null or empty (no automatic instructions).</param>
-	public Simulation(string scene, string commands = "")
+	/// <param name="commands">Vehicle input command instructions filename.
+	/// Can be null or empty (no automatic instructions).</param>
+	/// <param name="particlecount">Number of particles for the RB-PHD algorithm.
+	/// If only mapping is done, it is irrelevant.</param>
+	/// <param name="onlymapping">If true, no localization is executed and the robot's position
+	/// is assumed perfectly known.</param>
+	/// <param name="simulate">True means a full simulation is performed;
+	/// false uses real sensor data (realtime or from a file).</param>
+	public Simulation(string scene, string commands = "", int particlecount = 5, bool onlymapping = false, bool simulate = true)
 	{
-		initScene(File.ReadAllText(scene));
+		if (simulate) {
+			initSceneFromSimFile(File.ReadAllText(scene));
+		}
+		else {
+			initSceneFromSensor(scene);
+		}
 
-		Navigator = new Navigator(Explorer, 1, false);
+		Navigator = new Navigator(Explorer, particlecount, onlymapping);
 
 		try {
 			if (!string.IsNullOrEmpty(commands)) {
@@ -222,7 +234,7 @@ public class Simulation : Game
 	/// Initialize the scene.
 	/// </summary>
 	/// <param name="scene">Scene descriptor text.</param>
-	private void initScene(string scene)
+	private void initSceneFromSimFile(string scene)
 	{
 		Dictionary<string, List<string>> dict = Util.ParseDictionary(scene);
 
@@ -256,12 +268,17 @@ public class Simulation : Game
 		}
 
 		Landmarks = new List<double[]>();
-		//Explorer  = new SimulatedVehicle(location, angle, axis, this.Landmarks);
-		Explorer  = new KinectVehicle(Directory.GetCurrentDirectory() + @"\first.oni");
+		Explorer  = new SimulatedVehicle(location, angle, axis, this.Landmarks);
 
 		for (int i = 0; i < maploc.Count; i++) {
 			Landmarks.Add(maploc[i]);
 		}
+	}
+
+	private void initSceneFromSensor(string sensor)
+	{
+		mapclip  = new float[4] {-6, 6, -3, 3};
+		Explorer = new KinectVehicle(sensor);
 	}
 
 	/// <summary>

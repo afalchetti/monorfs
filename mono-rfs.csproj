@@ -77,6 +77,7 @@
   <ItemGroup>
     <Compile Include="ArrayExtensions.cs" />
     <Compile Include="CircularBuffer.cs" />
+    <Compile Include="External\Options.cs" />
     <Compile Include="GraphicsDeviceExtension.cs" />
     <Compile Include="KinectVehicle.cs" />
     <Compile Include="MatrixExtensions.cs" />
@@ -94,6 +95,7 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>xcopy $(ProjectDir)additional $(TargetDir) /E /Y</PostBuildEvent>

@@ -14,6 +14,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using NDesk.Options;
 
 namespace monorfs
 {
@@ -72,18 +73,63 @@ public class Program
 	}
 
 	/// <summary>
+	/// Show a description of the program and its parameters to the user.
+	/// </summary>
+	private static void ShowHelp(OptionSet options)
+	{
+		Console.WriteLine("Usage: monorfs ");
+		Console.WriteLine("Showcase a Rao-Blackwellized PHD SLAM navigator.");
+		Console.WriteLine("If no options are specified a simulation of the full slam algorithm is run with one particle.");
+		Console.WriteLine();
+		Console.WriteLine("Options:");
+		options.WriteOptionDescriptions(Console.Out);
+
+	}
+
+	/// <summary>
 	/// Primary entry point.
 	/// </summary>
 	/// <param name="args">Command line arguments.</param>
 	//[STAThread]
 	public static void Main(string[] args)
 	{
-		if (!KinectVehicle.Initialize()) {
-			KinectVehicle.Shutdown();
+		string scenefile     = "map.world";
+		string commandfile   = "";
+		int    particlecount = 1;
+		bool   onlymapping   = false;
+		bool   simulate      = false;
+		bool   showhelp      = false;
+
+		OptionSet options = new OptionSet() {
+			{ "f|file=",      "Scene description file. Simulated, recorded or device id.",    f       => scenefile     = f },
+			{ "c|command=",   "Auto-command file (simulates user input).",                    c       => commandfile   = c },
+			{ "p|particles=", "Number of particles used for the RB-PHD",                      (int p) => particlecount = p },
+			{ "m|onlymap",    "Only do mapping, assuming known localization.",                m       => onlymapping   = m != null },
+			{ "s|simulate",   "Generate an artificial simulation instead of using a sensor.", s       => simulate      = s != null },
+			{ "h|help",       "Show this message and exit",                                   h       => showhelp      = h != null }
+		};
+
+		try {
+			options.Parse(args);
+		}
+		catch (OptionException e) {
+			Console.Write("monorfs: ");
+			Console.WriteLine(e.Message);
+			Console.WriteLine("Try monorfs --help for more information.");
 			Environment.Exit(1);
 		}
 
-		using (Simulation sim = new Simulation("map.world"/*, "movements.in"*/)) {
+		if (showhelp) {
+			ShowHelp(options);
+			return;
+		}
+
+		if (!KinectVehicle.Initialize()) {
+			KinectVehicle.Shutdown();
+			Environment.Exit(2);
+		}
+
+		using (Simulation sim = new Simulation(scenefile, commandfile, particlecount, onlymapping, simulate)) {
 			sim.Run();
 		
 			File.WriteAllText("trajectories.out", sim.SerializedTrajectories);
