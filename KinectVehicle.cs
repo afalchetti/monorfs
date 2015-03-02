@@ -10,7 +10,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
 using AForge;
 using Accord;
@@ -333,8 +332,15 @@ public class KinectVehicle : Vehicle
 	/// </summary>
 	public override void RenderSide()
 	{
-		Flip.Draw(sensed,   new Vector2(0, 0));
-		Flip.Draw(features, new Vector2(0, depth.VideoMode.Resolution.Height));
+		int vidwidth  = depth.VideoMode.Resolution.Width;
+		int vidheight = depth.VideoMode.Resolution.Height;
+		int gwidth    = Graphics.Viewport.Width;
+		int gheight   = Graphics.Viewport.Height;
+
+		Flip.Draw(sensed,   new Rectangle(0, 0,          gwidth,   gheight / 2),
+		                    new Rectangle(0, 0,          vidwidth, vidheight), Color.White);
+		Flip.Draw(features, new Rectangle(0, gheight/ 2, gwidth,   gheight / 2),
+		                    new Rectangle(0, 0,          vidwidth, vidheight), Color.White);
 	}
 
 	/// <summary>

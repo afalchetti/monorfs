@@ -197,12 +197,12 @@ public class Simulation : Game
 		Content.RootDirectory = "Content";
 		IsMouseVisible        = true;
 
-		graphicsManager.PreferredBackBufferWidth  = (int)(1000*1.2);
-		graphicsManager.PreferredBackBufferHeight = (int)(450*1.2);
+		graphicsManager.PreferredBackBufferWidth  = (int)(1000*1.0);
+		graphicsManager.PreferredBackBufferHeight = (int)(450*1.0);
 		graphicsManager.PreferMultiSampling       = true;
 		graphicsManager.IsFullScreen              = false;
 
-		const double screencut = 0.3;
+		const double screencut = 0.7;
 
 		scenedest = clipCenter((int)(graphicsManager.PreferredBackBufferWidth * screencut),
 		                       graphicsManager.PreferredBackBufferHeight,
@@ -484,8 +484,8 @@ public class Simulation : Game
 		flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
 		           DepthStencilState.Default, RasterizerState.CullNone);
 
-		flip.Draw(SceneBuffer, scenedest, Color.White);
-		flip.Draw(SideBuffer,  sidedest,  Color.White);
+		flip.Draw(SceneBuffer, scenedest, SceneBuffer.Bounds, Color.White);
+		flip.Draw(SideBuffer,  sidedest,  SideBuffer .Bounds, Color.White);
 		
 		flip.End();
 
