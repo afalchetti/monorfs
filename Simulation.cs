@@ -30,12 +30,12 @@ public class Simulation : Game
 	/// Measure cycle period in seconds. Every this
 	/// amount of time the SLAM solver is invoked.
 	/// </summary>
-	public const double MeasurePeriod = 1.0/10;
+	public const double MeasurePeriod = 1.0/30;
 
 	/// <summary>
 	/// Simulation frame period (frames per second inverse).
 	/// </summary>
-	public readonly TimeSpan FrameElapsed = new TimeSpan(10000000/60);
+	public readonly TimeSpan FrameElapsed = new TimeSpan(10000000/30);
 
 	/// <summary>
 	/// If true, the calculations are bound by realtime constraints,
@@ -489,7 +489,7 @@ public class Simulation : Game
 		
 		flip.End();
 
-		//Console.WriteLine(1.0/time.ElapsedGameTime.TotalSeconds);
+		Console.WriteLine((1.0/time.ElapsedGameTime.TotalSeconds).ToString("F2"));
 
 		base.Draw(time);
 	}
