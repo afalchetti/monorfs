@@ -34,20 +34,20 @@ public class SimulatedVehicle : Vehicle
 	/// <summary>
 	/// Motion model covariance matrix.
 	/// </summary>
-	public readonly double[,] MotionCovariance = new double[7, 7] {{4e-3, 0, 0, 0, 0, 0, 0},
-	                                                               {0, 4e-3, 0, 0, 0, 0, 0},
-	                                                               {0, 0, 4e-3, 0, 0, 0, 0},
-	                                                               {0, 0, 0, 4e-3, 0, 0, 0},
-	                                                               {0, 0, 0, 0, 4e-3, 0, 0},
-	                                                               {0, 0, 0, 0, 0, 4e-3, 0},
-	                                                               {0, 0, 0, 0, 0, 0, 4e-3}};
+	public readonly double[][] MotionCovariance = new double[7][] {new double[7] {4e-3, 0, 0, 0, 0, 0, 0},
+	                                                               new double[7] {0, 4e-3, 0, 0, 0, 0, 0},
+	                                                               new double[7] {0, 0, 4e-3, 0, 0, 0, 0},
+	                                                               new double[7] {0, 0, 0, 4e-3, 0, 0, 0},
+	                                                               new double[7] {0, 0, 0, 0, 4e-3, 0, 0},
+	                                                               new double[7] {0, 0, 0, 0, 0, 4e-3, 0},
+	                                                               new double[7] {0, 0, 0, 0, 0, 0, 4e-3}};
 
 	/// <summary>
 	/// Measurement model covariance matrix.
 	/// </summary>
-	public readonly double[,] MeasurementCovariance = new double[3, 3] {{2e-0,  0, 0},
-	                                                                    {0,  2e-0, 0},
-	                                                                    {0, 0, 1e-3}};
+	public readonly double[][] MeasurementCovariance = new double[3][] {new double[3] {2e-0,  0, 0},
+	                                                                    new double[3] {0,  2e-0, 0},
+	                                                                    new double[3] {0, 0, 1e-3}};
 
 	/// <summary>
 	/// Probability of detection.
@@ -316,7 +316,7 @@ public class SimulatedVehicle : Vehicle
 	/// </summary>
 	/// <param name="landmark">Landmark 3d location against which the measurement is performed.</param>
 	/// <returns>Measurement model linearization jacobian.</returns>
-	public double[,] MeasurementJacobian(double[] landmark)
+	public double[][] MeasurementJacobian(double[] landmark)
 	{
 		double[]   diff  = landmark.Subtract(Location);
 		Quaternion local = Quaternion.Conjugate(Orientation) *
@@ -326,12 +326,12 @@ public class SimulatedVehicle : Vehicle
 		// f/z I 0
 		//  X/|X|
 		double mag = Math.Sqrt(local.X * local.X + local.Y * local.Y + local.Z * local.Z);
-		double[,] jprojection = {{VisionFocal / local.Z, 0,                     -VisionFocal * local.X / (local.Z * local.Z)},
-		                         {0,                     VisionFocal / local.Z, -VisionFocal * local.Y / (local.Z * local.Z)},
-		                         {local.X / mag,         local.Y / mag,         local.Z /mag}};
+		double[][] jprojection = {new double[] {VisionFocal / local.Z, 0,                     -VisionFocal * local.X / (local.Z * local.Z)},
+		                          new double[] {0,                     VisionFocal / local.Z, -VisionFocal * local.Y / (local.Z * local.Z)},
+		                          new double[] {local.X / mag,         local.Y / mag,         local.Z /mag}};
 
 		// the jacobian of the change of coordinates part of the measurement process is the rotation matrix 
-		double[,] jrotation = ME.MatrixFromQuaternion(Orientation);
+		double[][] jrotation = ME.MatrixFromQuaternion(Orientation);
 
 		return jprojection.Multiply(jrotation);
 	}
@@ -398,7 +398,7 @@ public class SimulatedVehicle : Vehicle
 	/// the method will throw an exception.
 	/// <param name="camera">Camera rotation matrix.</param>
 	/// </summary>
-	public override void Render(double[,] camera)
+	public override void Render(double[][] camera)
 	{
 		base.Render(camera);
 
@@ -412,7 +412,7 @@ public class SimulatedVehicle : Vehicle
 	/// </summary>
 	/// <param name="landmark">Point landmark position.</param>
 	/// <param name="camera">Camera rotation matrix.</param>
-	private void RenderLandmark(double[] landmark, double[,] camera)
+	private void RenderLandmark(double[] landmark, double[][] camera)
 	{
 		const float halflen = 0.024f;
 		

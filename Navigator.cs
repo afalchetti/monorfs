@@ -33,9 +33,9 @@ public class Navigator
 	/// <summary>
 	/// Landmark density spread expected on unexplored areas
 	/// </summary>
-	public static readonly double[,] BirthCovariance = new double[3, 3] {{1e-3, 0, 0},
-	                                                                     {0, 1e-3, 0},
-	                                                                     {0, 0, 1e-3}};
+	public static readonly double[][] BirthCovariance = new double[3][] {new double[3] {1e-3, 0, 0},
+	                                                                     new double[3] {0, 1e-3, 0},
+	                                                                     new double[3] {0, 0, 1e-3}};
 
 	/// <summary>
 	/// Minimum weight that is kept after a model prune.
@@ -444,14 +444,14 @@ public class Navigator
 		}
 
 		// measurement PHD update
-		double[,]   R  = pose.MeasurementCovariance;
-		double[,]   I  = Accord.Math.Matrix.Identity(3);
-		double[][]  m  = new double  [model.Count][];
-		double[][,] H  = new double  [model.Count][,];
-		double[][,] P  = new double  [model.Count][,];
-		double[][,] PH = new double  [model.Count][,];
-		double[][,] S  = new double  [model.Count][,];
-		Gaussian[]  q  = new Gaussian[model.Count];
+		double[][]   R  = pose.MeasurementCovariance;
+		double[][]   I  = Accord.Math.Matrix.Identity(3).ToArray();
+		double[][]   m  = new double  [model.Count][];
+		double[][][] H  = new double  [model.Count][][];
+		double[][][] P  = new double  [model.Count][][];
+		double[][][] PH = new double  [model.Count][][];
+		double[][][] S  = new double  [model.Count][][];
+		Gaussian[]   q  = new Gaussian[model.Count];
 
 		for (int i = 0; i < q.Length; i++) {
 			Gaussian component = model[i];
@@ -485,9 +485,9 @@ public class Navigator
 					continue;
 				}
 
-				double[,] gain       = PH[i].Multiply(S[i].Inverse());
-				double[]  mean       = m[i].Add(gain.Multiply(measurement.Subtract(pose.MeasurePerfect(m[i]))));
-				double[,] covariance = I.Subtract(gain.Multiply(H[i])).Multiply(P[i]);
+				double[][] gain       = PH[i].Multiply(S[i].Inverse());
+				double[]   mean       = m[i].Add(gain.Multiply(measurement.Subtract(pose.MeasurePerfect(m[i]))));
+				double[][] covariance = I.Subtract(gain.Multiply(H[i])).Multiply(P[i]);
 
 				double weight = PD * q[i].Weight * q[i].Evaluate(measurement) / (pose.ClutterDensity + PD * weightsum);
 
@@ -562,9 +562,9 @@ public class Navigator
 	/// <returns>Merged gaussian.</returns>
 	private Gaussian Merge(Gaussian maincomponent, List<Gaussian> components)
 	{
-		double    weight     = maincomponent.Weight;
-		double[]  mean       = maincomponent.Weight.Multiply(maincomponent.Mean);
-		double[,] covariance = maincomponent.Weight.Multiply(maincomponent.Covariance);
+		double     weight     = maincomponent.Weight;
+		double[]   mean       = maincomponent.Weight.Multiply(maincomponent.Mean);
+		double[][] covariance = maincomponent.Weight.Multiply(maincomponent.Covariance);
 
 		// merged gaussian follows the rules
 		// w = sum of (wi)
@@ -574,7 +574,7 @@ public class Navigator
 			double[] diff = component.Mean.Subtract(maincomponent.Mean);
 			weight    += component.Weight;
 			mean       = mean      .Add(component.Weight.Multiply(component.Mean));
-			covariance = covariance.Add(component.Weight.Multiply(component.Covariance.Add(diff.OuterProduct(diff))));
+			covariance = covariance.Add(component.Weight.Multiply(component.Covariance.Add(diff.OuterProduct(diff).ToArray())));
 		}
 
 		mean       = mean.Divide(weight);
@@ -665,7 +665,7 @@ public class Navigator
 	/// the method will throw an exception.
 	/// </summary>
 	/// <param name="camera">Camera rotation matrix.</param>
-	public void Render(double[,] camera)
+	public void Render(double[][] camera)
 	{
 		RenderTrajectory(camera);
 		RenderEstimate(camera);
@@ -675,7 +675,7 @@ public class Navigator
 	/// Render the navigation HUD.
 	/// </summary>
 	/// <param name="camera">Camera rotation matrix.</param>
-	public void RenderEstimate(double[,] camera) {
+	public void RenderEstimate(double[][] camera) {
 		foreach (Gaussian component in MapModels[BestParticle]) {
 			RenderGaussian(component, camera);
 		}
@@ -685,7 +685,7 @@ public class Navigator
 	/// Render the path that the vehicle has traveled so far.
 	/// </summary>
 	/// <param name="camera">Camera rotation matrix.</param>
-	public void RenderTrajectory(double[,] camera)
+	public void RenderTrajectory(double[][] camera)
 	{
 		double[][] vertices = new double[Waypoints.Count][];
 		Color color = Color.Blue;
@@ -702,7 +702,7 @@ public class Navigator
 	/// </summary>
 	/// <param name="gaussian">Gaussian to be rendered.</param>
 	/// <param name="camera">Camera rotation matrix.</param>
-	public void RenderGaussian(Gaussian gaussian, double[,] camera)
+	public void RenderGaussian(Gaussian gaussian, double[][] camera)
 	{
 		Color incolor  = Color.DeepSkyBlue; incolor.A  = 200;
 		Color outcolor = Color.Blue;        outcolor.A = 200;
@@ -723,19 +723,19 @@ public class Navigator
 			outcolor = Color.Red;
 		}
 
-		double[,] covariance = camera.Multiply(gaussian.Covariance).MultiplyByTranspose(camera).Submatrix(0, 1, 0, 1);
+		double[][] covariance = camera.Multiply(gaussian.Covariance).MultiplyByTranspose(camera).Submatrix(0, 1, 0, 1);
 
-		var       decomp = new EigenvalueDecomposition(covariance);
-		double[,] stddev = decomp.DiagonalMatrix;
+		var        decomp = new EigenvalueDecomposition(covariance.ToMatrix());
+		double[,]  stddev = decomp.DiagonalMatrix;
 
 		for (int i = 0; i < stddev.GetLength(0); i++) {
 			stddev[i, i] = (stddev[i, i] > 0) ? Math.Sqrt(stddev[i, i]) : 0;
 		}
 
-		double[,] rotation = decomp.Eigenvectors;
-		double[,] linear   = rotation.Multiply(stddev);
+		double[,]  rotation = decomp.Eigenvectors;
+		double[][] linear   = rotation.Multiply(stddev).ToArray();
 
-		double[,] recover = linear.Multiply(linear);
+		double[][] recover = linear.Multiply(linear);
 
 		if (linear.Determinant() < 0) {
 			linear = linear.ReverseColumns();
@@ -745,8 +745,8 @@ public class Navigator
 		VertexPositionColor[] vertices = new VertexPositionColor[pinterval.Length];
 
 		for (int i = 0; i < points.Length; i++) {
-			points[i]    = linear.Multiply(pinterval[i]);
-			points[i]    = new double[3] {points[i][0], points[i][1], 0}.Add(camera.Multiply(gaussian.Mean));
+			points  [i]  = linear.Multiply(pinterval[i]);
+			points  [i]  = new double[3] {points[i][0], points[i][1], 0}.Add(camera.Multiply(gaussian.Mean));
 			vertices[i]  = new VertexPositionColor(points[i].ToVector3(), incolor);
 		}
 
@@ -774,9 +774,9 @@ public class Gaussian
 
 	public double[] Mean { get; private set; }
 
-	public double[,] Covariance { get; private set; }
+	public double[][] Covariance { get; private set; }
 
-	public double[,] CovarianceInverse;
+	public double[][] CovarianceInverse;
 
 	public double multiplier;
 
@@ -797,7 +797,7 @@ public class Gaussian
 		}
 	}
 
-	public Gaussian(double[] mean, double[,] covariance, double weight)
+	public Gaussian(double[] mean, double[][] covariance, double weight)
 	{
 		Mean              = mean;
 		Covariance        = covariance;
@@ -842,10 +842,10 @@ public class Gaussian
 
 			serialized.Append(";");
 			
-			for (int i = 0; i < Covariance.GetLength(0); i++) {
-			for (int k = 0; k < Covariance.GetLength(1); k++) {
+			for (int i = 0; i < Covariance   .Length; i++) {
+			for (int k = 0; k < Covariance[i].Length; k++) {
 				serialized.Append(" ");
-				serialized.Append(Covariance[i, k].ToString("F6"));
+				serialized.Append(Covariance[i][k].ToString("F6"));
 			}
 			}
 

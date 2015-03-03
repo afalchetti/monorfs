@@ -230,7 +230,7 @@ public abstract class Vehicle : IDisposable
 	/// the method will throw an exception.
 	/// </summary>
 	/// <param name="camera">Camera rotation matrix.</param>
-	public virtual void Render(double[,] camera)
+	public virtual void Render(double[][] camera)
 	{
 		RenderFOV(camera);
 		RenderTrajectory(camera);
@@ -245,7 +245,7 @@ public abstract class Vehicle : IDisposable
 	/// Render the vehicle physical body on the graphics device.
 	/// <param name="camera">Camera rotation matrix.</param>
 	/// </summary>
-	public void RenderBody(double[,] camera)
+	public void RenderBody(double[][] camera)
 	{
 		const float halflen = 0.06f;
 		
@@ -323,7 +323,7 @@ public abstract class Vehicle : IDisposable
 	/// Render the Field-of-View cone on the graphics device.
 	/// </summary>
 	/// <param name="camera">Camera rotation matrix.</param>
-	public void RenderFOV(double[,] camera)
+	public void RenderFOV(double[][] camera)
 	{
 		
 		Color incolorA = Color.LightGreen; incolorA.A = 30;
@@ -408,7 +408,7 @@ public abstract class Vehicle : IDisposable
 	/// Render the path that the vehicle has traveled so far.
 	/// </summary>
 	/// <param name="camera">Camera rotation matrix.</param>
-	public void RenderTrajectory(double[,] camera)
+	public void RenderTrajectory(double[][] camera)
 	{
 		double[][] vertices = new double[Waypoints.Count][];
 		Color      color    = Color.Yellow;
@@ -425,7 +425,7 @@ public abstract class Vehicle : IDisposable
 	/// </summary>
 	/// <param name="measurement">Point measurement position.</param>
 	/// <param name="camera">Camera rotation matrix.</param>
-	private void RenderMeasure(double[] measurement, double[,] camera)
+	private void RenderMeasure(double[] measurement, double[][] camera)
 	{
 		const float halflen = 0.03f;
 		

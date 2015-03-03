@@ -121,7 +121,7 @@ public class Simulation : Game
 	/// <summary>
 	/// Camera matrix.
 	/// </summary>
-	private double[,] camera;
+	private double[][] camera;
 	
 	/// <summary>
 	/// Last time the navigator update method was called.
@@ -227,7 +227,7 @@ public class Simulation : Game
 		sidedest.X += (int)(graphicsManager.PreferredBackBufferWidth * screencut);
 
 		camangle = 0;
-		camera   = Accord.Math.Matrix.Identity(3);
+		camera   = Accord.Math.Matrix.Identity(3).ToArray();
 	}
 
 	/// <summary>

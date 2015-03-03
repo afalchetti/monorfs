@@ -85,7 +85,7 @@ public static class Util
 		var dictionary = new Dictionary<string, List<string>>();
 		descriptor     = descriptor.Replace("\r\n", "\n").Replace('\r', '\n');
         string[] lines = descriptor.Split('\n');
-		string key     = "";
+		string   key   = "";
 
 		Regex emptyline = new Regex(@"^\s*$");
 
@@ -121,11 +121,11 @@ public static class Util
 	/// <param name="mean">Distribution mean vector.</param>
 	/// <param name="covariance">Distribution covariance matrix.</param>
 	/// <returns>Random vector.</returns>
-	public static double[] RandomGaussianVector(double[] mean, double[,] covariance)
+	public static double[] RandomGaussianVector(double[] mean, double[][] covariance)
 	{
 		// first find the square root of the covariance matrix
 		// C such as C * C^T = covariance
-		var       cholesky = new CholeskyDecomposition(covariance);
+		var       cholesky = new CholeskyDecomposition(covariance.ToMatrix());
 		double[]  sqrtdiag = cholesky.Diagonal;
 		double[,] covroot;
 
