@@ -88,32 +88,32 @@ public class Navigator
 	/// <summary>
 	/// Expected number of landmarks after the prediction step.
 	/// </summary>
-	public double[] Mpredicted;
+	private double[] mpredicted;
 
 	/// <summary>
 	/// Expected number of landmarks after the correction step.
 	/// </summary>
-	public double[] Mcorrected;
+	private double[] mcorrected;
 
 	/// <summary>
 	/// Index of the particle with the biggest weight.
 	/// </summary>
-	public int BestParticle;
+	private int bestparticle;
 
 	/// <summary>
 	/// True if the localization of the vehicle is known.
 	/// </summary>
-	public bool OnlyMapping;
+	public bool OnlyMapping { get; private set; }
 
 	/// <summary>
 	/// Prediction interval base model.
 	/// </summary>
-	public double[][] pinterval;
+	private double[][] pinterval;
 
 	/// <summary>
 	/// The estimated trajectory.
 	/// </summary>
-	public List<double[]> Waypoints;
+	public List<double[]> Waypoints { get; private set; }
 
 	/// <summary>
 	/// Internel render output.
@@ -151,49 +151,128 @@ public class Navigator
 	/// <param name="onlymapping">If true, don't do SLAM, but mapping (i.e. the localization is assumed known).</param>
 	public Navigator(Vehicle vehicle, int particlecount, bool onlymapping = false)
 	{
-		this.OnlyMapping = onlymapping;
+		OnlyMapping = onlymapping;
+
+		// a reference copy, which gives the navigator precise info about
+		// the real vehicle pose
+		RefVehicle = vehicle;
 
 		if (onlymapping) {
-			// a reference copy, which gives the navigator precise info about
-			// the real vehicle pose
-			this.RefVehicle = vehicle;
 			particlecount = 1;
 		}
 
 		// do a deep copy, so no real info flows
 		// into the navigator, only estimates, in SLAM.
 		// In mapping, info flows only through RefVehicle
-		this.VehicleParticles = new SimulatedVehicle[particlecount];
-		this.MapModels        = new List<Gaussian>  [particlecount];
-		this.VehicleWeights   = new double          [particlecount];
-		this.toexplore        = new List<double[]>  [particlecount];
+		VehicleParticles = new SimulatedVehicle[particlecount];
+		MapModels        = new List<Gaussian>  [particlecount];
+		VehicleWeights   = new double          [particlecount];
+		toexplore        = new List<double[]>  [particlecount];
 
 		for (int i = 0; i < particlecount; i++) {
-			this.VehicleParticles[i] = new SimulatedVehicle(vehicle, 1.8, 1.8, 0.7, 5e-7);
-			this.MapModels       [i] = new List<Gaussian>();
-			this.VehicleWeights  [i] = 1.0 / particlecount;
-			this.toexplore       [i] = new List<double[]>();
+			VehicleParticles[i] = new SimulatedVehicle(vehicle, 1.8, 1.8, 0.7, 5e-7);
+			MapModels       [i] = new List<Gaussian>();
+			VehicleWeights  [i] = 1.0 / particlecount;
+			toexplore       [i] = new List<double[]>();
 		}
 
-		
+		mpredicted   = new double[particlecount];
+		mcorrected   = new double[particlecount];
+		bestparticle = 0;
 
-		this.Mpredicted   = new double[VehicleParticles.Length];
-		this.Mcorrected   = new double[VehicleParticles.Length];
-		this.BestParticle = 0;
+		Waypoints = new List<double[]>();
+		Waypoints.Add(new double[4] {0, vehicle.X, vehicle.Y, vehicle.Z});
 
-		this.Waypoints = new List<double[]>();
-		this.Waypoints.Add(new double[4] {0, vehicle.X, vehicle.Y, vehicle.Z});
-
-		this.WayMaps = new List<Tuple<double, List<Gaussian>>>();
-		this.WayMaps.Add(new Tuple<double, List<Gaussian>>(0, new List<Gaussian>()));
+		WayMaps = new List<Tuple<double, List<Gaussian>>>();
+		WayMaps.Add(new Tuple<double, List<Gaussian>>(0, new List<Gaussian>()));
 
 		const int segments = 32;
-		this.pinterval = new double[segments][];
+		pinterval = new double[segments][];
 
 		// pinterval will be the 5-sigma ellipse
 		for (int i = 0; i < segments; i++) {
-			this.pinterval[i] = new double[2] {5*Math.Cos(2 * Math.PI * i / segments), 5*Math.Sin(2 * Math.PI * i / segments)};
+			this.pinterval[i] = new double[2] {5 * Math.Cos(2 * Math.PI * i / segments), 5*Math.Sin(2 * Math.PI * i / segments)};
 		}
+	}
+
+	/// <summary>
+	/// Change the mode of the navigator to solving full slam.
+	/// The unique particle currently in use will be multiplied into new localization particles.
+	/// </summary>
+	/// <param name="particlecount">Number of particles for the Montecarlo filter.</param>
+	public void StartSlam(int particlecount)
+	{
+		if (OnlyMapping) {
+			OnlyMapping = false;
+
+			CollapseParticles(particlecount);
+		}
+	}
+
+	/// <summary>
+	/// Change the mode of the navigator to do only mapping.
+	/// The vehicle pose resets to the correct location, but the map is inherited
+	/// from the previous best particle (MAP).
+	/// </summary>
+	public void StartMapping()
+	{
+		if (!OnlyMapping) {
+			OnlyMapping = true;
+
+			CollapseParticles(1);
+		}
+	}
+
+	/// <summary>
+	/// Collapse the vehicle particles to the best previous particle.
+	/// </summary>
+	/// <param name="particlecount">Number of particles for the Montecarlo filter.</param>
+	private void CollapseParticles(int particlecount)
+	{
+		Vehicle        prevvehicle = VehicleParticles[bestparticle];
+		List<Gaussian> prevmodel   = MapModels       [bestparticle];
+		List<double[]> prevexplore = toexplore       [bestparticle];
+
+		VehicleParticles = new SimulatedVehicle[particlecount];
+		MapModels        = new List<Gaussian>  [particlecount];
+		VehicleWeights   = new double          [particlecount];
+		toexplore        = new List<double[]>  [particlecount];
+
+		for (int i = 0; i < particlecount; i++) {
+			VehicleParticles[i] = new SimulatedVehicle(prevvehicle, 1.8, 1.8, 0.7, 5e-7);
+			MapModels       [i] = new List<Gaussian>(prevmodel);
+			VehicleWeights  [i] = 1.0 / particlecount;
+			toexplore       [i] = new List<double[]>(prevexplore);
+		}
+
+		mpredicted   = new double[particlecount];
+		mcorrected   = new double[particlecount];
+		bestparticle = 0;
+	}
+
+	/// <summary>
+	/// Reset the model of every particle to an empty map.
+	/// </summary>
+	public void ResetModels()
+	{
+		for (int i = 0; i < MapModels.Length; i++) {
+			MapModels[i].Clear();
+		}
+	}
+
+	/// <summary>
+	/// Remove all the localization and mapping history and start it again.
+	/// </summary>
+	public void ResetHistory()
+	{
+		Waypoints.Clear();
+		WayMaps  .Clear();
+		
+		Waypoints = new List<double[]>();
+		Waypoints.Add(new double[4] {0, RefVehicle.X, RefVehicle.Y, RefVehicle.Z});
+
+		WayMaps = new List<Tuple<double, List<Gaussian>>>();
+		WayMaps.Add(new Tuple<double, List<Gaussian>>(0, new List<Gaussian>()));
 	}
 
 	/// <summary>
@@ -217,7 +296,7 @@ public class Navigator
 			}
 		}
 
-		Vehicle best = VehicleParticles[BestParticle];
+		Vehicle best = VehicleParticles[bestparticle];
 		
 		double[] prevloc = new double[3] {Waypoints[Waypoints.Count - 1][1],
 		                                  Waypoints[Waypoints.Count - 1][2],
@@ -263,7 +342,7 @@ public class Navigator
 			ResampleParticles();
 		}
 
-		WayMaps.Add(new Tuple<double, List<Gaussian>>(time.TotalGameTime.TotalSeconds, MapModels[BestParticle]));
+		WayMaps.Add(new Tuple<double, List<Gaussian>>(time.TotalGameTime.TotalSeconds, MapModels[bestparticle]));
 	}
 
 	/// <summary>
@@ -375,7 +454,7 @@ public class Navigator
 
 			if (weights[i] > maxweight) {
 				maxweight = weights[i];
-				BestParticle = i;
+				bestparticle = i;
 			}
 		}
 
@@ -676,7 +755,7 @@ public class Navigator
 	/// </summary>
 	/// <param name="camera">Camera rotation matrix.</param>
 	public void RenderEstimate(double[][] camera) {
-		foreach (Gaussian component in MapModels[BestParticle]) {
+		foreach (Gaussian component in MapModels[bestparticle]) {
 			RenderGaussian(component, camera);
 		}
 	}

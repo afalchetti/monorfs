@@ -65,6 +65,11 @@ public class Simulation : Game
 	/// </summary>
 	public Navigator Navigator { get; private set; }
 
+	/// <summary>
+	/// Number of localization Montecarlo filter particles.
+	/// </summary>
+	public int ParticleCount { get; private set; }
+
 	// MonoGame-related Fields
 
 	/// <summary>
@@ -96,6 +101,11 @@ public class Simulation : Game
 	/// Double batch flipper.
 	/// </summary>
 	private SpriteBatch flip;
+
+	/// <summary>
+	/// Previous update frame keyboard state.
+	/// </summary>
+	private KeyboardState prevkeyboard;
 	
 	/// <summary>
 	/// Scene double buffer flipping destination rectangle.
@@ -187,7 +197,8 @@ public class Simulation : Game
 			initSceneFromSensor(scene);
 		}
 
-		Navigator = new Navigator(Explorer, particlecount, onlymapping);
+		ParticleCount = particlecount;
+		Navigator     = new Navigator(Explorer, particlecount, onlymapping);
 
 		try {
 			if (!string.IsNullOrEmpty(commands)) {
@@ -325,7 +336,7 @@ public class Simulation : Game
 	
 
 	/// <summary>
-	/// Allows the game to perform any initialization it needs to before starting to run.
+	/// Allows the game to perform any initialization it needs to do before it starts running.
 	/// </summary>
 	protected override void Initialize()
 	{
@@ -362,6 +373,9 @@ public class Simulation : Game
 			IsFixedTimeStep = false;
 		}
 
+		
+		prevkeyboard = Keyboard.GetState();
+
 		base.Initialize();
 	}
 	
@@ -394,6 +408,11 @@ public class Simulation : Game
 		
 		bool fast = keyboard.IsKeyDown(Keys.LeftShift);
 		bool slow = keyboard.IsKeyDown(Keys.LeftControl);
+
+		bool forceslam         = false;
+		bool forcemapping      = false;
+		bool forcereset        = keyboard.IsKeyDown(Keys.R);
+		bool forcehistoryreset = keyboard.IsKeyDown(Keys.T);
 
 		double multiplier = 1.0;
 		multiplier *= (fast) ? 2.0 : 1.0;
@@ -438,6 +457,11 @@ public class Simulation : Game
 		if (keyboard.IsKeyDown(Keys.V)) {
 			dcam -= 0.06 * multiplier;
 		}
+		
+		if (keyboard.IsKeyDown(Keys.M) && !prevkeyboard.IsKeyDown(Keys.M)) {
+			forceslam    = Navigator.OnlyMapping;
+			forcemapping = !Navigator.OnlyMapping;
+		}
 
 		double[] autocmd = Commands.Next();
 		
@@ -464,6 +488,23 @@ public class Simulation : Game
 
 			lastnavigationupdate = new GameTime(simtime.TotalGameTime, simtime.ElapsedGameTime);
 		}
+
+		if (forcehistoryreset) {
+			Navigator.ResetHistory();
+		}
+
+		if (forcereset) {
+			Navigator.ResetModels();
+		}
+
+		if (forceslam) {
+			Navigator.StartSlam(ParticleCount);
+		}
+		else if (forcemapping) {
+			Navigator.StartMapping();
+		}
+
+		prevkeyboard = keyboard;
 
 		base.Update(time);
 	}
