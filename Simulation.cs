@@ -43,7 +43,7 @@ public class Simulation : Game
 	/// Otherwise, the simulated timestep is always the same, regardless of
 	/// how long the operations take.
 	/// </summary>
-	public const bool Realtime = false;
+	public bool Realtime { get; private set; }
 
 	/// <summary>
 	/// Simulated time.
@@ -188,7 +188,7 @@ public class Simulation : Game
 	/// is assumed perfectly known.</param>
 	/// <param name="simulate">True means a full simulation is performed;
 	/// false uses real sensor data (realtime or from a file).</param>
-	public Simulation(string scene, string commands = "", int particlecount = 5, bool onlymapping = false, bool simulate = true)
+	public Simulation(string scene, string commands = "", int particlecount = 5, bool onlymapping = false, bool simulate = true, bool realtime = false)
 	{
 		if (simulate) {
 			initSceneFromSimFile(File.ReadAllText(scene));
@@ -199,6 +199,7 @@ public class Simulation : Game
 
 		ParticleCount = particlecount;
 		Navigator     = new Navigator(Explorer, particlecount, onlymapping);
+		Realtime      = realtime;
 
 		try {
 			if (!string.IsNullOrEmpty(commands)) {
@@ -242,7 +243,7 @@ public class Simulation : Game
 	}
 
 	/// <summary>
-	/// Initialize the scene.
+	/// Initialize the scene from a simulation file.
 	/// </summary>
 	/// <param name="scene">Scene descriptor text.</param>
 	private void initSceneFromSimFile(string scene)
@@ -286,6 +287,10 @@ public class Simulation : Game
 		}
 	}
 
+	/// <summary>
+	/// Initialize the scene from a real sensor device.
+	/// </summary>
+	/// <param name="sensor">Device (or recorded file) path.</param>
 	private void initSceneFromSensor(string sensor)
 	{
 		mapclip  = new float[4] {-6, 6, -3, 3};

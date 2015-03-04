@@ -98,6 +98,7 @@ public class Program
 		int    particlecount = 1;
 		bool   onlymapping   = false;
 		bool   simulate      = false;
+		bool   realtime      = false;
 		bool   showhelp      = false;
 
 		OptionSet options = new OptionSet() {
@@ -106,6 +107,7 @@ public class Program
 			{ "p|particles=", "Number of particles used for the RB-PHD",                      (int p) => particlecount = p },
 			{ "m|onlymap",    "Only do mapping, assuming known localization.",                m       => onlymapping   = m != null },
 			{ "s|simulate",   "Generate an artificial simulation instead of using a sensor.", s       => simulate      = s != null },
+			{ "r|realtime",   "Process the system in realtime, instead of a fixed step.",     r       => realtime      = r != null },
 			{ "h|help",       "Show this message and exit",                                   h       => showhelp      = h != null }
 		};
 
@@ -129,7 +131,7 @@ public class Program
 			Environment.Exit(2);
 		}
 
-		using (Simulation sim = new Simulation(scenefile, commandfile, particlecount, onlymapping, simulate)) {
+		using (Simulation sim = new Simulation(scenefile, commandfile, particlecount, onlymapping, simulate, realtime)) {
 			sim.Run();
 		
 			File.WriteAllText("trajectories.out", sim.SerializedTrajectories);
