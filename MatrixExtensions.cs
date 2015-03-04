@@ -1,4 +1,4 @@
-﻿// MatrixEntensions.cs
+﻿// MatrixExtensions.cs
 // Utility extensions to matrix class (double[][])
 // Part of MonoRFS
 //

@@ -1,4 +1,4 @@
-﻿// GraphicsDeviceEntension.cs
+﻿// GraphicsDeviceExtension.cs
 // Utility  methods to deal with graphics
 // Part of MonoRFS
 //
