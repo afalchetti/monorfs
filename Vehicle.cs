@@ -410,8 +410,17 @@ public abstract class Vehicle : IDisposable
 	/// <param name="camera">Camera rotation matrix.</param>
 	public void RenderTrajectory(double[][] camera)
 	{
+		RenderTrajectory(camera, Color.Yellow);
+	}
+
+	/// <summary>
+	/// Render the path that the vehicle has traveled so far.
+	/// </summary>
+	/// <param name="camera">Camera rotation matrix.</param>
+	/// <param name="color">Trajectory color.</param>
+	public void RenderTrajectory(double[][] camera, Color color)
+	{
 		double[][] vertices = new double[Waypoints.Count][];
-		Color      color    = Color.Yellow;
 
 		for (int i = 0; i < Waypoints.Count; i++) {
 			vertices[i] = camera.Multiply(new double[3] {Waypoints[i][1], Waypoints[i][2], Waypoints[i][3]});

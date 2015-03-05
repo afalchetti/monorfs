@@ -116,6 +116,12 @@ public class Navigator
 	public List<double[]> Waypoints { get; private set; }
 
 	/// <summary>
+	/// If true every particle history is rendered onscreen;
+	/// otherwise, only the best particle is.
+	/// </summary>
+	public const bool RenderAllParticles = true;
+
+	/// <summary>
 	/// Internel render output.
 	/// </summary>
 	private GraphicsDevice graphics;
@@ -447,7 +453,7 @@ public class Navigator
 				random -= VehicleWeights[k];
 			}
 			
-			particles[i] = new SimulatedVehicle(VehicleParticles[k - 1]);
+			particles[i] = new SimulatedVehicle(VehicleParticles[k - 1], RenderAllParticles);
 			models   [i] = new List<Gaussian>(MapModels[k - 1]);
 			weights  [i] = 1.0 / weights.Length;
 			random      += 1.0 / weights.Length;
@@ -746,7 +752,15 @@ public class Navigator
 	/// <param name="camera">Camera rotation matrix.</param>
 	public void Render(double[][] camera)
 	{
-		RenderTrajectory(camera);
+		if (RenderAllParticles) {
+			foreach (var particle in VehicleParticles) {
+				particle.RenderTrajectory(camera, Color.Blue);
+			}
+		}
+		else {
+			RenderTrajectory(camera);
+		}
+
 		RenderEstimate(camera);
 	}
 
