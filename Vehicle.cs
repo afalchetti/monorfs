@@ -225,6 +225,15 @@ public abstract class Vehicle : IDisposable
 	public abstract List<double[]> Measure();
 
 	/// <summary>
+	/// Remove all the localization history and start it again from the current position.
+	/// </summary>
+	public void ResetHistory()
+	{
+		Waypoints.Clear();
+		Waypoints.Add(new double[4] {0, X, Y, Z});
+	}
+
+	/// <summary>
 	/// Render the vehicle on the graphics device.
 	/// The graphics device must be ready, otherwise
 	/// the method will throw an exception.

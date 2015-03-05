@@ -98,7 +98,7 @@ public class Navigator
 	/// <summary>
 	/// Index of the particle with the biggest weight.
 	/// </summary>
-	private int bestparticle;
+	public int BestParticle { get; private set; }
 
 	/// <summary>
 	/// True if the localization of the vehicle is known.
@@ -184,7 +184,7 @@ public class Navigator
 
 		mpredicted   = new double[particlecount];
 		mcorrected   = new double[particlecount];
-		bestparticle = 0;
+		BestParticle = 0;
 
 		Waypoints = new List<double[]>();
 		Waypoints.Add(new double[4] {0, vehicle.X, vehicle.Y, vehicle.Z});
@@ -235,9 +235,9 @@ public class Navigator
 	/// <param name="particlecount">Number of particles for the Montecarlo filter.</param>
 	private void CollapseParticles(int particlecount)
 	{
-		Vehicle        prevvehicle = VehicleParticles[bestparticle];
-		List<Gaussian> prevmodel   = MapModels       [bestparticle];
-		List<double[]> prevexplore = toexplore       [bestparticle];
+		Vehicle        prevvehicle = VehicleParticles[BestParticle];
+		List<Gaussian> prevmodel   = MapModels       [BestParticle];
+		List<double[]> prevexplore = toexplore       [BestParticle];
 
 		VehicleParticles = new SimulatedVehicle[particlecount];
 		MapModels        = new List<Gaussian>  [particlecount];
@@ -253,7 +253,7 @@ public class Navigator
 
 		mpredicted   = new double[particlecount];
 		mcorrected   = new double[particlecount];
-		bestparticle = 0;
+		BestParticle = 0;
 	}
 
 	/// <summary>
@@ -267,15 +267,19 @@ public class Navigator
 	}
 
 	/// <summary>
-	/// Remove all the localization and mapping history and start it again.
+	/// Remove all the localization and mapping history and start it again from the current position.
 	/// </summary>
 	public void ResetHistory()
 	{
+		foreach (var particle in VehicleParticles) {
+			particle.ResetHistory();
+		}
+
 		Waypoints.Clear();
 		WayMaps  .Clear();
 		
 		Waypoints = new List<double[]>();
-		Waypoints.Add(new double[4] {0, RefVehicle.X, RefVehicle.Y, RefVehicle.Z});
+		Waypoints.Add(new double[4] {0, VehicleParticles[BestParticle].X, VehicleParticles[BestParticle].Y, VehicleParticles[BestParticle].Z});
 
 		WayMaps = new List<Tuple<double, List<Gaussian>>>();
 		WayMaps.Add(new Tuple<double, List<Gaussian>>(0, new List<Gaussian>()));
@@ -302,7 +306,7 @@ public class Navigator
 			}
 		}
 
-		Vehicle best = VehicleParticles[bestparticle];
+		Vehicle best = VehicleParticles[BestParticle];
 		
 		double[] prevloc = new double[3] {Waypoints[Waypoints.Count - 1][1],
 		                                  Waypoints[Waypoints.Count - 1][2],
@@ -348,7 +352,7 @@ public class Navigator
 			ResampleParticles();
 		}
 
-		WayMaps.Add(new Tuple<double, List<Gaussian>>(time.TotalGameTime.TotalSeconds, MapModels[bestparticle]));
+		WayMaps.Add(new Tuple<double, List<Gaussian>>(time.TotalGameTime.TotalSeconds, MapModels[BestParticle]));
 	}
 
 	/// <summary>
@@ -460,7 +464,7 @@ public class Navigator
 
 			if (weights[i] > maxweight) {
 				maxweight = weights[i];
-				bestparticle = i;
+				BestParticle = i;
 			}
 		}
 
@@ -769,7 +773,7 @@ public class Navigator
 	/// </summary>
 	/// <param name="camera">Camera rotation matrix.</param>
 	public void RenderEstimate(double[][] camera) {
-		foreach (Gaussian component in MapModels[bestparticle]) {
+		foreach (Gaussian component in MapModels[BestParticle]) {
 			RenderGaussian(component, camera);
 		}
 	}

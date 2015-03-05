@@ -496,6 +496,7 @@ public class Simulation : Game
 
 		if (forcehistoryreset) {
 			Navigator.ResetHistory();
+			Explorer .ResetHistory();
 		}
 
 		if (forcereset) {
