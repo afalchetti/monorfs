@@ -513,7 +513,7 @@ namespace NDesk.Options {
 			throw new InvalidOperationException ("Option has no names!");
 		}
 
-		[Obsolete ("Use KeyedCollection.this[string]")]
+		//[Obsolete ("Use KeyedCollection.this[string]")]
 		protected Option GetOptionForName (string option)
 		{
 			if (option == null)
@@ -687,7 +687,7 @@ namespace NDesk.Options {
 			bool process = true;
 			OptionContext c = CreateOptionContext ();
 			c.OptionIndex = -1;
-			var def = GetOptionForName ("<>");
+			var def = /*this["<>"]; //*/ GetOptionForName ("<>");
 			var unprocessed = 
 				from argument in arguments
 				where ++c.OptionIndex >= 0 && (process || def != null)

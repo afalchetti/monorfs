@@ -343,13 +343,6 @@ class GraphCombinatoricsTest
 	}
 
 	[Test]
-	public void MurtyNodeChildrenNoDuplicates()
-	{
-		// Not implemented yet
-		Assert.IsTrue(false);
-	}
-
-	[Test]
 	public void MurtyPairingFullSmall()
 	{
 		SparseMatrix profit = new SparseMatrix(3, 3);
@@ -396,18 +389,6 @@ class GraphCombinatoricsTest
 		foreach (int[] assignment in pairing) {
 			Assert.IsTrue(expected[h++].SequenceEqual(assignment));
 		}
-	}
-
-	[Test]
-	public void MurtyPairing1()
-	{
-		Assert.IsTrue(false);
-	}
-
-	[Test]
-	public void MurtyPairing2()
-	{
-		Assert.IsTrue(false);
 	}
 }
 }

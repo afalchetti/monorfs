@@ -141,7 +141,7 @@ public class Simulation : Game
 	/// <summary>
 	/// Automatic simulation command input.
 	/// </summary>
-	private CircularBuffer<double[]> Commands;
+	public CircularBuffer<double[]> Commands { get; private set; }
 
 	/// <summary>
 	/// Get a string representation of the trajectories of the vehicle and the
@@ -480,7 +480,7 @@ public class Simulation : Game
 		bool DoCorrect = !keyboard.IsKeyDown(Keys.C);
 		bool DoPrune   = !keyboard.IsKeyDown(Keys.Q);
 
-		Explorer.Update (simtime, 0, 0, ds, dyaw, dpitch, droll);
+		Explorer .Update(simtime, 0, 0, ds, dyaw, dpitch, droll);
 		Navigator.Update(simtime, 0, 0, ds, dyaw, dpitch, droll);
 
 		camangle += dcam;
@@ -553,7 +553,7 @@ public class Simulation : Game
 		
 		flip.End();
 
-		Console.WriteLine((1.0/time.ElapsedGameTime.TotalSeconds).ToString("F2"));
+		//Console.WriteLine((1.0/time.ElapsedGameTime.TotalSeconds).ToString("F2"));
 
 		base.Draw(time);
 	}

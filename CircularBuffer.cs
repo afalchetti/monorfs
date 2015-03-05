@@ -17,7 +17,7 @@ namespace monorfs
 /// <summary>
 /// Circular indexed array.
 /// </summary>
-class CircularBuffer<T>
+public class CircularBuffer<T>
 {
 	/// <summary>
 	/// Internal values.

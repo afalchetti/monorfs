@@ -233,7 +233,7 @@ public class Navigator
 	/// Collapse the vehicle particles to the best previous particle.
 	/// </summary>
 	/// <param name="particlecount">Number of particles for the Montecarlo filter.</param>
-	private void CollapseParticles(int particlecount)
+	public void CollapseParticles(int particlecount)
 	{
 		Vehicle        prevvehicle = VehicleParticles[BestParticle];
 		List<Gaussian> prevmodel   = MapModels       [BestParticle];
