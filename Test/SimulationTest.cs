@@ -87,6 +87,7 @@ class SimulationTest
 		explorer .Update(time, 0, 0, ds, dyaw, dpitch, droll);
 		navigator.Update(time, 0, 0, ds, dyaw, dpitch, droll);
 		updatehook();
+
 		if (time.TotalGameTime.TotalSeconds - lastnavigationupdate.TotalGameTime.TotalSeconds > Simulation.MeasurePeriod) {
 			List<double[]> measurements = explorer.Measure();
 			measurehook();
@@ -98,7 +99,7 @@ class SimulationTest
 		}
 	}
 
-	public void UpdateLoop(int loopcount, Action iterwork, Action updatehook, Action measurehook, Action slamhook)
+	public void UpdateLoop(int loopcount, Action updatehook, Action measurehook, Action slamhook, Action iterwork)
 	{
 		GameTime time        = new GameTime(new TimeSpan(0), new TimeSpan(0));
 		lastnavigationupdate = new GameTime(new TimeSpan(0), new TimeSpan(0));
@@ -128,8 +129,7 @@ class SimulationTest
 		UpdateLoop(300,
 		() =>
 		{
-			navigator.VehicleParticles[0].Location    = explorer.Location;
-			navigator.VehicleParticles[0].Orientation = explorer.Orientation;
+			navigator.VehicleParticles[0].State = explorer.State;
 		},
 		nop, nop,
 		() =>
@@ -140,8 +140,7 @@ class SimulationTest
 			                 "real weight:   " + navigator.VehicleWeights[0] + "\n" +
 			                 "best weight:   " + navigator.VehicleWeights[navigator.BestParticle] + "\n";
 
-			Console.WriteLine(message);
-			Assert.AreEqual(0, navigator.BestParticle/*, message*/);
+			Assert.AreEqual(0, navigator.BestParticle, message);
 			Assert.IsTrue(explorer.State.SequenceEqual(navigator.VehicleParticles[navigator.BestParticle].State)/*, message*/);
 		});
 	}
@@ -152,13 +151,13 @@ class SimulationTest
 		SimulatedVehicle   refvehicle = new SimulatedVehicle(new double[3] {0, 0, 0}, 0, new double[] {0, 0, 0}, new List<double[]>());
 		SimulatedVehicle[] particles  = new SimulatedVehicle[5];
 		
-		particles[0] = new SimulatedVehicle(refvehicle); navigator.VehicleParticles[0].State = new double[7] {0, 0, 0, 0, 0, 0, 0};
-		particles[1] = new SimulatedVehicle(refvehicle); navigator.VehicleParticles[0].State = new double[7] {1, 1, 1, 1, 1, 1, 1};
-		particles[2] = new SimulatedVehicle(refvehicle); navigator.VehicleParticles[0].State = new double[7] {2, 2, 2, 2, 2, 2, 2};
-		particles[3] = new SimulatedVehicle(refvehicle); navigator.VehicleParticles[0].State = new double[7] {3, 3, 3, 3, 3, 3, 3};
-		particles[4] = new SimulatedVehicle(refvehicle); navigator.VehicleParticles[0].State = new double[7] {4, 4, 4, 4, 4, 4, 4};
+		particles[0] = new SimulatedVehicle(refvehicle); particles[0].State = new double[7] {0, 0, 0, 0, 0, 0, 0};
+		particles[1] = new SimulatedVehicle(refvehicle); particles[1].State = new double[7] {1, 1, 1, 1, 1, 1, 1};
+		particles[2] = new SimulatedVehicle(refvehicle); particles[2].State = new double[7] {2, 2, 2, 2, 2, 2, 2};
+		particles[3] = new SimulatedVehicle(refvehicle); particles[3].State = new double[7] {3, 3, 3, 3, 3, 3, 3};
+		particles[4] = new SimulatedVehicle(refvehicle); particles[4].State = new double[7] {4, 4, 4, 4, 4, 4, 4};
 
-		int iterations = 1000;
+		int iterations = 10000;
 		int count0     = 0;
 		int count3     = 0;
 
@@ -174,10 +173,9 @@ class SimulationTest
 			navigator.VehicleWeights  [2] = 0.3;
 			navigator.VehicleWeights  [3] = 0.01;
 			navigator.VehicleWeights  [4] = 0.3;
-
-			Console.WriteLine(string.Join(", ", Array.ConvertAll(navigator.VehicleWeights, w => w.ToString("F2"))));
-
+			
 			navigator.ResampleParticles();
+			//Console.WriteLine(string.Join(", ", Array.ConvertAll(navigator.VehicleParticles, p => p.X.ToString("F0"))));
 
 			// these three have probabilities higher than 0.2 so they must always be in the resampled particles
 			Assert.IsTrue(navigator.VehicleParticles.Any(x => particles[1].State.SequenceEqual(x.State)));
@@ -187,6 +185,9 @@ class SimulationTest
 			count0 += navigator.VehicleParticles.Any(x => particles[0].State.SequenceEqual(x.State)) ? 1 : 0;
 			count3 += navigator.VehicleParticles.Any(x => particles[3].State.SequenceEqual(x.State)) ? 1 : 0;
 		}
+		
+		Console.WriteLine("count0: " + count0 + " / " + iterations + " -> " + ((float) count0 / iterations).ToString("F2") + "; expected = 0.55");
+		Console.WriteLine("count3: " + count3 + " / " + iterations + " -> " + ((float) count3 / iterations).ToString("F2") + "; expected = 0.05");
 		
 		// these can't be in every resample; sometime they need to be missed
 		Assert.Less(count0, iterations);
