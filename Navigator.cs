@@ -383,8 +383,9 @@ public class Navigator
 		// use the most probable components approximation otherwise
 		SparseMatrix logprobs = new SparseMatrix(visible.Count + measurements.Count, visible.Count + measurements.Count, double.NegativeInfinity);
 
-		double     logPD  = (visible.Count > 0) ? Math.Log(pose.DetectionProbability(visible[0].Mean)) : 0;
-		Gaussian[] zprobs = new Gaussian[visible.Count];
+		double     logPD      = (visible.Count > 0) ? Math.Log(pose.DetectionProbability(visible[0].Mean)) : 0;
+		double     logclutter = Math.Log(pose.ClutterDensity);
+		Gaussian[] zprobs     = new Gaussian[visible.Count];
 
 
 		for (int i = 0; i < visible.Count; i++) {
@@ -397,7 +398,7 @@ public class Navigator
 			if (d < 3) {
 				// prob = log (pD * zprob(measurement))
 				// this way multiplying probabilities equals to adding (negative) profits
-				logprobs[i, k] = logPD + Math.Log(zprobs[i].multiplier) + 0.5 * d * d;
+				logprobs[i, k] = logPD + Math.Log(zprobs[i].multiplier) - 0.5 * d * d;
 			}
 		}
 		}
@@ -407,14 +408,35 @@ public class Navigator
 		}
 
 		for (int i = 0; i < measurements.Count; i++) {
-			logprobs[visible.Count + i, i] = pose.ClutterDensity;
+			logprobs[visible.Count + i, i] = logclutter;
 		}
 
-		List<SparseMatrix> components = GraphCombinatorics.ConnectedComponents(logprobs).ConvertAll(c => c.Compact());
-		double             total      = 1.0;
+		List<SparseMatrix> connectedfull = GraphCombinatorics.ConnectedComponents(logprobs);
+		List<SparseMatrix> components    = new List<SparseMatrix>();
 
+		for (int i = 0; i < connectedfull.Count; i++) {
+			int[]        rows;
+			int[]        cols;
+			SparseMatrix component = connectedfull[i].Compact(out rows, out cols);
+
+			// fill the (Misdetection x Clutter) quadrant of the matrix with zeros (don't contribute)
+			for (int k = 0; k < rows.Length; k++) {
+				if (rows[k] >= visible.Count) {
+					for (int h = 0; h < cols.Length; h++) {
+						if (cols[h] >= measurements.Count) {
+							component[k, h] = 0;
+						}
+					}
+				}
+			}
+			
+			components.Add(component);
+		}
+
+		double total = 1.0;
 		foreach (SparseMatrix component in components) {
-			IEnumerable<int[]> assignments; 
+
+			IEnumerable<int[]> assignments;
 			if (component.Rows.Count <= 8) {
 				assignments = GraphCombinatorics.LexicographicalPairing(component, visible.Count);
 
@@ -427,7 +449,7 @@ public class Navigator
 			double comptotal = 0;
 			double prev      = 0;
 			foreach (int[] assignment in assignments) {
-				comptotal += Math.Exp(GraphCombinatorics.AssignmentValue(logprobs, assignment));
+				comptotal += Math.Exp(GraphCombinatorics.AssignmentValue(component, assignment));
 
 				if (h >= 200 || comptotal / prev < 1.001) {
 					break;
