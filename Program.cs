@@ -93,7 +93,7 @@ public class Program
 	//[STAThread]
 	public static void Main(string[] args)
 	{
-		string scenefile     = "map.world";
+		string scenefile     = "";
 		string commandfile   = "";
 		int    particlecount = 1;
 		bool   onlymapping   = false;
