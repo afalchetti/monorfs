@@ -43,6 +43,11 @@ public class Navigator
 	public const double MinWeight = 1e-2;
 
 	/// <summary>
+	/// Minimum particles effective fraction that need to exist to give reasonable exploration.
+	/// </summary>
+	public const double MinEffectiveParticle = 0.3;
+
+	/// <summary>
 	/// Maximum number of gaussians kept after a model prune.
 	/// </summary>
 	public const int MaxQuantity = 50;
@@ -360,7 +365,10 @@ public class Navigator
 			}
 
 			VehicleWeights = VehicleWeights.Divide(sum);
-			ResampleParticles();
+
+			if (ParticleDepleted()) {
+				ResampleParticles();
+			}
 		}
 
 		WayMaps.Add(new Tuple<double, List<Gaussian>>(time.TotalGameTime.TotalSeconds, MapModels[BestParticle]));
@@ -504,6 +512,23 @@ public class Navigator
 		VehicleParticles = particles;
 		VehicleWeights   = weights;
 		MapModels        = models;
+	}
+
+	/// <summary>
+	/// Check the depletion state of the particles.
+	/// </summary>
+	/// <returns>
+	/// True if there are too few "effective particles",
+	/// i.e. a lot of particle have negligible weights.</returns>
+	public bool ParticleDepleted()
+	{
+		double cum = 0;
+
+		foreach (double weight in VehicleWeights) {
+			cum += weight * weight;
+		}
+
+		return 1.0/cum < MinEffectiveParticle * VehicleWeights.Length;
 	}
 
 	/// <summary>
