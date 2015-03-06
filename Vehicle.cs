@@ -27,9 +27,17 @@ namespace monorfs
 public abstract class Vehicle : IDisposable
 {
 	/// <summary>
+	/// Internal vehicle pose state.
+	/// </summary>
+	private double[] state;
+
+	/// <summary>
 	/// Get the internal state as a vector.
 	/// </summary>
-	public double[] State { get; set; }
+	public double[] State {
+		get { return state; }
+		set { state = new double[value.Length]; Array.Copy(value, state,  value.Length); }
+	}
 
 	/// <summary>
 	/// Get the location x-axis coordinate.

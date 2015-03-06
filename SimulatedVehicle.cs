@@ -37,10 +37,10 @@ public class SimulatedVehicle : Vehicle
 	public readonly double[][] MotionCovariance = new double[7][] {new double[7] {4e-3, 0, 0, 0, 0, 0, 0},
 	                                                               new double[7] {0, 4e-3, 0, 0, 0, 0, 0},
 	                                                               new double[7] {0, 0, 4e-3, 0, 0, 0, 0},
-	                                                               new double[7] {0, 0, 0, 4e-3, 0, 0, 0},
-	                                                               new double[7] {0, 0, 0, 0, 4e-3, 0, 0},
-	                                                               new double[7] {0, 0, 0, 0, 0, 4e-3, 0},
-	                                                               new double[7] {0, 0, 0, 0, 0, 0, 4e-3}};
+	                                                               new double[7] {0, 0, 0, 4e-4, 0, 0, 0},
+	                                                               new double[7] {0, 0, 0, 0, 4e-4, 0, 0},
+	                                                               new double[7] {0, 0, 0, 0, 0, 4e-4, 0},
+	                                                               new double[7] {0, 0, 0, 0, 0, 0, 4e-4}};
 
 	/// <summary>
 	/// Measurement model covariance matrix.

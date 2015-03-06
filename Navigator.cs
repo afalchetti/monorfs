@@ -304,6 +304,11 @@ public class Navigator
 			for (int i = 0; i < VehicleParticles.Length; i++) {
 				VehicleParticles[i].Update(time, dx, dy, dz, dyaw, dpitch, droll);
 			}
+
+			// debug: force the correct particle into the mix (it should always win)
+			// or use a really close match (it too should win)
+			//VehicleParticles[0].State = RefVehicle.State;
+			//VehicleParticles[0].X += 0.0001;
 		}
 
 		Vehicle best = VehicleParticles[BestParticle];
@@ -343,12 +348,18 @@ public class Navigator
 
 			if (!OnlyMapping) { VehicleWeights[i] *= WeightAlpha(measurements, predicted, corrected, VehicleParticles[i]); }
 
-			MapModels[i]  = corrected;
+			MapModels[i] = corrected;
 		});
 
 		// localization update
 		if (!OnlyMapping) {
-			VehicleWeights = VehicleWeights.Divide(VehicleWeights.Sum());
+			double sum = VehicleWeights.Sum();
+
+			if (sum == 0) {
+				sum = 1;
+			}
+
+			VehicleWeights = VehicleWeights.Divide(sum);
 			ResampleParticles();
 		}
 

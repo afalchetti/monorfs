@@ -88,6 +88,7 @@
     <Compile Include="GraphCombinatorics.cs" />
     <Compile Include="SparseMatrix.cs" />
     <Compile Include="Test\GraphCombinatoricsTest.cs" />
+    <Compile Include="Test\SimulationTest.cs" />
     <Compile Include="Util.cs" />
     <Compile Include="SimulatedVehicle.cs" />
     <Compile Include="Vehicle.cs" />
@@ -98,7 +99,8 @@
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>xcopy $(ProjectDir)additional $(TargetDir) /E /Y</PostBuildEvent>
+    <PostBuildEvent>xcopy $(ProjectDir)additional $(TargetDir) /E /Y
+"D:\applications\NUnit 2.6.3\bin\nunit.exe" "$(TargetPath)"</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
