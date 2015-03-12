@@ -12,8 +12,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using AForge;
+using AForge.Imaging;
 using Accord;
 using Accord.Math;
+using Accord.Imaging;
 
 using Microsoft.Xna.Framework;
 using OpenNIWrapper;
@@ -45,11 +47,6 @@ public class KinectVehicle : Vehicle
 	private Queue<float[][]> cachedmaps;
 
 	/// <summary>
-	/// Cached history processed depth map for feature extraction visualization.
-	/// </summary>
-	private Queue<float[][]> cachedprocessed;
-
-	/// <summary>
 	/// Cached history extracted features.
 	/// </summary>
 	private Queue<List<SparseItem>> cachedfeatures;
@@ -57,12 +54,18 @@ public class KinectVehicle : Vehicle
 	// Cached constants
 
 	/// <summary>
-	/// Device resolution on the X-axis.
+	/// For efficiency purposes, not the whole image is used.
+	/// It is subsampled first using this delta factor.
+	/// </summary>
+	private const int delta = 16;
+
+	/// <summary>
+	/// Device resolution on the X-axis, properly scaled.
 	/// </summary>
 	private float resx;
 
 	/// <summary>
-	/// Device resolution on the Y-axis.
+	/// Device resolution on the Y-axis, properly scaled.
 	/// </summary>
 	private float resy;
 
@@ -86,7 +89,12 @@ public class KinectVehicle : Vehicle
 	/// <summary>
 	/// Sensor depth image reading.
 	/// </summary>
-	private Texture2D features;
+	private List<SparseItem> interest;
+
+	/// <summary>
+	/// Point texture to illustrate landmark positions.
+	/// </summary>
+	private Texture2D landmark;
 
 	/// <summary>
 	/// Renderer.
@@ -100,9 +108,13 @@ public class KinectVehicle : Vehicle
 		set
 		{
 			base.Graphics = value;
-			
-			sensed   = new Texture2D(Graphics, depth.VideoMode.Resolution.Width, depth.VideoMode.Resolution.Height, false, SurfaceFormat.Color);
-			features = new Texture2D(Graphics, depth.VideoMode.Resolution.Width, depth.VideoMode.Resolution.Height, false, SurfaceFormat.Color);
+			sensed = new Texture2D(Graphics,
+			                       (int) (depth.VideoMode.Resolution.Width  / delta),
+			                       (int) (depth.VideoMode.Resolution.Height / delta),
+			                       false,
+			                       SurfaceFormat.Color);
+
+			landmark = CreatePoint();
 		}
 	}
 
@@ -141,9 +153,9 @@ public class KinectVehicle : Vehicle
 			depth = device.CreateVideoStream(Device.SensorType.Depth);
 			depth.Start();
 
-			cachedmaps      = new Queue<float[][]>();
-			cachedprocessed = new Queue<float[][]>();
-			cachedfeatures  = new Queue<List<SparseItem>>();
+			cachedmaps     = new Queue<float[][]>();
+			cachedfeatures = new Queue<List<SparseItem>>();
+			interest       = new List<SparseItem>();
 			
 			if (device.IsFile) {
 				device.PlaybackControl.Speed = -1;
@@ -155,11 +167,11 @@ public class KinectVehicle : Vehicle
 				                                  Resolution      = new System.Drawing.Size(320, 240) };
 			}
 
-			SidebarWidth  = depth.VideoMode.Resolution.Width;
-			SidebarHeight = depth.VideoMode.Resolution.Height * 2;  // two images stacked vertically
+			SidebarWidth  = (int) (depth.VideoMode.Resolution.Width  / delta);
+			SidebarHeight = (int) (depth.VideoMode.Resolution.Height / delta);
 
-			resx    = depth.VideoMode.Resolution.Width;
-			resy    = depth.VideoMode.Resolution.Height;
+			resx    = depth.VideoMode.Resolution.Width  / delta;
+			resy    = depth.VideoMode.Resolution.Height / delta;
 			xzalpha = 2 * (float) Math.Tan(depth.HorizontalFieldOfView / 2);
 			yzalpha = 2 * (float) Math.Tan(depth.VerticalFieldOfView   / 2);
 		}
@@ -196,21 +208,18 @@ public class KinectVehicle : Vehicle
 	{
 		List<double[]> measurements = new List<double[]>();
 
-		float[][]        frame;
-		float[][]        processed;
-		List<SparseItem> interest;
-
-		NextFrame(out frame, out processed, out interest);
+		float[][] frame;
+		
+		NextFrame(out frame, out interest);
 
 		for (int i = 0; i < interest.Count; i++) {
-			float range = GetDepth(interest[i].I, interest[i].K, frame[interest[i].I][interest[i].K]);
+			float range = GetDepth(interest[i].I, interest[i].K, (float) interest[i].Value);
 
-			measurements.Add(new double[3] {interest[i].I, interest[i].K, range});
+			measurements.Add(new double[3] {interest[i].I - resx / 2, interest[i].K - resy / 2, range});
 		}
 		
-		if (sensed != null && features != null) {
-			MatrixToTexture(sensed,   frame);
-			MatrixToTexture(features, processed);
+		if (sensed != null) {
+			//MatrixToTexture(sensed, frame);
 		}
 
 		return measurements;
@@ -220,18 +229,16 @@ public class KinectVehicle : Vehicle
 	/// Read a frame from the cache if possible, otherwise use the original device.
 	/// </summary>
 	/// <param name="frame">Out. Sensor output.</param>
-	/// <param name="processed">Out. Processed representation (for displaying purposes).</param>
 	/// <param name="interest">Out. List of interest points extracted from the map.</param>
-	private void NextFrame(out float[][] frame, out float[][] processed, out List<SparseItem> interest)
+	private void NextFrame(out float[][] frame, out List<SparseItem> interest)
 	{
 		if (cachedmaps.Count > 0) {
-			frame     = cachedmaps     .Dequeue();
-			processed = cachedprocessed.Dequeue();
-			interest  = cachedfeatures .Dequeue();
+			frame     = cachedmaps    .Dequeue();
+			interest  = cachedfeatures.Dequeue();
 
 		}
 		else {
-			ReadProcessFrame(out frame, out processed, out interest);
+			ReadProcessFrame(out frame, out interest);
 		}
 	}
 
@@ -243,20 +250,20 @@ public class KinectVehicle : Vehicle
 	/// stream dies before reaching to that point.</param>
 	private void Cache(int maxframes)
 	{
+		Console.WriteLine("Starting cache process...");
 		for (int i = 0; i < maxframes; i++) {
 			if (!depth.IsValid) {
 				break;
 			}
 			
 			float[][]        bitmap;
-			float[][]        processed;
 			List<SparseItem> interest;
 
-			ReadProcessFrame(out bitmap, out processed, out interest);
+			ReadProcessFrame(out bitmap, out interest);
 
-			cachedmaps     .Enqueue(bitmap);
-			cachedprocessed.Enqueue(processed);
-			cachedfeatures .Enqueue(interest);
+			cachedmaps    .Enqueue(bitmap);
+			cachedfeatures.Enqueue(interest);
+			Console.WriteLine("frame " + (i + 1) + " / " + maxframes);
 		}
 	}
 
@@ -264,15 +271,12 @@ public class KinectVehicle : Vehicle
 	/// Get a frame from the device and process it.
 	/// </summary>
 	/// <param name="frame">Out. Sensor output.</param>
-	/// <param name="processed">Out. Processed representation (for displaying purposes).</param>
 	/// <param name="interest">Out. List of interest points extracted from the map.</param>
-	private void ReadProcessFrame(out float[][] frame, out float[][] processed, out List<SparseItem> interest)
+	private void ReadProcessFrame(out float[][] frame, out List<SparseItem> interest)
 	{
 		using (VideoFrameRef frameref = depth.ReadFrame()) {
-			frame               = FrameToArray(frameref);
-			float[][] curvature = CalculateCurvature(frame);
-			interest            = LocalMax(curvature, 0.8f, 25);
-			processed           = curvature;
+			frame    = FrameToArray(frameref);
+			interest = ExtractKeypoints(frame, 50, 25);
 		}
 	}
 
@@ -283,21 +287,30 @@ public class KinectVehicle : Vehicle
 	/// <returns>Image data array.</returns>
 	private float[][] FrameToArray(VideoFrameRef image)
 	{
-		IntPtr    data  = image.Data;
-		float[][] array = new float[image.VideoMode.Resolution.Width][];
+		IntPtr    data      = image.Data;
+		int       width     = image.VideoMode.Resolution.Width;
+		int       height    = image.VideoMode.Resolution.Height;
+		int       subwidth  = width / delta;
+		int       subheight = height / delta;
+
+		short[] copy = new short[width * height];
+		Marshal.Copy(data, copy, 0, copy.Length);
+
+
+		float[][] array = new float[subwidth][];
 		
 		for (int i = 0; i < array.Length; i++) {
-			array[i] = new float[image.VideoMode.Resolution.Height];
+			array[i] = new float[subheight];
 		}
 
-		short[] copy = new short[array.Length * array[0].Length];
-		Marshal.Copy(data, copy, 0, copy.Length);
-		
 		int h = 0;
 		for (int k = 0; k < array[0].Length; k++) {
-		for (int i = 0; i < array   .Length; i++) {
-			array[i][k] = copy[h++];
-		}
+			h = width * k * delta;
+
+			for (int i = 0; i < array.Length; i++) {
+				array[i][k] = copy[h];
+				h += delta;
+			}
 		}
 
 		return array;
@@ -346,7 +359,7 @@ public class KinectVehicle : Vehicle
 	/// Calculate the intrinsic gaussian curvature of an image.
 	/// </summary>
 	/// <param name="image">Original image.</param>
-	/// <returns>Curvature.</returns>
+	/// <returns>Intrinsic gaussian curvature (k1 x k2).</returns>
 	private float[][] CalculateCurvature(float[][] image)
 	{
 		float[][] curvature = new float[image.Length][];
@@ -372,25 +385,46 @@ public class KinectVehicle : Vehicle
 	}
 
 	/// <summary>
-	/// Obtain a subsampled image (no filtering performed).
+	/// Straightforward reverse comparer (big goes before small).
 	/// </summary>
-	/// <param name="image">Original image.</param>
-	/// <param name="xcount">New matrix width.</param>
-	/// <param name="ycount">Mew matrix height.</param>
-	/// <returns>Subsampled matrix as a sparse entry list.</returns>
-	private List<SparseItem> Subsample(float[][] image, int xcount, int ycount)
+	private class ReverseComparer : IComparer<int>
 	{
-		List<SparseItem> subsampled = new List<SparseItem>();
+		public int Compare(int a, int b) { return b - a; }
+	}
 
-		for (int i = 0; i < xcount; i++) {
-		for (int k = 0; k < ycount; k++) {
-			int imgX = (int)((i + 0.5) * image   .Length / xcount);
-			int imgY = (int)((k + 0.5) * image[0].Length / ycount);
-			subsampled.Add(new SparseItem(imgX, imgY, image[imgX][imgY]));
-		}
+	/// <summary>
+	/// Extract keypoints from an image using the FAST methodology.
+	/// </summary>
+	/// <param name="image">Input image.</param>
+	/// <param name="threshold">Selection threshold value. Higher gives less keypoints.</param>
+	/// <param name="maxcount">Maximum number of interest points. The highest scored keypoints are chosen.</param>
+	/// <returns>List of keypoints in measurement space.</returns>
+	private static List<SparseItem> ExtractKeypoints(float[][] image, int threshold = 20, int maxcount = int.MaxValue)
+	{
+		var            detector  = new FastCornersDetector(threshold);
+		var            converter = new Accord.Imaging.Converters.MatrixToImage(0, 10000);
+		UnmanagedImage bitmap;
+		
+		converter.Convert(image.ToMatrix(), out bitmap);
+		IntPoint[]       features  = detector.ProcessImage(bitmap).ToArray();
+		List<SparseItem> keypoints = new List<SparseItem>();
+
+		Array.Sort(detector.Scores, features, new ReverseComparer());
+
+		for (int i = 0; i < features.Length && i < maxcount; i++) {
+			IntPoint point = features[i];
+
+			// the coordinates are inverted because of the MatrixToImage converter
+			// (image is row-major, matrix is column-major)
+			// it is more efficient to just let it be and invert here than trying
+			// to fix the coordinate order (and it doesn't matter anyway for the extractor)
+			int x = (int) point.Y;
+			int y = (int) point.X;
+
+			keypoints.Add(new SparseItem(x, y, image[x][y]));
 		}
 
-		return subsampled;
+		return keypoints;
 	}
 
 	/// <summary>
@@ -405,40 +439,15 @@ public class KinectVehicle : Vehicle
 		var data = new Color[matrix.Length * matrix[0].Length];
 
 		float maxval = matrix.Max();
-		float minval = matrix.Min();
 
 		int h = 0;
 		for (int k = 0; k < matrix[0].Length; k++) {
 		for (int i = 0; i < matrix   .Length; i++) {
-			int gray = (int)((matrix[i][k] - minval) / (maxval - minval) * 255);
+			int gray = (int)(matrix[i][k] / maxval * 255);
 			data[h++] = new Color(gray, gray, gray);
 		}
 		}
 
-		target.SetData(data);
-	}
-
-	/// <summary>
-	/// Obtain a data stream for a Texture2D object from
-	/// a bidimensional matrix expressed as a sparse matrix.
-	/// </summary>
-	/// <param name="target">Render target.</param>
-	/// <param name="list">Original matrix represented as a list of matrix entries.</param>
-	/// <param name="width">Output image width.</param>
-	/// <param name="height">Output image height.</param>
-	/// <returns>Color data stream.</returns>
-	private void ListToTextureData(Texture2D target, IEnumerable<SparseItem> list, int width, int height)
-	{
-		var data = new Color[width * height];
-
-		double maxval = list.Aggregate(double.NegativeInfinity, (cum, item) => Math.Max(cum, item.Value));
-		double minval = list.Aggregate(double.PositiveInfinity, (cum, item) => Math.Min(cum, item.Value));
-		
-		foreach (var item in list) {
-			int gray = (int)((item.Value - minval) / (maxval - minval) * 255);
-			data[width * item.K + item.I] = new Color(gray, gray, gray);
-		}
-		
 		target.SetData(data);
 	}
 
@@ -460,16 +469,39 @@ public class KinectVehicle : Vehicle
 	/// </summary>
 	public override void RenderSide()
 	{
-		int vidwidth  = depth.VideoMode.Resolution.Width;
-		int vidheight = depth.VideoMode.Resolution.Height;
+		int vidwidth  = sensed.Width;
+		int vidheight = sensed.Height;
 		int gwidth    = Graphics.Viewport.Width;
 		int gheight   = Graphics.Viewport.Height;
 
-		Flip.Draw(sensed,   new Rectangle(0, 0,          gwidth,   gheight / 2),
-		                    new Rectangle(0, 0,          vidwidth, vidheight), Color.White);
-		Flip.Draw(features, new Rectangle(0, gheight/ 2, gwidth,   gheight / 2),
-		                    new Rectangle(0, 0,          vidwidth, vidheight), Color.White);
+		float ratio = (float) gwidth / vidwidth;
+
+		Flip.Draw(sensed, new Rectangle(0, 0, gwidth,   gheight),
+		                  new Rectangle(0, 0, vidwidth, vidheight), Color.White);
+
+		foreach (var point in interest) {
+			Flip.Draw(landmark, new Vector2(point.I * ratio - landmark.Width / 2, point.K * ratio - landmark.Height / 2));
+		}
 	}
+
+	/// <summary>
+	/// Create a 3-pixel wide point texture.
+	/// </summary>
+	/// <returns>Point texture.</returns>
+	public Texture2D CreatePoint()
+    {
+        const int side = 3;
+        Texture2D point = new Texture2D(Graphics, side, side);
+        Color[]   data  = new Color[side * side];
+
+        for (int i = 0; i < data.Length; i++) {
+			data[i] = Color.Red;
+        }
+
+        point.SetData(data);
+
+        return point;
+    }
 
 	/// <summary>
 	/// Dispose all assets.

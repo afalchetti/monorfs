@@ -3,3 +3,5 @@ bin/*
 obj/*
 *.suo
 *.user
+additional/*.oni
+additional/*.in
