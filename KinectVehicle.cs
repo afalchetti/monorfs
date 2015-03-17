@@ -403,6 +403,7 @@ public class KinectVehicle : Vehicle
 	{
 		var            detector  = new FastCornersDetector(threshold);
 		var            converter = new Accord.Imaging.Converters.MatrixToImage(0, 10000);
+		int            topcount  = maxcount; // this is the end index; it may grow if invalid items are found
 		UnmanagedImage bitmap;
 		
 		converter.Convert(image.ToMatrix(), out bitmap);
@@ -411,7 +412,8 @@ public class KinectVehicle : Vehicle
 
 		Array.Sort(detector.Scores, features, new ReverseComparer());
 
-		for (int i = 0; i < features.Length && i < maxcount; i++) {
+
+		for (int i = 0; i < features.Length && i < topcount; i++) {
 			IntPoint point = features[i];
 
 			// the coordinates are inverted because of the MatrixToImage converter
@@ -421,7 +423,12 @@ public class KinectVehicle : Vehicle
 			int x = (int) point.Y;
 			int y = (int) point.X;
 
-			keypoints.Add(new SparseItem(x, y, image[x][y]));
+			if (image[x][y] != 0) {
+				keypoints.Add(new SparseItem(x, y, image[x][y]));
+			}
+			else {
+				topcount++;
+			}
 		}
 
 		return keypoints;
