@@ -136,6 +136,11 @@ public class Simulation : Game
 	private double camangle;
 
 	/// <summary>
+	/// Camera zoom factor.
+	/// </summary>
+	private double camzoom;
+
+	/// <summary>
 	/// Camera matrix.
 	/// </summary>
 	private double[][] camera;
@@ -246,6 +251,7 @@ public class Simulation : Game
 		sidedest.X += (int)(graphicsManager.PreferredBackBufferWidth * screencut);
 
 		camangle = 0;
+		camzoom  = 1;
 		camera   = Accord.Math.Matrix.Identity(3).ToArray();
 	}
 
@@ -412,13 +418,14 @@ public class Simulation : Game
 
 		KeyboardState keyboard = Keyboard.GetState();
 
-		double dlocx  = 0;
-		double dlocy  = 0;
-		double dlocz  = 0;
-		double dyaw   = 0;
-		double dpitch = 0;
-		double droll  = 0;
-		double dcam   = 0;
+		double dlocx     = 0;
+		double dlocy     = 0;
+		double dlocz     = 0;
+		double dyaw      = 0;
+		double dpitch    = 0;
+		double droll     = 0;
+		double dcamangle = 0;
+		double dcamzoom  = 0;
 		
 		bool fast = keyboard.IsKeyDown(Keys.LeftShift);
 		bool slow = keyboard.IsKeyDown(Keys.LeftControl);
@@ -465,11 +472,19 @@ public class Simulation : Game
 		}
 
 		if (keyboard.IsKeyDown(Keys.B)) {
-			dcam += 0.06 * multiplier;
+			dcamangle += 0.06 * multiplier;
 		}
 
 		if (keyboard.IsKeyDown(Keys.V)) {
-			dcam -= 0.06 * multiplier;
+			dcamangle -= 0.06 * multiplier;
+		}
+
+		if (keyboard.IsKeyDown(Keys.Up)) {
+			dcamzoom += 0.05 * multiplier;
+		}
+
+		if (keyboard.IsKeyDown(Keys.Down)) {
+			dcamzoom -= 0.05 * multiplier;
 		}
 		
 		if (keyboard.IsKeyDown(Keys.M) && !prevkeyboard.IsKeyDown(Keys.M)) {
@@ -479,13 +494,13 @@ public class Simulation : Game
 
 		double[] autocmd = Commands.Next();
 		
-		dlocx  += autocmd[0];
-		dlocy  += autocmd[1];
-		dlocz  += autocmd[2];
-		dyaw   += autocmd[3];
-		dpitch += autocmd[4];
-		droll  += autocmd[5];
-		dcam   += autocmd[6];
+		dlocx       += autocmd[0];
+		dlocy       += autocmd[1];
+		dlocz       += autocmd[2];
+		dyaw        += autocmd[3];
+		dpitch      += autocmd[4];
+		droll       += autocmd[5];
+		dcamangle   += autocmd[6];
 		
 		bool DoPredict = !keyboard.IsKeyDown(Keys.P);
 		bool DoCorrect = !keyboard.IsKeyDown(Keys.C);
@@ -500,8 +515,9 @@ public class Simulation : Game
 			Navigator.Update(simtime, 0, 0, 0, 0, 0, 0);
 		}
 
-		camangle += dcam;
-		camera    = MatrixExtensions.CreateRotationX(camangle);
+		camangle += dcamangle;
+		camzoom   = Math.Max(0.1, Math.Min(10.0, camzoom * (1 + dcamzoom)));
+		camera    = camzoom.Multiply(MatrixExtensions.CreateRotationX(camangle));
 
 		if (simtime.TotalGameTime.TotalSeconds - lastnavigationupdate.TotalGameTime.TotalSeconds > MeasurePeriod) {
 			List<double[]> measurements = Explorer.Measure();
