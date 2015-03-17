@@ -46,6 +46,13 @@ public class Simulation : Game
 	public bool Realtime { get; private set; }
 
 	/// <summary>
+	/// Defines if the particles look at the odometry input as relevant information
+	/// for the pose update. This may be set to false if there is no odometry
+	/// or for performance comparisons of the system with and without it.
+	/// </summary>
+	public const bool UseOdometry = true;
+
+	/// <summary>
 	/// Simulated time.
 	/// </summary>
 	private GameTime simtime = new GameTime();
@@ -212,7 +219,7 @@ public class Simulation : Game
 
 		if (string.IsNullOrEmpty(commands)) {
 			Commands = new CircularBuffer<double[]>(1);
-			Commands.Add(new double[5] {0, 0, 0, 0, 0});
+			Commands.Add(new double[7] {0, 0, 0, 0, 0, 0, 0});
 		}
 
 		// MonoGame-related construction
@@ -304,14 +311,14 @@ public class Simulation : Game
 	private void initCommands(string[] commandstr)
 	{
 		if (commandstr.Length < 1) {
-			commandstr = new string[1] {"0 0 0 0 0"};
+			commandstr = new string[1] {"0 0 0 0 0 0 0"};
 		}
 
 		Commands = new CircularBuffer<double[]>(commandstr.Length);
 
 		for (int i = 0; i < commandstr.Length; i++) {
 			Commands.Add(ParseDoubleList(commandstr[i]));
-			// the item structure is {ds, dyaw, dpitch, droll, dcamera}
+			// the item structure is {dlocx, dlocy, dlocz, dyaw, dpitch, droll, dcamera}
 		}
 	}
 
@@ -405,7 +412,9 @@ public class Simulation : Game
 
 		KeyboardState keyboard = Keyboard.GetState();
 
-		double ds     = 0;
+		double dlocx  = 0;
+		double dlocy  = 0;
+		double dlocz  = 0;
 		double dyaw   = 0;
 		double dpitch = 0;
 		double droll  = 0;
@@ -424,11 +433,11 @@ public class Simulation : Game
 		multiplier /= (slow) ? 4.0 : 1.0;
 		
 		if (keyboard.IsKeyDown(Keys.I)) {
-			ds += 0.02 * multiplier;
+			dlocz += 0.02 * multiplier;
 		}
 
 		if (keyboard.IsKeyDown(Keys.K)) {
-			ds -= 0.02 * multiplier;
+			dlocz -= 0.02 * multiplier;
 		}
 
 		if (keyboard.IsKeyDown(Keys.J)) {
@@ -470,18 +479,26 @@ public class Simulation : Game
 
 		double[] autocmd = Commands.Next();
 		
-		ds     += autocmd[0];
-		dyaw   += autocmd[1];
-		dpitch += autocmd[2];
-		droll  += autocmd[3];
-		dcam   += autocmd[4];
+		dlocx  += autocmd[0];
+		dlocy  += autocmd[1];
+		dlocz  += autocmd[2];
+		dyaw   += autocmd[3];
+		dpitch += autocmd[4];
+		droll  += autocmd[5];
+		dcam   += autocmd[6];
 		
 		bool DoPredict = !keyboard.IsKeyDown(Keys.P);
 		bool DoCorrect = !keyboard.IsKeyDown(Keys.C);
 		bool DoPrune   = !keyboard.IsKeyDown(Keys.Q);
 
-		Explorer .Update(simtime, 0, 0, ds, dyaw, dpitch, droll);
-		Navigator.Update(simtime, 0, 0, ds, dyaw, dpitch, droll);
+		Explorer .Update(simtime, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
+
+		if (UseOdometry) {
+			Navigator.Update(simtime, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
+		}
+		else {
+			Navigator.Update(simtime, 0, 0, 0, 0, 0, 0);
+		}
 
 		camangle += dcam;
 		camera    = MatrixExtensions.CreateRotationX(camangle);

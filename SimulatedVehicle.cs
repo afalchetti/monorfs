@@ -66,6 +66,13 @@ public class SimulatedVehicle : Vehicle
 	public readonly double ClutterCount;
 
 	/// <summary>
+	/// Defines if this vehicle remains perfectly still when no input commands are given.
+	/// If the robot is well located on the ground this makes sense, but if it is a handheld
+	/// device, it is not so easy to maintain it steady.
+	/// </summary>
+	public const bool PerfectStill = false;
+
+	/// <summary>
 	/// Landmark 3d locations against which the measurements are performed.
 	/// </summary>
 	public List<double[]> Landmarks;
@@ -157,8 +164,8 @@ public class SimulatedVehicle : Vehicle
 	/// <param name="droll">Angle variation from odometry in the roll coordinate since last timestep.</param>
 	public override void Update(GameTime time, double dx, double dy, double dz, double dyaw, double dpitch, double droll)
 	{
-		// no input, static friction makes the robot stay put
-		if (dx == 0 && dy == 0 && dz == 0 && dyaw == 0 && dpitch == 0 && droll == 0) {
+		// no input, static friction makes the robot stay put (if there is any static friction)
+		if (PerfectStill && dx == 0 && dy == 0 && dz == 0 && dyaw == 0 && dpitch == 0 && droll == 0) {
 			return;
 		}
 
