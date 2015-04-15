@@ -509,7 +509,7 @@ public class KinectVehicle : Vehicle
 		float ratio = (float) gwidth / vidwidth;
 
 		Flip.Draw(sensed, new Rectangle(0, 0, gwidth,   gheight),
-		                  new Rectangle(0, 0, vidwidth, vidheight), Color.White);
+		                  new Rectangle(0, 0, vidwidth, vidheight), Color.Gray);
 
 		foreach (var point in interest) {
 			Flip.Draw(landmark, new Vector2(point.I * ratio - landmark.Width / 2, point.K * ratio - landmark.Height / 2));
