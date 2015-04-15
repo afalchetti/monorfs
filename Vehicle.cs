@@ -162,7 +162,11 @@ public abstract class Vehicle : IDisposable
 	/// <param name="theta">Orientation angle.</param>
 	/// <param name="axis">Orientation rotation axis.</param>
 	public Vehicle(double[] location, double theta, double[] axis)
-		: this(location, theta, axis, 240, new Rectangle(-160, -120, 320, 240), new Range(0.8f, 2*4f)) {}
+		: this(location, theta, axis, 575.8156 / KinectVehicle.Delta,
+	           new Rectangle(-640 / KinectVehicle.Delta / 2, -480 / KinectVehicle.Delta / 2,
+	                          640 / KinectVehicle.Delta,      480 / KinectVehicle.Delta),
+			   new Range(0.1f, 2f)) {}
+			   //new Range(0.1f, 10f)) {}
 
 	/// <summary>
 	/// Construct a new Vehicle object from its initial state and appropiate constants.
