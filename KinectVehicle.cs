@@ -421,6 +421,7 @@ public class KinectVehicle : Vehicle
 		var            detector  = new FastCornersDetector(threshold);
 		var            converter = new Accord.Imaging.Converters.MatrixToImage(0, 10000);
 		int            topcount  = maxcount; // this is the end index; it may grow if invalid items are found
+		int            border    = 4;
 		UnmanagedImage bitmap;
 		
 		converter.Convert(image.ToMatrix(), out bitmap);
@@ -440,8 +441,8 @@ public class KinectVehicle : Vehicle
 			int x = (int) point.Y;
 			int y = (int) point.X;
 
-			if (image[x][y] != 0) {
-				keypoints.Add(new SparseItem(x, y, image[x][y]));
+			if (x >= border && x < image.Length - border && y >= border && y < image[0].Length - border && image[x][y] != 0) {
+				keypoints.Add(new SparseItem(x, y, image[x][y] / 5000));
 			}
 			else {
 				topcount++;
@@ -484,14 +485,14 @@ public class KinectVehicle : Vehicle
 	/// <returns>Point range.</returns>
 	private float GetRange(int px, int py, float z)
 	{
-		// depth in OpenNI is the processed z-axis, not the range and its measured in millimeters
+		// depth in OpenNI is the processed z-axis, not the range and its measured in meters
 		float nx = px / resx - 0.5f;
 		float ny = 0.5f - py / resy;
 
 		float x = xzalpha * nx * z;
 		float y = yzalpha * ny * z;
 		
-		return (float) Math.Sqrt(x * x + y * y + z * z) / 1000;
+		return (float) Math.Sqrt(x * x + y * y + z * z);
 	}
 
 	/// <summary>
