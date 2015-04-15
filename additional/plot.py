@@ -118,7 +118,7 @@ def mapdistance(a, b, c, p):
 	distances = [[landmarkdistance(ai, bk, c)**p for ai in a] + [c**p for i in xrange(len(b) - len(a))] for bk in b]
 	indices   = munkres.Munkres().compute(distances)
 	
-	return sum(distances[i][k] for i, k in indices)
+	return sum(distances[i][k] for i, k in indices) / max(len(a), len(b))
 
 def landmarkdistance(x, y, c):
 	return min(c, np.linalg.norm(x - y))
