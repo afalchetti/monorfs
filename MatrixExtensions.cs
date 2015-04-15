@@ -176,11 +176,24 @@ public static class MatrixExtensions
 		                        new double[3] {2 * (xz + yw),     2 * (yz - xw),     1 - 2 * (xx + yy)}};
 	}
 
+	/// <summary>
+	/// Convert a 3D vector from a double array representation to a Vector3 object.
+	/// </summary>
+	/// <param name="x">Double array representation.</param>
+	/// <returns>Vector3 object.</returns>
 	public static Vector3 ToVector3(this double[] x)
 	{
 		return new Vector3((float) x[0], (float) x[1], (float) x[2]);
 	}
 
+	/// <summary>
+	/// Multiply a scalar coefficient with a matrix (element-wise), possibly in-place.
+	/// </summary>
+	/// <param name="coeff">Scalar coefficient.</param>
+	/// <param name="matrix">Original matrix.</param>
+	/// <param name="inplace">Don't create a new matrix, use the original one. Lower memory footprint but breaks
+	/// immutability (useful for thread-safety).</param>
+	/// <returns>Scaled matrix.</returns>
 	public static double[][] Multiply(this double coeff, double[][] matrix, bool inplace = false)
 	{
 		double[][] result;
@@ -205,21 +218,48 @@ public static class MatrixExtensions
 		return result;
 	}
 
+	/// <summary>
+	/// Divide a matrix by a scalar coefficient (element-wise), possibly in-place.
+	/// </summary>
+	/// <param name="coeff">Scalar coefficient.</param>
+	/// <param name="matrix">Original matrix.</param>
+	/// <param name="inplace">Don't create a new matrix, use the original one. Lower memory footprint but breaks
+	/// immutability (useful for thread-safety).</param>
+	/// <returns>Scaled matrix.</returns>
 	public static double[][] Divide(this double[][] matrix, double coeff, bool inplace = false)
 	{
 		return (1/coeff).Multiply(matrix, inplace);
 	}
 
+	/// <summary>
+	/// Multiply a jagged matrix by the transpose of another.
+	/// </summary>
+	/// <remarks>Jagged version of the Accord.Net function.</remarks>
+	/// <param name="a">First matrix.</param>
+	/// <param name="b">Second matrix.</param>
+	/// <returns>Multiplication result.</returns>
 	public static double[][] MultiplyByTranspose(this double[][] a, double[][] b)
 	{
 		return a.Multiply(b.Transpose());
 	}
 
+	/// <summary>
+	/// Calculate the determinant of a jagged matrix.
+	/// </summary>
+	/// <remarks>Jagged version of the Accord.Net function.</remarks>
+	/// <param name="a">Original matrix.</param>
+	/// <returns>Matrix determinant.</returns>
 	public static double Determinant(this double[][] matrix)
 	{
 		return matrix.ToMatrix().Determinant();
 	}
-
+	
+	/// <summary>
+	/// Calculate the inverse of a jagged matrix.
+	/// </summary>
+	/// <remarks>Jagged version of the Accord.Net function.</remarks>
+	/// <param name="a">Original matrix.</param>
+	/// <returns>Matrix inverse.</returns>
 	public static double[][] Inverse(this double[][] matrix)
 	{
 		return matrix.ToMatrix().Inverse().ToArray();

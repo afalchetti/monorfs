@@ -406,7 +406,7 @@ public class Navigator
 			if (d < 3) {
 				// prob = log (pD * zprob(measurement))
 				// this way multiplying probabilities equals to adding (negative) profits
-				logprobs[i, k] = logPD + Math.Log(zprobs[i].multiplier) - 0.5 * d * d;
+				logprobs[i, k] = logPD + Math.Log(zprobs[i].Multiplier) - 0.5 * d * d;
 			}
 		}
 		}
@@ -925,24 +925,62 @@ public class Navigator
 /// </summary>
 public class Gaussian
 {
+	/// <summary>
+	/// Gaussian coefficient on a mixture.
+	/// </summary>
+	/// <remarks>
+	/// Though it may be seen as external to the gaussian distribution,
+	/// this class is a gaussian descriptor, not a gaussian distribution.
+	/// </remarks>
 	public double Weight { get; private set; }
 
+	/// <summary>
+	/// Distribution center of symmetry. It is also the most dense point.
+	/// </summary>
 	public double[] Mean { get; private set; }
 
+	/// <summary>
+	/// Multidimensional dispersion measure.
+	/// </summary>
 	public double[][] Covariance { get; private set; }
 
+	// Cached values
+
+	/// <summary>
+	/// Cached covariance inverse.
+	/// </summary>
 	public double[][] CovarianceInverse;
 
-	public double multiplier;
+	/// <summary>
+	/// Cached coefficient from the function definition.
+	/// </summary>
+	public double Multiplier;
 
+	// Tabular constants
+
+	/// <summary>
+	/// Negative exponential function tabulation.
+	/// </summary>
 	private static readonly double[] tabulatedexp;
 
+	/// <summary>
+	/// Number of tabulated points for the exponential function.
+	/// </summary>
 	private const int tabgrid = 32;
 
-	private const double tabdelta = 32 / 16;
-
+	/// <summary>
+	/// Maximum evaluation point for the exponential function.
+	/// </summary>
 	private const double tabmax = 16;
 
+	/// <summary>
+	/// Cached tabulation difference between each data point.
+	/// </summary>
+	private const double tabdelta = 32 / 16;
+
+	/// <summary>
+	/// Construct the negative exponential tabulation.
+	/// </summary>
 	static Gaussian()
 	{
 		tabulatedexp = new double[tabgrid + 1];
@@ -952,23 +990,39 @@ public class Gaussian
 		}
 	}
 
+	/// <summary>
+	/// Construct a new Gaussian object given its parameters.
+	/// </summary>
+	/// <param name="mean">Gaussian mean value.</param>
+	/// <param name="covariance">Gaussian covariance matrix.</param>
+	/// <param name="weight">Gaussian coefficient in the mixture.</param>
 	public Gaussian(double[] mean, double[][] covariance, double weight)
 	{
 		Mean              = mean;
 		Covariance        = covariance;
 		Weight            = (!double.IsNaN(weight)) ? weight : 0;
-		multiplier        = Math.Pow(2 * Math.PI, -mean.Length / 2) / Math.Sqrt(covariance.Determinant());
+		Multiplier        = Math.Pow(2 * Math.PI, -mean.Length / 2) / Math.Sqrt(covariance.Determinant());
 		CovarianceInverse = covariance.Inverse();
 	}
 
+	/// <summary>
+	/// Evaluate the gaussian component, although without the weight multiplication.
+	/// </summary>
+	/// <param name="x">Evaluation point.</param>
+	/// <returns>Distribution density.</returns>
 	public double Evaluate(double[] x)
 	{
 		double[]  diff = x.Subtract(Mean);
-		return multiplier * ApproximateNegExp(0.5 * Accord.Math.Matrix.InnerProduct(diff, CovarianceInverse.Multiply(diff)));
+		return Multiplier * ApproximateNegExp(0.5 * Accord.Math.Matrix.InnerProduct(diff, CovarianceInverse.Multiply(diff)));
 		//return multiplier * Math.Exp(-0.5 * Accord.Math.Matrix.InnerProduct(diff, CovarianceInverse.Multiply(diff)));
 	}
 
-	public double ApproximateNegExp(double x)
+	/// <summary>
+	/// Approximate (pre-tabulated) negative exponential function, exp(-x).
+	/// </summary>
+	/// <param name="x">Evaluation point.</param>
+	/// <returns>Function evaluation.</returns>
+	public static double ApproximateNegExp(double x)
 	{
 		if (0 <= x && x <= tabmax) {
 			return tabulatedexp[(int)(tabdelta * x)];
@@ -981,6 +1035,9 @@ public class Gaussian
 		}
 	}
 
+	/// <summary>
+	/// Get a linear string representation in column-major order.
+	/// </summary>
 	public string LinearSerialization
 	{
 		get

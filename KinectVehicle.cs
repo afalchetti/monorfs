@@ -57,7 +57,7 @@ public class KinectVehicle : Vehicle
 	/// For efficiency purposes, not the whole image is used.
 	/// It is subsampled first using this delta factor.
 	/// </summary>
-	private const int delta = 16;
+	public const int Delta = 16;
 
 	/// <summary>
 	/// Device resolution on the X-axis, properly scaled.
@@ -109,8 +109,8 @@ public class KinectVehicle : Vehicle
 		{
 			base.Graphics = value;
 			sensed = new Texture2D(Graphics,
-			                       (int) (depth.VideoMode.Resolution.Width  / delta),
-			                       (int) (depth.VideoMode.Resolution.Height / delta),
+			                       (int) (depth.VideoMode.Resolution.Width  / Delta),
+			                       (int) (depth.VideoMode.Resolution.Height / Delta),
 			                       false,
 			                       SurfaceFormat.Color);
 
@@ -167,11 +167,11 @@ public class KinectVehicle : Vehicle
 				                                  Resolution      = new System.Drawing.Size(320, 240) };
 			}
 
-			SidebarWidth  = (int) (depth.VideoMode.Resolution.Width  / delta);
-			SidebarHeight = (int) (depth.VideoMode.Resolution.Height / delta);
+			SidebarWidth  = (int) (depth.VideoMode.Resolution.Width  / Delta);
+			SidebarHeight = (int) (depth.VideoMode.Resolution.Height / Delta);
 
-			resx    = depth.VideoMode.Resolution.Width  / delta;
-			resy    = depth.VideoMode.Resolution.Height / delta;
+			resx    = depth.VideoMode.Resolution.Width  / Delta;
+			resy    = depth.VideoMode.Resolution.Height / Delta;
 			xzalpha = 2 * (float) Math.Tan(depth.HorizontalFieldOfView / 2);
 			yzalpha = 2 * (float) Math.Tan(depth.VerticalFieldOfView   / 2);
 		}
@@ -213,7 +213,7 @@ public class KinectVehicle : Vehicle
 		NextFrame(out frame, out interest);
 
 		for (int i = 0; i < interest.Count; i++) {
-			float range = GetDepth(interest[i].I, interest[i].K, (float) interest[i].Value);
+			float range = GetRange(interest[i].I, interest[i].K, (float) interest[i].Value);
 
 			measurements.Add(new double[3] {interest[i].I - resx / 2, interest[i].K - resy / 2, range});
 		}
@@ -290,8 +290,8 @@ public class KinectVehicle : Vehicle
 		IntPtr    data      = image.Data;
 		int       width     = image.VideoMode.Resolution.Width;
 		int       height    = image.VideoMode.Resolution.Height;
-		int       subwidth  = width / delta;
-		int       subheight = height / delta;
+		int       subwidth  = width / Delta;
+		int       subheight = height / Delta;
 
 		short[] copy = new short[width * height];
 		Marshal.Copy(data, copy, 0, copy.Length);
@@ -305,11 +305,11 @@ public class KinectVehicle : Vehicle
 
 		int h = 0;
 		for (int k = 0; k < array[0].Length; k++) {
-			h = width * k * delta;
+			h = width * k * Delta;
 
 			for (int i = 0; i < array.Length; i++) {
 				array[i][k] = copy[h];
-				h += delta;
+				h += Delta;
 			}
 		}
 
@@ -458,7 +458,14 @@ public class KinectVehicle : Vehicle
 		target.SetData(data);
 	}
 
-	private float GetDepth(int px, int py, float z)
+	/// <summary>
+	/// Transform a point in local 3D space (x-y-depth) into a range measurement.
+	/// </summary>
+	/// <param name="px">Pixel x-coordinate.</param>
+	/// <param name="py">Pixel y-coordinate.</param>
+	/// <param name="z">Depth coordinate.</param>
+	/// <returns>Point range.</returns>
+	private float GetRange(int px, int py, float z)
 	{
 		// depth in OpenNI is the processed z-axis, not the range and its measured in millimeters
 		float nx = px / resx - 0.5f;

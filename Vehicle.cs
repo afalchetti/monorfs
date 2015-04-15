@@ -342,7 +342,6 @@ public abstract class Vehicle : IDisposable
 	/// <param name="camera">Camera rotation matrix.</param>
 	public void RenderFOV(double[][] camera)
 	{
-		
 		Color incolorA = Color.LightGreen; incolorA.A = 30;
 		Color incolorB = Color.LightGreen; incolorB.A = 15;
 		Color outcolor = Color.DarkGreen;  outcolor.A = 30;

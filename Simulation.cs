@@ -354,7 +354,7 @@ public class Simulation : Game
 	
 
 	/// <summary>
-	/// Allows the game to perform any initialization it needs to do before it starts running.
+	/// Allow the game to perform any initialization it needs to do before it starts running.
 	/// </summary>
 	protected override void Initialize()
 	{
@@ -391,7 +391,6 @@ public class Simulation : Game
 			IsFixedTimeStep = false;
 		}
 
-		
 		prevkeyboard = Keyboard.GetState();
 
 		base.Initialize();

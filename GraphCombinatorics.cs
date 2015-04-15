@@ -683,11 +683,19 @@ public class PriorityQueue<T> : IEnumerable<KeyValuePair<double, T>>
 		return item;
 	}
 
+	/// <summary>
+	/// Get an IEnumerator for the class in descending priority order.
+	/// </summary>
+	/// <returns>Enumerator.</returns>
 	public IEnumerator<KeyValuePair<double, T>> GetEnumerator()
 	{
 		return data.GetEnumerator();
 	}
-
+	
+	/// <summary>
+	/// Get a nongeneric IEnumerator for the class in descending priority order.
+	/// </summary>
+	/// <returns>Enumerator.</returns>
 	IEnumerator IEnumerable.GetEnumerator()
 	{
 		return GetEnumerator();
@@ -699,25 +707,52 @@ public class PriorityQueue<T> : IEnumerable<KeyValuePair<double, T>>
 /// </summary>
 public class MatrixKey
 {
+	/// <summary>
+	/// Column index.
+	/// </summary>
 	public int I { get; private set; }
+
+	/// <summary>
+	/// Row index.
+	/// </summary>
 	public int K { get; private set; }
 
+	/// <summary>
+	/// Construct a matrix key given column/row indices.
+	/// </summary>
+	/// <param name="i">Column index.</param>
+	/// <param name="k">Row index.</param>
 	public MatrixKey(int i, int k)
 	{
 		I = i;
 		K = k;
 	}
 
+	/// <summary>
+	/// Compares with another matrix key by value.
+	/// Two keys are equal iff both the column and row indices are equal.
+	/// </summary>
+	/// <param name="that">Compared key.</param>
+	/// <returns>True if both keys refer to the same matrix index; false otherwise.</returns>
 	public bool Equals(MatrixKey that)
 	{
 		return this.I == that.I && this.K == that.K;
 	}
-
+	
+	/// <summary>
+	/// Compares with another object by value.
+	/// </summary>
+	/// <param name="that">Compared object.</param>
+	/// <returns>True if both keys refer to the same matrix index; false otherwise.</returns>
 	public override bool Equals(object that)
 	{
 		return that is MatrixKey && this.Equals(that as MatrixKey);
 	}
 
+	/// <summary>
+	/// Get a quasi-unique code that represents the object.
+	/// </summary>
+	/// <returns>Hash code.</returns>
 	public override int GetHashCode()
 	{
 		int hash = 17;
@@ -727,7 +762,11 @@ public class MatrixKey
 
 		return hash;
 	}
-
+	
+	/// <summary>
+	/// Get a string representation of the key.
+	/// </summary>
+	/// <returns>String representation.</returns>
 	public override string ToString()
 	{
 		return "(" + I + ", " + K + ")";
