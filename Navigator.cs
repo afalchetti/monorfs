@@ -50,7 +50,7 @@ public class Navigator
 	/// <summary>
 	/// Maximum number of gaussians kept after a model prune.
 	/// </summary>
-	public const int MaxQuantity = 50;
+	public const int MaxQuantity = 100;
 
 	/// <summary>
 	/// Threshold used to decide when to merge close gaussian components.
@@ -181,7 +181,7 @@ public class Navigator
 		toexplore        = new List<double[]>  [particlecount];
 
 		for (int i = 0; i < particlecount; i++) {
-			VehicleParticles[i] = new SimulatedVehicle(vehicle, 1.8, 1.8, 0.7, 5e-7);
+			VehicleParticles[i] = new SimulatedVehicle(vehicle, 1.8, 1.8, 0.9, 5e-7);
 			MapModels       [i] = new List<Gaussian>();
 			VehicleWeights  [i] = 1.0 / particlecount;
 			toexplore       [i] = new List<double[]>();
