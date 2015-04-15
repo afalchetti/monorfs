@@ -88,7 +88,7 @@ class SimulationTest
 		navigator.Update(time, 0, 0, ds, dyaw, dpitch, droll);
 		updatehook();
 
-		if (time.TotalGameTime.TotalSeconds - lastnavigationupdate.TotalGameTime.TotalSeconds > Simulation.MeasurePeriod) {
+		if (time.TotalGameTime - lastnavigationupdate.TotalGameTime >= simulation.MeasureElapsed) {
 			List<double[]> measurements = explorer.Measure();
 			measurehook();
 			

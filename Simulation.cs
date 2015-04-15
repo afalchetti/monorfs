@@ -27,10 +27,10 @@ namespace monorfs
 public class Simulation : Game
 {
 	/// <summary>
-	/// Measure cycle period in seconds. Every this
-	/// amount of time the SLAM solver is invoked.
+	/// Measure cycle period. Every this amount of
+	/// time the SLAM solver is invoked.
 	/// </summary>
-	public const double MeasurePeriod = 1.0/30;
+	public readonly TimeSpan MeasureElapsed = new TimeSpan(10000000/30);
 
 	/// <summary>
 	/// Simulation frame period (frames per second inverse).
@@ -149,6 +149,16 @@ public class Simulation : Game
 	/// Last time the navigator update method was called.
 	/// </summary>
 	private GameTime lastnavigationupdate = new GameTime();
+
+	/// <summary>
+	/// Frame number for the command list.
+	/// </summary>
+	private int commandindex;
+
+	/// <summary>
+	/// If true, the motion and measurement dynamics are stopped.
+	/// </summary>
+	private bool paused;
 
 	/// <summary>
 	/// Automatic simulation command input.
@@ -392,6 +402,8 @@ public class Simulation : Game
 		}
 
 		prevkeyboard = Keyboard.GetState();
+		commandindex = 0;
+		paused       = false;
 
 		base.Initialize();
 	}
@@ -491,55 +503,69 @@ public class Simulation : Game
 			forcemapping = !Navigator.OnlyMapping;
 		}
 
-		double[] autocmd = Commands.Next();
-		
-		dlocx       += autocmd[0];
-		dlocy       += autocmd[1];
-		dlocz       += autocmd[2];
-		dyaw        += autocmd[3];
-		dpitch      += autocmd[4];
-		droll       += autocmd[5];
-		dcamangle   += autocmd[6];
-		
-		bool DoPredict = !keyboard.IsKeyDown(Keys.P);
-		bool DoCorrect = !keyboard.IsKeyDown(Keys.C);
-		bool DoPrune   = !keyboard.IsKeyDown(Keys.Q);
-
-		Explorer .Update(simtime, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
-
-		if (UseOdometry) {
-			Navigator.Update(simtime, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
-		}
-		else {
-			Navigator.Update(simtime, 0, 0, 0, 0, 0, 0);
+		if (keyboard.IsKeyDown(Keys.Escape) && !prevkeyboard.IsKeyDown(Keys.Escape)) {
+			paused = !paused;
 		}
 
 		camangle += dcamangle;
 		camzoom   = Math.Max(0.1, Math.Min(10.0, camzoom * (1 + dcamzoom)));
 		camera    = camzoom.Multiply(MatrixExtensions.CreateRotationX(camangle));
+		
+		if (!paused) {
+			if (commandindex < Commands.Size) {
+				double[] autocmd = Commands.Next();
+		
+				dlocx       += autocmd[0];
+				dlocy       += autocmd[1];
+				dlocz       += autocmd[2];
+				dyaw        += autocmd[3];
+				dpitch      += autocmd[4];
+				droll       += autocmd[5];
+				dcamangle   += autocmd[6];
 
-		if (simtime.TotalGameTime.TotalSeconds - lastnavigationupdate.TotalGameTime.TotalSeconds > MeasurePeriod) {
-			List<double[]> measurements = Explorer.Measure();
+				commandindex++;
+			}
+			else if (Commands.Size != 1) {
+				//paused = true;
+				commandindex = 0;
+			}
+
+			bool DoPredict = !keyboard.IsKeyDown(Keys.P);
+			bool DoCorrect = !keyboard.IsKeyDown(Keys.C);
+			bool DoPrune   = !keyboard.IsKeyDown(Keys.Q);
+
+			Explorer .Update(simtime, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
+
+			if (UseOdometry) {
+				Navigator.Update(simtime, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
+			}
+			else {
+				Navigator.Update(simtime, 0, 0, 0, 0, 0, 0);
+			}
+
+			if (simtime.TotalGameTime - lastnavigationupdate.TotalGameTime >= MeasureElapsed) {
+				List<double[]> measurements = Explorer.Measure();
 			
-			Navigator.SlamUpdate(simtime, measurements, DoPredict, DoCorrect, DoPrune);
+				Navigator.SlamUpdate(simtime, measurements, DoPredict, DoCorrect, DoPrune);
 
-			lastnavigationupdate = new GameTime(simtime.TotalGameTime, simtime.ElapsedGameTime);
-		}
+				lastnavigationupdate = new GameTime(simtime.TotalGameTime, simtime.ElapsedGameTime);
+			}
 
-		if (forcehistoryreset) {
-			Navigator.ResetHistory();
-			Explorer .ResetHistory();
-		}
+			if (forcehistoryreset) {
+				Navigator.ResetHistory();
+				Explorer .ResetHistory();
+			}
 
-		if (forcereset) {
-			Navigator.ResetModels();
-		}
+			if (forcereset) {
+				Navigator.ResetModels();
+			}
 
-		if (forceslam) {
-			Navigator.StartSlam(ParticleCount);
-		}
-		else if (forcemapping) {
-			Navigator.StartMapping();
+			if (forceslam) {
+				Navigator.StartSlam(ParticleCount);
+			}
+			else if (forcemapping) {
+				Navigator.StartMapping();
+			}
 		}
 
 		prevkeyboard = keyboard;
