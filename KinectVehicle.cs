@@ -197,7 +197,24 @@ public class KinectVehicle : Vehicle
 	/// <param name="droll">Angle variation from odometry in the roll coordinate since last timestep.</param>
 	public override void Update(GameTime time, double dx, double dy, double dz, double dyaw, double dpitch, double droll)
 	{
-		// no update logic since a real vehicle doesn't have meaningful localization
+		// note that the framework uses Yaw = Y, Pitch = X, Roll = Z => YXZ Tait-Bryan parametrization
+		// this is equivalent to a plane pointing upwards with its wings on the X direction
+		Quaternion dorientation   = Quaternion.CreateFromYawPitchRoll((float) dyaw, (float) dpitch, (float) droll);
+		Quaternion neworientation = Orientation * dorientation;
+		Quaternion midrotation    = Quaternion.Slerp(Orientation, neworientation, 0.5f);
+		Quaternion dlocation      = midrotation * new Quaternion((float) dx, (float) dy, (float) dz, 0) * Quaternion.Conjugate(midrotation);
+
+		Location    = new double[3] {X + dlocation.X, Y + dlocation.Y, Z + dlocation.Z};
+		Orientation = neworientation;
+		Orientation = Quaternion.Normalize(Orientation);
+
+		double[] prevloc = new double[3] {Waypoints[Waypoints.Count - 1][1],
+		                                  Waypoints[Waypoints.Count - 1][2],
+		                                  Waypoints[Waypoints.Count - 1][3]};
+
+		if (Location.Subtract(prevloc).SquareEuclidean() >= 1e-2f) {
+			Waypoints.Add(new double[4] {time.TotalGameTime.TotalSeconds, X, Y, Z});
+		}
 	}
 	
 	/// <summary>
