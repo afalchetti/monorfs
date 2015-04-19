@@ -1,5 +1,5 @@
 ﻿// SimulatedVehicle.cs
-// Vehicle motion and measurement model using a simulated environment.
+// Vehicle motion and measurement model using a simulated environment
 // Part of MonoRFS
 //
 // Copyright (C) 2015 Angelo Falchetti

@@ -1,5 +1,5 @@
 ﻿// GraphCombinatorics.cs
-// Graph combinatorics algorithms.
+// Graph combinatorics algorithms
 // Part of MonoRFS
 //
 // Copyright (C) 2015 Angelo Falchetti

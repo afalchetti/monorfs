@@ -1,5 +1,5 @@
 ﻿// Vehicle.cs
-// Abstract vehicle motion and measurement model.
+// Abstract vehicle motion and measurement model
 // Part of MonoRFS
 //
 // Copyright (C) 2015 Angelo Falchetti

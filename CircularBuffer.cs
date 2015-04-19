@@ -1,5 +1,5 @@
 ﻿// CircularBuffer.cs
-// Circular indexed array.
+// Circular indexed array
 // Part of MonoRFS
 //
 // Copyright (C) 2015 Angelo Falchetti
