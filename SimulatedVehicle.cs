@@ -75,7 +75,7 @@ public class SimulatedVehicle : Vehicle
 	/// <summary>
 	/// Landmark 3d locations against which the measurements are performed.
 	/// </summary>
-	public List<double[]> Landmarks;
+	public List<double[]> Landmarks { get; set; }
 
 	/// <summary>
 	/// Poisson distributed random generator with parameter lambda = ClutterCount.

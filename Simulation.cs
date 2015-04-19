@@ -22,133 +22,14 @@ using System.Text;
 namespace monorfs
 {
 /// <summary>
-/// Vehicle navigation simulation through a landmark map.
+/// Interactive manipulator for a simulation of vehicle navigation through a landmark map.
 /// </summary>
-public class Simulation : Game
+public class Simulation : Manipulator
 {
 	/// <summary>
-	/// Measure cycle period. Every this amount of
-	/// time the SLAM solver is invoked.
+	/// Automatic simulation command input.
 	/// </summary>
-	public readonly TimeSpan MeasureElapsed = new TimeSpan(10000000/30);
-
-	/// <summary>
-	/// Simulation frame period (frames per second inverse).
-	/// </summary>
-	public readonly TimeSpan FrameElapsed = new TimeSpan(10000000/30);
-
-	/// <summary>
-	/// If true, the calculations are bound by realtime constraints,
-	/// i.e. if it takes too long, the vehicle will move proportionally.
-	/// Otherwise, the simulated timestep is always the same, regardless of
-	/// how long the operations take.
-	/// </summary>
-	public bool Realtime { get; private set; }
-
-	/// <summary>
-	/// Defines if the particles look at the odometry input as relevant information
-	/// for the pose update. This may be set to false if there is no odometry
-	/// or for performance comparisons of the system with and without it.
-	/// </summary>
-	public const bool UseOdometry = true;
-
-	/// <summary>
-	/// Simulated time.
-	/// </summary>
-	private GameTime simtime = new GameTime();
-
-	/// <summary>
-	/// Main vehicle.
-	/// </summary>
-	public Vehicle Explorer { get; private set; }
-
-	/// <summary>
-	/// Map description through points of interest
-	/// </summary>
-	public List<double[]> Landmarks { get; private set; }
-
-	/// <summary>
-	/// SLAM solver.
-	/// </summary>
-	public Navigator Navigator { get; private set; }
-
-	/// <summary>
-	/// Number of localization Montecarlo filter particles.
-	/// </summary>
-	public int ParticleCount { get; private set; }
-
-	// MonoGame-related Fields
-
-	/// <summary>
-	/// Manager responsible for rendering.
-	/// </summary>
-	private GraphicsDeviceManager graphicsManager;
-
-	/// <summary>
-	/// Render output.
-	/// </summary>
-	private GraphicsDevice graphics;
-
-	/// <summary>
-	/// Rendering shader definition.
-	/// </summary>
-	private BasicEffect effect;
-	
-	/// <summary>
-	/// Scene double buffer.
-	/// </summary>
-	public RenderTarget2D SceneBuffer { get; private set; }
-
-	/// <summary>
-	/// Sidebar double buffer.
-	/// </summary>
-	public RenderTarget2D SideBuffer { get; private set; }
-
-	/// <summary>
-	/// Double batch flipper.
-	/// </summary>
-	private SpriteBatch flip;
-
-	/// <summary>
-	/// Previous update frame keyboard state.
-	/// </summary>
-	private KeyboardState prevkeyboard;
-	
-	/// <summary>
-	/// Scene double buffer flipping destination rectangle.
-	/// </summary>
-	private Rectangle scenedest;
-
-	/// <summary>
-	/// Sidebar double buffer flipping destination rectangle.
-	/// </summary>
-	private Rectangle sidedest;
-
-	/// <summary>
-	/// Map clipping area.
-	/// It is formatted as [left, right, bottom, top].
-	/// </summary>
-	private float[] mapclip;
-
-	/// <summary>
-	/// Camera angle.
-	/// </summary>
-	private double camangle;
-
-	/// <summary>
-	/// Camera zoom factor.
-	/// </summary>
-	private double camzoom;
-
-	/// <summary>
-	/// Camera matrix.
-	/// </summary>
-	private double[][] camera;
-	
-	/// <summary>
-	/// Last time the navigator update method was called.
-	/// </summary>
-	private GameTime lastnavigationupdate = new GameTime();
+	public CircularBuffer<double[]> Commands { get; private set; }
 
 	/// <summary>
 	/// Frame number for the command list.
@@ -156,15 +37,23 @@ public class Simulation : Game
 	private int commandindex;
 
 	/// <summary>
-	/// If true, the motion and measurement dynamics are stopped.
+	/// Measure cycle period. Every this amount of
+	/// time the SLAM solver is invoked.
 	/// </summary>
-	private bool paused;
+	public readonly TimeSpan MeasureElapsed = new TimeSpan(10000000/30);
+	
+	/// <summary>
+	/// Last time the navigator update method was called.
+	/// </summary>
+	private GameTime lastnavigationupdate = new GameTime();
 
 	/// <summary>
-	/// Automatic simulation command input.
+	/// Defines if the particles look at the odometry input as relevant information
+	/// for the pose update. This may be set to false if there is no odometry
+	/// or for performance comparisons of the system with and without it.
 	/// </summary>
-	public CircularBuffer<double[]> Commands { get; private set; }
-
+	public const bool UseOdometry = true;
+	
 	/// <summary>
 	/// Get a string representation of the trajectories of the vehicle and the
 	/// most likely particle (which may jump when the best particle changes).
@@ -199,77 +88,81 @@ public class Simulation : Game
 	}
 
 	/// <summary>
-	/// Construct a simulation from a formatted desccription file.
+	/// Create a simulation object from apair of formatted desccription files.
 	/// </summary>
-	/// <param name="scene">Scene descriptor filename.</param>
-	/// <param name="commands">Vehicle input command instructions filename.
+	/// <param name="scenefile">Scene descriptor filename.</param>
+	/// <param name="commandfile">Vehicle input command instructions filename.
 	/// Can be null or empty (no automatic instructions).</param>
+	/// <param name="particlecount">Number of particles for the RB-PHD algorithm.
+	/// If only mapping is done, it's not used, but the mode can be changed at runtime.</param>
+	/// <param name="onlymapping">If true, no localization is executed and the robot's position
+	/// is assumed perfectly known.</param>
+	/// <param name="simulate">True means a full simulation is performed;
+	/// false uses real sensor data (real device or a recording from a file).</param>
+	/// <param name="realtime">If true, the system works at the highest speed it can;
+	/// otherwise, the framerate is fixed and even if processing takes longer than the timestep, the simulation works
+	/// as it had taken exactly the nominal rate.</param>
+	/// <returns>Prepared simulation object.</returns>
+	public static Simulation FromFiles(string scenefile, string commandfile = "", int particlecount = 5,
+	                                   bool onlymapping = false, bool simulate = true, bool realtime = false)
+	{
+		Vehicle                  explorer;
+		CircularBuffer<double[]> commands;
+		float[]                  mapclip;
+
+		if (simulate) {
+			explorer = vehicleFromSimFile(File.ReadAllText(scenefile), out mapclip);
+		}
+		else {
+			explorer = vehicleFromSensor(scenefile, out mapclip);
+		}
+
+		try {
+			if (!string.IsNullOrEmpty(commandfile)) {
+				commands =  commandsFromDescriptor(File.ReadAllLines(commandfile));
+			}
+			else {
+				commands = new CircularBuffer<double[]>(1);
+				commands.Add(new double[7] {0, 0, 0, 0, 0, 0, 0});
+			}
+		}
+		catch (FileNotFoundException) {
+			commands = new CircularBuffer<double[]>(1);
+			commands.Add(new double[7] {0, 0, 0, 0, 0, 0, 0});
+		}
+
+		return new Simulation(explorer, commands, mapclip, particlecount, onlymapping, realtime);
+	}
+
+	/// <summary>
+	/// Construct a simulation from its parts.
+	/// </summary>
+	/// <param name="explorer">Main vehicle in the simulation. This is the only entity the user directly controls.</param>
+	/// <param name="commands">List of stored commands for the vehicle as odometry readings.</param>
+	/// <param name="mapclip">Initial observable area in the form [left, right, bottom, top]</param>
 	/// <param name="particlecount">Number of particles for the RB-PHD algorithm.
 	/// If only mapping is done, it is irrelevant.</param>
 	/// <param name="onlymapping">If true, no localization is executed and the robot's position
 	/// is assumed perfectly known.</param>
 	/// <param name="simulate">True means a full simulation is performed;
 	/// false uses real sensor data (realtime or from a file).</param>
-	public Simulation(string scene, string commands = "", int particlecount = 5, bool onlymapping = false, bool simulate = true, bool realtime = false)
+	/// <param name="realtime">If true, the system works at the highest speed it can;
+	/// otherwise, the framerate is fixed and even if processing takes longer than the timestep, the simulation works
+	/// as it had taken exactly the nominal rate.</param>
+	public Simulation(Vehicle explorer, CircularBuffer<double[]> commands, float[] mapclip, int particlecount = 5,
+	                  bool onlymapping = false, bool realtime = false)
+		: base(explorer, new Navigator(explorer, particlecount, onlymapping), particlecount, realtime, mapclip)
 	{
-		if (simulate) {
-			initSceneFromSimFile(File.ReadAllText(scene));
-		}
-		else {
-			initSceneFromSensor(scene);
-		}
-
-		ParticleCount = particlecount;
-		Navigator     = new Navigator(Explorer, particlecount, onlymapping);
-		Realtime      = realtime;
-
-		try {
-			if (!string.IsNullOrEmpty(commands)) {
-				initCommands(File.ReadAllLines(commands));
-			}
-		}
-		catch (FileNotFoundException) {
-			commands = null;
-		}
-
-		if (string.IsNullOrEmpty(commands)) {
-			Commands = new CircularBuffer<double[]>(1);
-			Commands.Add(new double[7] {0, 0, 0, 0, 0, 0, 0});
-		}
-
-		// MonoGame-related construction
-		graphicsManager = new GraphicsDeviceManager(this);
-
-		Content.RootDirectory = "Content";
-		IsMouseVisible        = true;
-
-		graphicsManager.PreferredBackBufferWidth  = (int)(1000*1.0);
-		graphicsManager.PreferredBackBufferHeight = (int)(450*1.0);
-		graphicsManager.PreferMultiSampling       = true;
-		graphicsManager.IsFullScreen              = false;
-
-		const double screencut = 0.7;
-
-		scenedest = clipCenter((int)(graphicsManager.PreferredBackBufferWidth * screencut),
-		                       graphicsManager.PreferredBackBufferHeight,
-		                       (mapclip[1] - mapclip[0]) / (mapclip[3] - mapclip[2]));
-
-		sidedest = clipCenter((int)(graphicsManager.PreferredBackBufferWidth * (1 - screencut)),
-		                      graphicsManager.PreferredBackBufferHeight,
-		                      (float) Explorer.SidebarWidth / Explorer.SidebarHeight);
-
-		sidedest.X += (int)(graphicsManager.PreferredBackBufferWidth * screencut);
-
-		camangle = 0;
-		camzoom  = 1;
-		camera   = Accord.Math.Matrix.Identity(3).ToArray();
+		Commands = commands;
 	}
 
 	/// <summary>
-	/// Initialize the scene from a simulation file.
+	/// Create a vehicle from a simulation file.
 	/// </summary>
 	/// <param name="scene">Scene descriptor text.</param>
-	private void initSceneFromSimFile(string scene)
+	/// <param name="mapclip">Secondary output; initial observable area.</param>
+	/// <returns>Simulated vehicle parsed from file.</returns>
+	private static Vehicle vehicleFromSimFile(string scene, out float[] mapclip)
 	{
 		Dictionary<string, List<string>> dict = Util.ParseDictionary(scene);
 
@@ -302,153 +195,82 @@ public class Simulation : Game
 			maploc.Add(landmark);
 		}
 
-		Landmarks = new List<double[]>();
-		Explorer  = new SimulatedVehicle(location, angle, axis, this.Landmarks);
-
-		for (int i = 0; i < maploc.Count; i++) {
-			Landmarks.Add(maploc[i]);
-		}
+		return new SimulatedVehicle(location, angle, axis, maploc);
 	}
-
+	
 	/// <summary>
-	/// Initialize the scene from a real sensor device.
+	/// Create a vehicle from a real sensor device.
 	/// </summary>
-	/// <param name="sensor">Device (or recorded file) path.</param>
-	private void initSceneFromSensor(string sensor)
+	/// <param name="scene">Device (or recorded file) path.</param>
+	/// <param name="mapclip">Secondary output; initial observable area.</param>
+	/// <returns>Vehicle linked to sensor.</returns>
+	private static Vehicle vehicleFromSensor(string sensor, out float[] mapclip)
 	{
-		mapclip  = new float[4] {-6, 6, -3, 3};
-		Explorer = new KinectVehicle(sensor);
+		mapclip = new float[4] {-6, 6, -3, 3};
+		return new KinectVehicle(sensor);
 	}
 
 	/// <summary>
-	/// Read and initialize the command list.
+	/// Create a command list from a descriptor string array.
 	/// </summary>
-	/// <param name="commands">Command descriptor array.</param>
-	private void initCommands(string[] commandstr)
+	/// <param name="commandstr">Command descriptor array.</param>
+	/// <returns>Command list.</returns>
+	private static CircularBuffer<double[]> commandsFromDescriptor(string[] commandstr)
 	{
 		if (commandstr.Length < 1) {
 			commandstr = new string[1] {"0 0 0 0 0 0 0"};
 		}
 
-		Commands = new CircularBuffer<double[]>(commandstr.Length);
+		CircularBuffer<double[]> commands = new CircularBuffer<double[]>(commandstr.Length);
 
 		for (int i = 0; i < commandstr.Length; i++) {
-			Commands.Add(ParseDoubleList(commandstr[i]));
+			commands.Add(ParseDoubleList(commandstr[i]));
 			// the item structure is {dlocx, dlocy, dlocz, dyaw, dpitch, droll, dcamera}
 		}
-	}
 
-	/// <summary>
-	/// Get the biggest centered rectangle of the specified
-	/// aspect ratio tha fits inside a screen of specified size.
-	/// </summary>
-	/// <param name="width">Screen width.</param>
-	/// <param name="height">Screen height.</param>
-	/// <param name="aspectratio">Target aspect ratio.</param>
-	/// <returns> Biggest centered rectangle.</returns>
-	private Rectangle clipCenter(int width, int height, float aspect)
-	{
-		float rectheight = height;
-		float rectwidth  = rectheight * aspect;
-
-		if (rectwidth > width) {
-			rectwidth  = width;
-			rectheight = rectwidth / aspect;
-		}
-		
-		int offx = (int)((width  - rectwidth)  / 2);
-		int offy = (int)((height - rectheight) / 2);
-
-		return new Rectangle(offx, offy, (int) rectwidth, (int) rectheight);
+		return commands;
 	}
 	
 
 	/// <summary>
-	/// Allow the game to perform any initialization it needs to do before it starts running.
+	/// Allow the simulation to perform any initialization it needs to do before it starts running.
 	/// </summary>
 	protected override void Initialize()
 	{
-		graphics           = graphicsManager.GraphicsDevice;
-		Explorer .Graphics = graphics;
-		Navigator.Graphics = graphics;
-
-		graphics.BlendState        = BlendState.NonPremultiplied;
-		graphics.DepthStencilState = DepthStencilState.Default;
-		graphics.RasterizerState   = RasterizerState.CullNone;
-		graphics.SamplerStates[0]  = SamplerState.LinearClamp;
-
-		effect            = new BasicEffect(graphics);
-		effect.Alpha      = 1.0f;
-		effect.View       = Microsoft.Xna.Framework.Matrix.Identity;
-		effect.World      = Microsoft.Xna.Framework.Matrix.Identity;
-		effect.Projection = Microsoft.Xna.Framework.Matrix.CreateOrthographicOffCenter(mapclip[0], mapclip[1], mapclip[2], mapclip[3], -100, 100);
-
-		effect.LightingEnabled    = false;
-		effect.VertexColorEnabled = true;
-		
-		SceneBuffer = new RenderTarget2D(graphics, 2 * scenedest.Width, 2 * scenedest.Height,
-		                                 false, SurfaceFormat.Color, DepthFormat.Depth16,
-		                                 0, RenderTargetUsage.DiscardContents);
-
-		SideBuffer = new RenderTarget2D(graphics, sidedest.Width, sidedest.Height,
-		                                false, SurfaceFormat.Color, DepthFormat.Depth16,
-		                                0, RenderTargetUsage.DiscardContents);
-
-		if (!Realtime) {
-			TargetElapsedTime = FrameElapsed;
-		}
-		else {
-			IsFixedTimeStep = false;
-		}
-
-		prevkeyboard = Keyboard.GetState();
 		commandindex = 0;
-		paused       = false;
-
 		base.Initialize();
 	}
 	
 	/// <summary>
-	/// LoadContent will be called once per game and is the place to load
+	/// LoadContent will be called once per simulation and is the place to load
 	/// all of your content.
 	/// </summary>
-	protected override void LoadContent()
-	{
-		flip          = new SpriteBatch(graphics);
-		Explorer.Flip = this.flip;
-	}
+	///protected override void LoadContent()
+	///{
+	///	base.LoadContent();
+	///}
 
 	/// <summary>
-	/// Allows the game to run logic such as updating the world,
+	/// Allows the simulation to run logic such as updating the world,
 	/// checking for collisions, gathering input, and playing audio.
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
-	protected override void Update(GameTime time)
+	/// <param name="keyboard">Current keyboard state information.</param>
+	/// <param name="prevkeyboard">Old keyboard state information. Used to get newly pressed keys.</param>
+	/// <param name="multiplier">Movement scale multiplier.</param>
+	protected override void Update(GameTime time, KeyboardState keyboard, KeyboardState prevkeyboard, double multiplier)
 	{
-		simtime = Realtime ? time : new GameTime(simtime.TotalGameTime.Add(FrameElapsed), FrameElapsed);
-
-		KeyboardState keyboard = Keyboard.GetState();
-
 		double dlocx     = 0;
 		double dlocy     = 0;
 		double dlocz     = 0;
 		double dyaw      = 0;
 		double dpitch    = 0;
 		double droll     = 0;
-		double dcamangle = 0;
-		double dcamzoom  = 0;
-		
-		bool fast = keyboard.IsKeyDown(Keys.LeftShift);
-		bool slow = keyboard.IsKeyDown(Keys.LeftControl);
 
 		bool forceslam         = false;
 		bool forcemapping      = false;
 		bool forcereset        = keyboard.IsKeyDown(Keys.R);
 		bool forcehistoryreset = keyboard.IsKeyDown(Keys.T);
-
-		double multiplier = 1.0;
-		multiplier *= (fast) ? 2.0 : 1.0;
-		multiplier /= (slow) ? 4.0 : 1.0;
 		
 		if (keyboard.IsKeyDown(Keys.I)) {
 			dlocz += 0.02 * multiplier;
@@ -481,52 +303,27 @@ public class Simulation : Game
 		if (keyboard.IsKeyDown(Keys.D)) {
 			droll += 0.1 * multiplier;
 		}
-
-		if (keyboard.IsKeyDown(Keys.B)) {
-			dcamangle += 0.06 * multiplier;
-		}
-
-		if (keyboard.IsKeyDown(Keys.V)) {
-			dcamangle -= 0.06 * multiplier;
-		}
-
-		if (keyboard.IsKeyDown(Keys.Up)) {
-			dcamzoom += 0.05 * multiplier;
-		}
-
-		if (keyboard.IsKeyDown(Keys.Down)) {
-			dcamzoom -= 0.05 * multiplier;
-		}
 		
 		if (keyboard.IsKeyDown(Keys.M) && !prevkeyboard.IsKeyDown(Keys.M)) {
 			forceslam    = Navigator.OnlyMapping;
 			forcemapping = !Navigator.OnlyMapping;
 		}
-
-		if (keyboard.IsKeyDown(Keys.Escape) && !prevkeyboard.IsKeyDown(Keys.Escape)) {
-			paused = !paused;
-		}
-
-		camangle += dcamangle;
-		camzoom   = Math.Max(0.1, Math.Min(10.0, camzoom * (1 + dcamzoom)));
-		camera    = camzoom.Multiply(MatrixExtensions.CreateRotationX(camangle));
 		
-		if (!paused) {
+		if (!Paused) {
 			if (commandindex < Commands.Size) {
 				double[] autocmd = Commands.Next();
 		
-				dlocx       += autocmd[0];
-				dlocy       += autocmd[1];
-				dlocz       += autocmd[2];
-				dyaw        += autocmd[3];
-				dpitch      += autocmd[4];
-				droll       += autocmd[5];
-				dcamangle   += autocmd[6];
+				dlocx  += autocmd[0];
+				dlocy  += autocmd[1];
+				dlocz  += autocmd[2];
+				dyaw   += autocmd[3];
+				dpitch += autocmd[4];
+				droll  += autocmd[5];
 
 				commandindex++;
 			}
 			else if (Commands.Size != 1) {
-				//paused = true;
+				Paused = true;
 				commandindex = 0;
 			}
 
@@ -534,21 +331,21 @@ public class Simulation : Game
 			bool DoCorrect = !keyboard.IsKeyDown(Keys.C);
 			bool DoPrune   = !keyboard.IsKeyDown(Keys.Q);
 
-			Explorer .Update(simtime, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
+			Explorer.Update(time, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
 
 			if (UseOdometry) {
-				Navigator.Update(simtime, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
+				Navigator.Update(time, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
 			}
 			else {
-				Navigator.Update(simtime, 0, 0, 0, 0, 0, 0);
+				Navigator.Update(time, 0, 0, 0, 0, 0, 0);
 			}
 
-			if (simtime.TotalGameTime - lastnavigationupdate.TotalGameTime >= MeasureElapsed) {
+			if (time.TotalGameTime - lastnavigationupdate.TotalGameTime >= MeasureElapsed) {
 				List<double[]> measurements = Explorer.Measure();
 			
-				Navigator.SlamUpdate(simtime, measurements, DoPredict, DoCorrect, DoPrune);
+				Navigator.SlamUpdate(time, measurements, DoPredict, DoCorrect, DoPrune);
 
-				lastnavigationupdate = new GameTime(simtime.TotalGameTime, simtime.ElapsedGameTime);
+				lastnavigationupdate = new GameTime(time.TotalGameTime, time.ElapsedGameTime);
 			}
 
 			if (forcehistoryreset) {
@@ -567,53 +364,6 @@ public class Simulation : Game
 				Navigator.StartMapping();
 			}
 		}
-
-		prevkeyboard = keyboard;
-
-		base.Update(time);
-	}
-
-	/// <summary>
-	/// This is called when the game should draw itself.
-	/// </summary>
-	/// <param name="time">Provides a snapshot of timing values.</param>
-	protected override void Draw(GameTime time)
-	{
-		// scene panel
-		graphics.SetRenderTarget(SceneBuffer);
-		graphics.Clear(Color.DarkSeaGreen);
-
-		foreach (EffectPass pass in effect.CurrentTechnique.Passes) {
-			pass.Apply();
-			
-			Explorer .Render(camera);
-			Navigator.Render(camera);
-		}
-
-		// sidebar
-		graphics.SetRenderTarget(SideBuffer);
-		graphics.Clear(Color.Black);
-
-		flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
-		           DepthStencilState.Default, RasterizerState.CullNone);
-
-		Explorer.RenderSide();
-
-		flip.End();
-
-		// to window
-		graphics.SetRenderTarget(null);
-		flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
-		           DepthStencilState.Default, RasterizerState.CullNone);
-
-		flip.Draw(SceneBuffer, scenedest, SceneBuffer.Bounds, Color.White);
-		flip.Draw(SideBuffer,  sidedest,  SideBuffer .Bounds, Color.White);
-		
-		flip.End();
-
-		//Console.WriteLine((1.0/time.ElapsedGameTime.TotalSeconds).ToString("F2"));
-
-		base.Draw(time);
 	}
 
 	/// <summary>
@@ -621,7 +371,7 @@ public class Simulation : Game
 	/// </summary>
 	/// <param name="descriptor">String representing the list. Separated by spaces.</param>
 	/// <returns>The double array.</returns>
-	public double[] ParseDoubleList(string descriptor) {
+	public static double[] ParseDoubleList(string descriptor) {
 		string[] values = descriptor.Split(' ');
 		double[] point = new double[values.Length];
 		
@@ -635,21 +385,6 @@ public class Simulation : Game
 		}
 
 		return point;
-	}
-
-	/// <summary>
-	/// Dispose any resources.
-	/// </summary>
-	/// <param name="disposing">Mask. If false, nothing is done.</param>
-	protected override void Dispose(bool disposing)
-	{
-		if (disposing) {
-			if (Explorer != null) {
-				Explorer.Dispose();
-			}
-
-			base.Dispose(disposing);
-		}
 	}
 }
 }

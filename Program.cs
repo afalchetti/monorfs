@@ -131,7 +131,7 @@ public class Program
 			Environment.Exit(2);
 		}
 
-		using (Simulation sim = new Simulation(scenefile, commandfile, particlecount, onlymapping, simulate, realtime)) {
+		using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, onlymapping, simulate, realtime)) {
 			sim.Run();
 		
 			File.WriteAllText("trajectories.out", sim.SerializedTrajectories);

@@ -45,7 +45,7 @@ class SimulationTest
 	[SetUp]
 	public void setup() {
 		try {
-			simulation = new Simulation("test.world", "test.in", 1, false, true, false);
+			simulation = Simulation.FromFiles("test.world", "test.in", 1, false, true, false);
 			commands   = simulation.Commands;
 			explorer   = simulation.Explorer;
 			navigator  = simulation.Navigator;
