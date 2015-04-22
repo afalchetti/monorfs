@@ -94,21 +94,29 @@ public class Program
 	public static void Main(string[] args)
 	{
 		string scenefile     = "";
+		string vehiclefile   = "";
+		string estimatefile  = "";
+		string mapfile       = "";
 		string commandfile   = "";
 		int    particlecount = 1;
 		bool   onlymapping   = false;
 		bool   simulate      = false;
 		bool   realtime      = false;
+		bool   viewer        = false;
 		bool   showhelp      = false;
 
 		OptionSet options = new OptionSet() {
-			{ "f|file=",      "Scene description file. Simulated, recorded or device id.",    f       => scenefile     = f },
-			{ "c|command=",   "Auto-command file (simulates user input).",                    c       => commandfile   = c },
-			{ "p|particles=", "Number of particles used for the RB-PHD",                      (int p) => particlecount = p },
-			{ "m|onlymap",    "Only do mapping, assuming known localization.",                m       => onlymapping   = m != null },
-			{ "s|simulate",   "Generate an artificial simulation instead of using a sensor.", s       => simulate      = s != null },
-			{ "r|realtime",   "Process the system in realtime, instead of a fixed step.",     r       => realtime      = r != null },
-			{ "h|help",       "Show this message and exit",                                   h       => showhelp      = h != null }
+			{ "f|file=",       "Scene description file. Simulated, recorded or device id.",    f       => scenefile     = f },
+			{ "c|command=",    "Auto-command file (simulates user input).",                    c       => commandfile   = c },
+			{ "p|particles=",  "Number of particles used for the RB-PHD",                      (int p) => particlecount = p },
+			{ "y|onlymap",     "Only do mapping, assuming known localization.",                y       => onlymapping   = y != null },
+			{ "s|simulate",    "Generate an artificial simulation instead of using a sensor.", s       => simulate      = s != null },
+			{ "r|realtime",    "Process the system in realtime, instead of a fixed step.",     r       => realtime      = r != null },
+			{ "v|view",        "View a precorded session.",                                    v       => viewer        = v != null },
+			{ "t|trajectory=", "Prerecorded trajectory file.",                                 t       => vehiclefile   = t },
+			{ "e|estimate=",   "Prerecorded estimation file.",                                 e       => estimatefile  = e },
+			{ "m|map=",        "Prerecorded map history file.",                                m       => mapfile       = m },
+			{ "h|help",        "Show this message and exit",                                   h       => showhelp      = h != null }
 		};
 
 		try {
@@ -131,13 +139,21 @@ public class Program
 			Environment.Exit(2);
 		}
 
-		using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, onlymapping, simulate, realtime)) {
-			sim.Run();
-		
-			File.WriteAllText("trajectories.out", sim.SerializedTrajectories);
-			File.WriteAllText("maps.out",         sim.SerializedMaps);
+		if (viewer) {
+			using (Viewer sim = Viewer.FromFiles(vehiclefile, estimatefile, mapfile, scenefile)) {
+				sim.Run();
+			}
+		}
+		else {
+			using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, onlymapping, simulate, realtime)) {
+				sim.Run();
 
-			SaveAsPng(sim.SceneBuffer, "final.png");
+				File.WriteAllText("trajectory.out", sim.SerializedTrajectory);
+				File.WriteAllText("estimate.out",   sim.SerializedEstimate);
+				File.WriteAllText("maps.out",       sim.SerializedMaps);
+				
+				SaveAsPng(sim.SceneBuffer, "final.png");
+			}
 		}
 
 		KinectVehicle.Shutdown();

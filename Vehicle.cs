@@ -32,7 +32,7 @@ public abstract class Vehicle : IDisposable
 	private double[] state;
 
 	/// <summary>
-	/// Get the internal state as a vector.
+	/// Get or set the internal state as a vector.
 	/// </summary>
 	public double[] State {
 		get { return state; }
@@ -40,7 +40,7 @@ public abstract class Vehicle : IDisposable
 	}
 
 	/// <summary>
-	/// Get the location x-axis coordinate.
+	/// Get or set the location x-axis coordinate.
 	/// </summary>
 	public double X
 	{
@@ -49,7 +49,7 @@ public abstract class Vehicle : IDisposable
 	}
 
 	/// <summary>
-	/// Get the location y-axis coordinate.
+	/// Get or set the location y-axis coordinate.
 	/// </summary>
 	public double Y
 	{
@@ -58,7 +58,7 @@ public abstract class Vehicle : IDisposable
 	}
 
 	/// <summary>
-	/// Get the location z-axis coordinate.
+	/// Get or set the location z-axis coordinate.
 	/// </summary>
 	public double Z
 	{
@@ -67,7 +67,7 @@ public abstract class Vehicle : IDisposable
 	}
 
 	/// <summary>
-	/// Get the space location of the vehicle, i.e. its coordinates.
+	/// Get or set the space location of the vehicle, i.e. its coordinates.
 	/// </summary>
 	public double[] Location
 	{
@@ -76,7 +76,7 @@ public abstract class Vehicle : IDisposable
 	}
 
 	/// <summary>
-	/// Get the rotation quaternion scalar component.
+	/// Get or set the rotation quaternion scalar component.
 	/// </summary>
 	public double W
 	{
@@ -85,7 +85,7 @@ public abstract class Vehicle : IDisposable
 	}
 
 	/// <summary>
-	/// Get the rotation quaternion vector component.
+	/// Get or set the rotation quaternion vector component.
 	/// </summary>
 	public double[] K
 	{
@@ -95,7 +95,7 @@ public abstract class Vehicle : IDisposable
 	
 
 	/// <summary>
-	/// Get the orientation of the vehicle.
+	/// Get or set the orientation of the vehicle.
 	/// </summary>
 	public Quaternion Orientation
 	{
@@ -143,7 +143,7 @@ public abstract class Vehicle : IDisposable
 	/// The first argument per item is a timestamp, the
 	/// next three are 3D coordinates.
 	/// </summary>
-	public List<double[]> Waypoints { get; protected set; }
+	public List<double[]> Waypoints { get; set; }
 	
 	/// <summary>
 	/// Cached measurements from the update process for rendering purposes.
@@ -165,8 +165,8 @@ public abstract class Vehicle : IDisposable
 		: this(location, theta, axis, 575.8156 / KinectVehicle.Delta,
 	           new Rectangle(-640 / KinectVehicle.Delta / 2, -480 / KinectVehicle.Delta / 2,
 	                          640 / KinectVehicle.Delta,      480 / KinectVehicle.Delta),
-			   new Range(0.1f, 2f)) {}
-			   //new Range(0.1f, 10f)) {}
+			   //new Range(0.1f, 2f)) {}
+			   new Range(0.1f, 10f)) {}
 
 	/// <summary>
 	/// Construct a new Vehicle object from its initial state and appropiate constants.
@@ -192,7 +192,7 @@ public abstract class Vehicle : IDisposable
 		MappedMeasurements = new List<double[]>();
 
 		Waypoints = new List<double[]>();
-		Waypoints.Add(new double[4] {0, X, Y, Z});
+		Waypoints.Add(new double[1] {0}.Concatenate(state));
 	}
 
 	/// <summary>
@@ -214,7 +214,7 @@ public abstract class Vehicle : IDisposable
 		}
 		else {
 			this.Waypoints = new List<double[]>();
-			this.Waypoints.Add(new double[4] {0, that.X, that.Y, that.Z});
+			this.Waypoints.Add(new double[1] {0}.Concatenate(that.state));
 		}
 	}
 	
@@ -242,7 +242,7 @@ public abstract class Vehicle : IDisposable
 	public void ResetHistory()
 	{
 		Waypoints.Clear();
-		Waypoints.Add(new double[4] {0, X, Y, Z});
+		Waypoints.Add(new double[1] {0}.Concatenate(state));
 	}
 
 	/// <summary>

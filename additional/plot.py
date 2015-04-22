@@ -33,13 +33,10 @@ def readscene(descriptor):
 	        "map": landmarks}
 
 def readtrajectories(descriptor):
-	descriptor     = normalizelinefeeds(descriptor)
-	descriptors    = descriptor.split("\n|\n")
-	realpoints     = (tuple(float(n) for n in point.split()) for point in descriptors[0].split("\n"))
-	estimatepoints = (tuple(float(n) for n in point.split()) for point in descriptors[1].split("\n"))
+	descriptor = normalizelinefeeds(descriptor)
+	points     = (tuple(float(n) for n in point.split()) for point in descriptor.split("\n"))
 	
-	return { "real":     [{"time": t, "pos": np.array((x, y, z))} for (t, x, y, z) in realpoints],
-	         "estimate": [{"time": t, "pos": np.array((x, y, z))} for (t, x, y, z) in estimatepoints] }
+	return [{"time": p[0], "pos": np.array((p[1], p[2], p[3]))} for p in points]
 
 def readmaps(descriptor):
 	descriptor  = normalizelinefeeds(descriptor)
@@ -48,7 +45,7 @@ def readmaps(descriptor):
 	return [tuple((float(head), [parsegaussian(line) for line in tail.split("\n") if line != ""])) for (head, tail) in descriptors]
 	
 def parsegaussian(descriptor):
-	descriptors = descriptor.split("; ")
+	descriptors = descriptor.split(";")
 	weight      = float(descriptor[0])
 	mean        = tuple((float(n) for n in descriptors[1].split()))
 	cov         = tuple((float(n) for n in descriptors[2].split()))
@@ -129,8 +126,11 @@ if __name__ == '__main__':
 		scene = readscene(sfile.read())
 	
 	print "reading trajectories"
-	with open("trajectories.out") as tfile:
-		trajectories = readtrajectories(tfile.read())
+	with open("trajectory.out") as tfile:
+		trajectory = readtrajectories(tfile.read())
+		
+	with open("estimate.out") as efile:
+		estimate   = readtrajectories(efile.read())
 	
 	print "reading maps"
 	with open("maps.out") as mfile:
@@ -138,7 +138,7 @@ if __name__ == '__main__':
 	
 	print "plotting trajectories"
 	trajplot = mp.figure(1)
-	plottrajectories(trajectories["real"], trajectories["estimate"])
+	plottrajectories(trajectory, estimate)
 	
 	mp.xlabel("Time [s]")
 	mp.ylabel("Pose error [m]")

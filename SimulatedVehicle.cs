@@ -188,9 +188,11 @@ public class SimulatedVehicle : Vehicle
 		                                  Waypoints[Waypoints.Count - 1][2],
 		                                  Waypoints[Waypoints.Count - 1][3]};
 
-		if (Location.Subtract(prevloc).SquareEuclidean() >= 1e-2f) {
-			Waypoints.Add(new double[4] {time.TotalGameTime.TotalSeconds, X, Y, Z});
-		}
+		 // FIXME this "too close to matter" efficiency option is disabled as a workaround to make
+		// viewer work smoothly but should eventually be reinstated and a smarter interpolation should be done there
+		//if (Location.Subtract(prevloc).SquareEuclidean() >= 1e-2f) {
+			Waypoints.Add(new double[1] {time.TotalGameTime.TotalSeconds}.Concatenate(State));
+		//}
 	}
 	
 	/// <summary>

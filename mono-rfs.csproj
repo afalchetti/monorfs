@@ -83,6 +83,8 @@
     <Compile Include="ArrayExtensions.cs" />
     <Compile Include="CircularBuffer.cs" />
     <Compile Include="Manipulator.cs" />
+    <Compile Include="Gaussian.cs" />
+    <Compile Include="Viewer.cs" />
     <Compile Include="External\Options.cs" />
     <Compile Include="GraphicsDeviceExtension.cs" />
     <Compile Include="KinectVehicle.cs" />
