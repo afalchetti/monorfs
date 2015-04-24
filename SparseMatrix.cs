@@ -11,7 +11,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 
 namespace monorfs
@@ -149,10 +148,21 @@ public class SparseMatrix : IEnumerable<SparseItem>
 
 			// note that rows can't be empty (invariant of this class)
 			// if they were, the very moment they become empty, they should be removed
-			var row  = data.First();
-			var item = row.Value.First();
 
-			return new SparseItem(row.Key, item.Key, item.Value);
+			KeyValuePair<int, Dictionary<int, double>> anyrow  = new KeyValuePair<int, Dictionary<int, double>>();
+			KeyValuePair<int, double>                  anyitem = new KeyValuePair<int, double>();
+			
+			foreach (var row in data) {  // get any row = foreach + break
+				anyrow = row;
+				break;
+			}
+
+			foreach (var item in anyrow.Value) {  // get any element = foreach + break
+				anyitem = item;
+				break;
+			}
+
+			return new SparseItem(anyrow.Key, anyitem.Key, anyitem.Value);
 		}
 	}
 

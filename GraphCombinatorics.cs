@@ -11,7 +11,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using AE = monorfs.ArrayExtensions;
 
 namespace monorfs
@@ -566,9 +565,38 @@ public class MurtyNode
 	/// This implies having the same field values and the same defined order for each field.</returns>
 	public bool Equals(MurtyNode that)
 	{
-		return Eliminated.SequenceEqual(that.Eliminated) &&
-		       Forced.SequenceEqual(that.Forced) &&
-		       (Assignment != null ? Assignment.SequenceEqual(that.Assignment) : that.Assignment == null);
+		if (this.Eliminated.Length != that.Eliminated.Length || this.Forced.Length != that.Forced.Length) {
+			return false;
+		}
+
+		for (int i = 0; i < this.Eliminated.Length; i++) {
+			if (this.Eliminated[i] != that.Eliminated[i]) {
+				return false;
+			}
+		}
+
+		for (int i = 0; i < this.Forced.Length; i++) {
+			if (this.Forced[i] != that.Forced[i]) {
+				return false;
+			}
+		}
+		
+		if (this.Assignment == null) {
+			return that.Assignment == null;
+		}
+		else {
+			if (that.Assignment == null) {
+				return false;
+			}
+
+			for (int i = 0; i < this.Assignment.Length; i++) {
+				if (this.Assignment[i] != that.Assignment[i]) {
+					return false;
+				}
+			}
+		}
+
+		return true;
 	}
 	
 	/// <summary>
