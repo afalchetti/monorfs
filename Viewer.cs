@@ -277,6 +277,8 @@ public class Viewer : Manipulator
 		Explorer .Waypoints    = VehicleWaypoints;
 		Navigator.Waypoints    = EstimateWaypoints;
 		Navigator.VehicleParticles[0].Waypoints = EstimateWaypoints;
+
+		Message = string.Format("time = {0,12:N4}        frame = {1,5:N0}", Trajectory[i].Item1, i);
 		
 		// frame-by-frame fine time lookup, reverse
 		if (keyboard.IsKeyDown(Keys.Q) && !prevkeyboard.IsKeyDown(Keys.Q)) {

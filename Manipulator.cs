@@ -131,6 +131,18 @@ public abstract class Manipulator : Game
 	private double[][] camera;
 
 	/// <summary>
+	/// Text message displayed next to the rendered simulation. 
+	/// </summary>
+	public string Message { get; protected set; }
+
+	/// <summary>
+	/// Render font.
+	/// </summary>
+	private SpriteFont font;
+
+	private Vector2 messagepos;
+
+	/// <summary>
 	/// Construct a Manipulator from its components.
 	/// </summary>
 	public Manipulator(Vehicle explorer, Navigator navigator, int particlecount, bool realtime, float[] mapclip, double fps = 30)
@@ -152,6 +164,8 @@ public abstract class Manipulator : Game
 		graphicsManager.IsFullScreen              = false;
 
 		FrameElapsed = new TimeSpan((long) (10000000/fps));
+		Message      = "";
+		messagepos   = new Vector2(20, graphicsManager.PreferredBackBufferHeight - 30);
 	}
 
 	/// <summary>
@@ -178,7 +192,6 @@ public abstract class Manipulator : Game
 		return new Rectangle(offx, offy, (int) rectwidth, (int) rectheight);
 	}
 	
-
 	/// <summary>
 	/// Allow the manipulator to perform any initialization it needs to do before it starts running.
 	/// </summary>
@@ -245,6 +258,7 @@ public abstract class Manipulator : Game
 	{
 		Flip          = new SpriteBatch(Graphics);
 		Explorer.Flip = this.Flip;
+		font          = Content.Load<SpriteFont>("pescadero");
 	}
 
 	/// <summary>
@@ -342,6 +356,7 @@ public abstract class Manipulator : Game
 
 		Flip.Draw(SceneBuffer, scenedest, SceneBuffer.Bounds, Color.White);
 		Flip.Draw(SideBuffer,  sidedest,  SideBuffer .Bounds, Color.White);
+		Flip.DrawString(font, Message, messagepos, Color.White);
 		
 		Flip.End();
 
