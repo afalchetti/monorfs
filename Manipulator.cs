@@ -44,7 +44,7 @@ public abstract class Manipulator : Game
 	/// <summary>
 	/// Frame period (frames per second inverse).
 	/// </summary>
-	public readonly TimeSpan FrameElapsed = new TimeSpan(10000000/30);
+	public readonly TimeSpan FrameElapsed;
 
 	/// <summary>
 	/// Simulated time.
@@ -166,6 +166,9 @@ public abstract class Manipulator : Game
 		FrameElapsed = new TimeSpan((long) (10000000/fps));
 		Message      = "";
 		messagepos   = new Vector2(20, graphicsManager.PreferredBackBufferHeight - 30);
+
+		IsFixedTimeStep   = false;
+		TargetElapsedTime = FrameElapsed;
 	}
 
 	/// <summary>
@@ -233,13 +236,6 @@ public abstract class Manipulator : Game
 		SideBuffer = new RenderTarget2D(Graphics, sidedest.Width, sidedest.Height,
 		                                false, SurfaceFormat.Color, DepthFormat.Depth16,
 		                                0, RenderTargetUsage.DiscardContents);
-
-		if (!Realtime) {
-			TargetElapsedTime = FrameElapsed;
-		}
-		else {
-			IsFixedTimeStep = false;
-		}
 
 		prevkeyboard = Keyboard.GetState();
 		camangle     = 0;

@@ -141,6 +141,8 @@ public class Viewer : Manipulator
 
 			mapindices[k] = h;
 		}
+		
+		IsFixedTimeStep = true;
 	}
 
 	/// <summary>
