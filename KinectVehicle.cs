@@ -263,7 +263,7 @@ public class KinectVehicle : Vehicle
 		NextFrame(out depthframe, out colorframe, out interest);
 
 		for (int i = 0; i < interest.Count; i++) {
-			float range = GetRange(interest[i].I, interest[i].K, depthframe[interest[i].I][interest[i].K]);
+			float range = GetRange(interest[i].I, interest[i].K, (float) interest[i].Value);
 
 			measurements.Add(new double[3] {interest[i].I - resx / 2, interest[i].K - resy / 2, range});
 		}
@@ -345,8 +345,9 @@ public class KinectVehicle : Vehicle
 
 		using (VideoFrameRef frameref = color.ReadFrame()) {
 			colorframe = ColorFrameToArray(frameref);
-			interest   = ExtractKeypoints(colorframe, (int) resx, (int) resy, 50, 25);
 		}
+
+		interest = ExtractKeypoints(colorframe, depthframe, (int) resx, (int) resy, 50, 25);
 	}
 
 	/// <summary>
@@ -498,11 +499,14 @@ public class KinectVehicle : Vehicle
 	/// <summary>
 	/// Extract keypoints from an image using the FAST methodology.
 	/// </summary>
-	/// <param name="image">Input image.</param>
+	/// <param name="image">Input color image.</param>
+	/// <param name="depth">Input depth map.</param>
+	/// <param name="width">Input image width.</param>
+	/// <param name="height">Input image height.</param>
 	/// <param name="threshold">Selection threshold value. Higher gives less keypoints.</param>
 	/// <param name="maxcount">Maximum number of interest points. The highest scored keypoints are chosen.</param>
 	/// <returns>List of keypoints in measurement space.</returns>
-	private static List<SparseItem> ExtractKeypoints(Color[] image, int width, int height, int threshold = 20, int maxcount = int.MaxValue)
+	private static List<SparseItem> ExtractKeypoints(Color[] image, float[][] depth, int width, int height, int threshold = 20, int maxcount = int.MaxValue)
 	{
 		var            detector  = new FastCornersDetector(threshold);
 		int            topcount  = maxcount; // this is the end index; it may grow if invalid items are found
@@ -520,8 +524,8 @@ public class KinectVehicle : Vehicle
 			int x = (int) point.X;
 			int y = (int) point.Y;
 
-			if (x >= border && x < bitmap.Width - border && y >= border && y < bitmap.Height - border) {
-				keypoints.Add(new SparseItem(x, y, -1));
+			if (x >= border && x < bitmap.Width - border && y >= border && y < bitmap.Height - border && depth[x][y] != 0) {
+				keypoints.Add(new SparseItem(x, y, depth[x][y]));
 			}
 			else {
 				topcount++;
