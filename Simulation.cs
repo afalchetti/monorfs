@@ -53,6 +53,11 @@ public class Simulation : Manipulator
 	/// or for performance comparisons of the system with and without it.
 	/// </summary>
 	public const bool UseOdometry = true;
+
+	/// <summary>
+	/// Every frame seen so far.
+	/// </summary>
+	public List<Texture2D> SidebarHistory;
 	
 	/// <summary>
 	/// Get a string representation of the real trajectory of the vehicle.
@@ -119,7 +124,8 @@ public class Simulation : Manipulator
 	                  bool onlymapping, bool realtime, float[] mapclip)
 		: base(explorer, new Navigator(explorer, particlecount, onlymapping), particlecount, realtime, mapclip)
 	{
-		Commands = commands;
+		Commands       = commands;
+		SidebarHistory = new List<Texture2D>();
 	}
 
 	/// <summary>
@@ -314,6 +320,24 @@ public class Simulation : Manipulator
 				Navigator.StartMapping();
 			}
 		}
+	}
+	
+	/// <summary>
+	/// This is called when the manipulator should draw itself.
+	/// </summary>
+	/// <param name="time">Provides a snapshot of timing values.</param>
+	protected override void Draw(GameTime time)
+	{
+		base.Draw(time);
+
+		Texture2D frame = new Texture2D(Graphics, SideBuffer.Width, SideBuffer.Height);
+		Color[]   data  = new Color[SideBuffer.Width * SideBuffer.Height];
+
+		SideBuffer.GetData(data);
+		frame     .SetData(data);
+		
+
+		SidebarHistory.Add(frame);
 	}
 }
 }

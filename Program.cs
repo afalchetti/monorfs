@@ -12,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
+using Accord.Extensions.Imaging;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using NDesk.Options;
@@ -69,6 +70,43 @@ public class Program
 
 			bitmap.Save(file, System.Drawing.Imaging.ImageFormat.Png);
 		}
+		}
+	}
+
+	/// <summary>
+	/// Save a stream of image frames as an AVI video file.
+	/// </summary>
+	/// <param name="frames">Ordered list of frames at 30 fps.</param>
+	/// <param name="file">Output filename.</param>
+	public static void SaveAsAvi(List<Texture2D> frames, string file)
+	{
+		if (frames.Count == 0) { return; }
+
+		int width  = frames[0].Width;
+		int height = frames[0].Height;
+
+		using (VideoWriter writer = new VideoWriter(file, new Accord.Extensions.Size(width, height),
+		                                            30, true, VideoCodec.FromName("MJPG"))) {
+			writer.Open();
+
+			foreach (Texture2D frame in frames) {
+				Bgr<byte>[,] bitmap = new Bgr<byte>[height, width];
+				Color[]      linear = new Color[width * height];
+
+				frame.GetData(linear);
+
+				int h = 0; 
+				for (int k = 0; k < height; k++) {
+				for (int i = 0; i < width;  i++) {
+					bitmap[k, i] = new Bgr<byte>(linear[h].B, linear[h].G, linear[h].R);
+					h++;
+				}
+				}
+
+				writer.Write(bitmap.Lock());
+			}
+
+			writer.Close();
 		}
 	}
 
@@ -148,11 +186,16 @@ public class Program
 			using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, onlymapping, simulate, realtime)) {
 				sim.Run();
 
+				Console.WriteLine("writing output");
 				File.WriteAllText("trajectory.out", sim.SerializedTrajectory);
 				File.WriteAllText("estimate.out",   sim.SerializedEstimate);
 				File.WriteAllText("maps.out",       sim.SerializedMaps);
 				
+				Console.WriteLine("Writing snapshot");
 				SaveAsPng(sim.SceneBuffer, "final.png");
+
+				Console.WriteLine("Writing sidebar video");
+				SaveAsAvi(sim.SidebarHistory, "sidebar.avi");
 			}
 		}
 

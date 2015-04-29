@@ -42,6 +42,17 @@
     <Reference Include="Accord, Version=2.14.0.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL">
       <Aliases>global</Aliases>
     </Reference>
+    <Reference Include="Accord.Extensions.Core, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\applications\accord-net-extensions\bin\Release\Accord.Extensions.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Accord.Extensions.Imaging.GenericImage, Version=2.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\applications\accord-net-extensions\bin\Release\Accord.Extensions.Imaging.GenericImage.dll</HintPath>
+    </Reference>
+    <Reference Include="Accord.Extensions.Imaging.IO">
+      <HintPath>..\..\..\..\applications\accord-net-extensions\bin\Release\Accord.Extensions.Imaging.IO.dll</HintPath>
+    </Reference>
     <Reference Include="Accord.Imaging, Version=2.14.0.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL" />
     <Reference Include="Accord.Math, Version=2.14.0.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL">
       <Aliases>global</Aliases>
