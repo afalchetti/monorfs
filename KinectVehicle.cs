@@ -508,27 +508,28 @@ public class KinectVehicle : Vehicle
 	/// <returns>List of keypoints in measurement space.</returns>
 	private static List<SparseItem> ExtractKeypoints(Color[] image, float[][] depth, int width, int height, int threshold = 20, int maxcount = int.MaxValue)
 	{
-		var            detector  = new FastCornersDetector(threshold);
-		int            topcount  = maxcount; // this is the end index; it may grow if invalid items are found
-		int            border    = Math.Min(50, (int) (width * 0.05));
-		UnmanagedImage bitmap    = ColorMatrixToImage(image, width, height);
-
-		IntPoint[]       features  = detector.ProcessImage(bitmap).ToArray();
+		var detector = new FastCornersDetector(threshold);
+		int topcount = maxcount; // this is the end index; it may grow if invalid items are found
+		int border   = Math.Min(50, (int) (width * 0.05));
 		List<SparseItem> keypoints = new List<SparseItem>();
 
-		Array.Sort(detector.Scores, features, new ReverseComparer());
+		using (UnmanagedImage bitmap = ColorMatrixToImage(image, width, height)) {
+			IntPoint[] features  = detector.ProcessImage(bitmap).ToArray();
 
-		for (int i = 0; i < features.Length && i < topcount; i++) {
-			IntPoint point = features[i];
+			Array.Sort(detector.Scores, features, new ReverseComparer());
 
-			int x = (int) point.X;
-			int y = (int) point.Y;
+			for (int i = 0; i < features.Length && i < topcount; i++) {
+				IntPoint point = features[i];
 
-			if (x >= border && x < bitmap.Width - border && y >= border && y < bitmap.Height - border && depth[x][y] != 0) {
-				keypoints.Add(new SparseItem(x, y, depth[x][y]));
-			}
-			else {
-				topcount++;
+				int x = (int) point.X;
+				int y = (int) point.Y;
+
+				if (x >= border && x < bitmap.Width - border && y >= border && y < bitmap.Height - border && depth[x][y] != 0) {
+					keypoints.Add(new SparseItem(x, y, depth[x][y]));
+				}
+				else {
+					topcount++;
+				}
 			}
 		}
 
