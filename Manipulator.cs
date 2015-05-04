@@ -113,7 +113,8 @@ public abstract class Manipulator : Game
 	/// <summary>
 	/// Sidebar double buffer flipping destination rectangle.
 	/// </summary>
-	private Rectangle sidedest;
+	/// FIXME this should be private. It is protected only as a temporal workaround to the explorer renderside dissociation
+	protected Rectangle sidedest;
 
 	/// <summary>
 	/// Camera angle.

@@ -131,10 +131,11 @@ public class Program
 	//[STAThread]
 	public static void Main(string[] args)
 	{
-		string scenefile     = "";
 		string vehiclefile   = "";
 		string estimatefile  = "";
 		string mapfile       = "";
+		string sidebarfile   = "";
+		string scenefile     = "";
 		string commandfile   = "";
 		int    particlecount = 1;
 		bool   onlymapping   = false;
@@ -154,6 +155,7 @@ public class Program
 			{ "t|trajectory=", "Prerecorded trajectory file.",                                 t       => vehiclefile   = t },
 			{ "e|estimate=",   "Prerecorded estimation file.",                                 e       => estimatefile  = e },
 			{ "m|map=",        "Prerecorded map history file.",                                m       => mapfile       = m },
+			{ "b|sidebar=",    "Prerecorded sidebar video file.",                              b       => sidebarfile   = b },
 			{ "h|help",        "Show this message and exit",                                   h       => showhelp      = h != null }
 		};
 
@@ -178,7 +180,7 @@ public class Program
 		}
 
 		if (viewer) {
-			using (Viewer sim = Viewer.FromFiles(vehiclefile, estimatefile, mapfile, scenefile)) {
+			using (Viewer sim = Viewer.FromFiles(vehiclefile, estimatefile, mapfile, sidebarfile, scenefile)) {
 				sim.Run();
 			}
 		}

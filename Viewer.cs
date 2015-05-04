@@ -16,6 +16,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 
+using Accord.Extensions.Imaging;
 using Accord.Math;
 using System.Text;
 
@@ -49,6 +50,18 @@ public class Viewer : Manipulator
 	/// The first entry of each tuple is a time point in seconds; the second is the map model.
 	/// </summary>
 	public TimedMapModel Map { get; private set; }
+
+	/// <summary>
+	/// Sidebar video filename.
+	/// </summary>
+	private string sidebarfile;
+	
+	/// <summary>
+	/// Every recorded sidebar frame.
+	/// </summary>
+	public List<Texture2D> SidebarHistory { get; private set; }
+
+	private Texture2D SideBuffer2;
 
 	/// <summary>
 	/// Vehicle waypoints internal cache.
@@ -111,8 +124,9 @@ public class Viewer : Manipulator
 	/// <param name="map">Recorded maximum-a-posteriori estimate for the map.</param>
 	/// <param name="fps">Frame rate.</param>
 	/// <param name="mapclip">Initial observable area in the form [left, right, bottom, top]</param>
+	/// <param name="sidebarfile">Sidebar video filename.</param>
 	public Viewer(SimulatedVehicle explorer, TimedState trajectory, TimedState estimate,
-	              TimedMapModel map, double fps, float[] mapclip)
+	              TimedMapModel map, double fps, float[] mapclip, string sidebarfile)
 		: base(explorer, new Navigator(explorer, 1, false), 1, false, mapclip, fps)
 	{
 		Trajectory = trajectory;
@@ -141,20 +155,23 @@ public class Viewer : Manipulator
 
 			mapindices[k] = h;
 		}
-		
-		IsFixedTimeStep = true;
+
+		// note that the sidebar video read has to wait until LoadContent to get an appropiate Graphics context
+		this.sidebarfile = sidebarfile;
+		IsFixedTimeStep  = true;
 	}
 
 	/// <summary>
 	/// Create a visualization object from a pair of formatted description files.
 	/// </summary>
 	/// <param name="vehiclefile">Vehicle trajectory descriptor file.</param>
-	/// <param name="estimationfile">Vehicle trajectory estimation descriptor file.</param>
+	/// <param name="estimatefile">Vehicle trajectory estimation descriptor file.</param>
 	/// <param name="mapfile">Map estimation descriptor file.</param>
+	/// <param name="sidebarfile">Sidebar history video file.</param>
 	/// <param name="scenefile">Scene descriptor filename, may be null or empty.</param>
 	/// <returns>Prepared visualization object.</returns>
 	/// <remarks>All file must be previously sorted by time value. This property is assumed.</remarks>
-	public static Viewer FromFiles(string vehiclefile, string estimatefile, string mapfile, string scenefile = "")
+	public static Viewer FromFiles(string vehiclefile, string estimatefile, string mapfile, string sidebarfile = "", string scenefile = "")
 	{
 		SimulatedVehicle explorer;
 		TimedState       trajectory;
@@ -174,7 +191,32 @@ public class Viewer : Manipulator
 			mapclip = new float[4] {-6, 6, -3, 3};
 		}
 
-		return new Viewer(explorer, trajectory, estimate, map, 30, mapclip);
+		return new Viewer(explorer, trajectory, estimate, map, 30, mapclip, sidebarfile);
+	}
+
+	/// <summary>
+	/// Load any multimedia content that the object requires to draw correctly on screen.
+	/// </summary>
+	protected override void LoadContent()
+	{
+		Texture2D nulltexture = new Texture2D(Graphics, 1, 1);
+
+		if (!string.IsNullOrEmpty(sidebarfile)) {
+			SidebarHistory = frameListFromAvi(sidebarfile);
+
+			for (int i = SidebarHistory.Count; i < Trajectory.Count; i++) {
+				SidebarHistory.Add(nulltexture);
+			}
+		}
+		else {
+			SidebarHistory = new List<Texture2D>();
+
+			foreach (var state in Trajectory) {
+				SidebarHistory.Add(nulltexture);
+			}
+		}
+
+		base.LoadContent();
 	}
 
 	/// <summary>
@@ -234,6 +276,45 @@ public class Viewer : Manipulator
 	}
 
 	/// <summary>
+	/// Get a list of frames from a video file in AVI format.
+	/// </summary>
+	/// <param name="filename">Input video filename.</param>
+	/// <returns>Frame list.</returns>
+	private List<Texture2D> frameListFromAvi(string filename)
+	{
+		List<Texture2D> frames = new List<Texture2D>();
+
+		using (FileCapture reader = new FileCapture(filename)) {
+			reader.Open();
+			Console.WriteLine("reading file " + filename);
+
+			foreach (Image<Bgr<byte>> image in reader) {
+				Texture2D    frame  = new Texture2D(Graphics, image.Width, image.Height);
+				Bgr<byte>[,] data   = new Bgr<byte>[image.Height, image.Width];
+				Color[]      linear = new Color[image.Width * image.Height];
+
+				image.CopyTo(data);
+
+				int h = 0;
+				for (int i = 0; i < image.Width; i++) {
+				for (int k = 0; k < image.Height; k++) {
+					linear[h] = new Color(data[k, i].B, data[k, i].G, data[k, i].R);
+				}
+				}
+
+				Console.WriteLine("frame " + reader.Position);
+				frame.SetData(linear);
+				frames.Add(frame);
+			}
+
+			Console.WriteLine("done.");
+			reader.Close();
+		}
+
+		return frames;
+	}
+
+	/// <summary>
 	/// Get a map model from a formatted string descriptor.
 	/// </summary>
 	/// <param name="descriptor">Formatted map descriptor.</param>
@@ -279,6 +360,7 @@ public class Viewer : Manipulator
 		Explorer .Waypoints    = VehicleWaypoints;
 		Navigator.Waypoints    = EstimateWaypoints;
 		Navigator.VehicleParticles[0].Waypoints = EstimateWaypoints;
+		SideBuffer2            = SidebarHistory[i];
 
 		Message = string.Format("time = {0,12:N4}        frame = {1,5:N0}", Trajectory[i].Item1, i);
 		
@@ -308,6 +390,27 @@ public class Viewer : Manipulator
 		if (!Paused) {
 			i++;
 		}
+	}
+	
+	/// <summary>
+	/// This is called when the viewer should draw itself.
+	/// </summary>
+	/// <param name="time">Provides a snapshot of timing values.</param>
+	protected override void Draw(GameTime time)
+	{
+		base.Draw(time);
+
+		// overwrite the sidebar
+		// TODO clean this up, shouldn't need to overwrite but instead use an unified interface.
+		//      the problem probably is that explorer shouldn't be in charge of rendering, only
+		//      providing the Texture2D and this should be overridable in the update method
+		Graphics.SetRenderTarget(null);
+		Flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
+		           DepthStencilState.Default, RasterizerState.CullNone);
+
+		Flip.Draw(SideBuffer2, sidedest, SideBuffer2.Bounds, Color.White);
+		
+		Flip.End();
 	}
 }
 }

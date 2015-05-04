@@ -55,7 +55,7 @@ public class Simulation : Manipulator
 	public const bool UseOdometry = true;
 
 	/// <summary>
-	/// Every frame seen so far.
+	/// Every sidebar frame seen so far.
 	/// </summary>
 	public List<Texture2D> SidebarHistory;
 	
@@ -323,12 +323,14 @@ public class Simulation : Manipulator
 	}
 	
 	/// <summary>
-	/// This is called when the manipulator should draw itself.
+	/// This is called when the simulator should draw itself.
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	protected override void Draw(GameTime time)
 	{
 		base.Draw(time);
+
+		// FIXME make sure this works with the pause behaviour and doesn't unsync when using it
 
 		Texture2D frame = new Texture2D(Graphics, SideBuffer.Width, SideBuffer.Height);
 		Color[]   data  = new Color[SideBuffer.Width * SideBuffer.Height];
