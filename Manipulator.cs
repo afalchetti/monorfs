@@ -279,6 +279,8 @@ public abstract class Manipulator : Game
 		multiplier *= (fast) ? 2.0 : 1.0;
 		multiplier /= (slow) ? 4.0 : 1.0;
 		
+		if (keyboard.IsKeyDown(Keys.Delete)) { Exit(); }
+
 		if (keyboard.IsKeyDown(Keys.Up)) {
 			dcamangle += 0.06 * multiplier;
 		}

@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -11,6 +11,7 @@
     <AssemblyName>mono-rfs</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+    <SignAssembly>false</SignAssembly>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>x86</PlatformTarget>
@@ -21,16 +22,19 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Externalconsole>true</Externalconsole>
+    <ConsolePause>false</ConsolePause>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>x86</PlatformTarget>
-    <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>
-    </DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ConsolePause>false</ConsolePause>
+    <Externalconsole>true</Externalconsole>
   </PropertyGroup>
   <PropertyGroup>
     <RunPostBuildEvent>Always</RunPostBuildEvent>
@@ -39,47 +43,6 @@
     <StartupObject>monorfs.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Accord, Version=2.14.0.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL">
-      <Aliases>global</Aliases>
-    </Reference>
-    <Reference Include="Accord.Extensions.Core, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\applications\accord-net-extensions\bin\Release\Accord.Extensions.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="Accord.Extensions.Imaging.GenericImage, Version=2.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\applications\accord-net-extensions\bin\Release\Accord.Extensions.Imaging.GenericImage.dll</HintPath>
-    </Reference>
-    <Reference Include="Accord.Extensions.Imaging.IO">
-      <HintPath>..\..\..\..\applications\accord-net-extensions\bin\Release\Accord.Extensions.Imaging.IO.dll</HintPath>
-    </Reference>
-    <Reference Include="Accord.Imaging, Version=2.14.0.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL" />
-    <Reference Include="Accord.Math, Version=2.14.0.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL">
-      <Aliases>global</Aliases>
-    </Reference>
-    <Reference Include="Accord.Statistics, Version=2.14.0.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL">
-      <Aliases>global</Aliases>
-    </Reference>
-    <Reference Include="AForge, Version=2.2.5.0, Culture=neutral, PublicKeyToken=c1db6ff4eaa06aeb, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\applications\AForge.NET\Framework\Release\AForge.dll</HintPath>
-      <Aliases>global</Aliases>
-    </Reference>
-    <Reference Include="AForge.Imaging, Version=2.2.5.0, Culture=neutral, PublicKeyToken=ba8ddea9676ca48b, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\applications\AForge.NET\Framework\Release\AForge.Imaging.dll</HintPath>
-    </Reference>
-    <Reference Include="AForge.Math, Version=2.2.5.0, Culture=neutral, PublicKeyToken=abba2e25397ee8c9, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\applications\AForge.NET\Framework\Release\AForge.Math.dll</HintPath>
-      <Aliases>global</Aliases>
-    </Reference>
-    <Reference Include="MonoGame.Framework, Version=3.1.2.0, Culture=neutral, processorArchitecture=MSIL" />
-    <Reference Include="NiWrapper.Net">
-      <HintPath>..\libs\NiWrapper\NiWrapper.Net.dll</HintPath>
-    </Reference>
-    <Reference Include="nunit.framework, Version=2.6.3.13283, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL" />
-    <Reference Include="OpenTK, Version=1.1.0.0, Culture=neutral, PublicKeyToken=bad199fe84eb3df4, processorArchitecture=MSIL" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
@@ -88,7 +51,57 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
-    <Reference Include="Tao.Sdl, Version=1.2.13.0, Culture=neutral, PublicKeyToken=9c7a200e36c0094e, processorArchitecture=MSIL" />
+    <Reference Include="Accord">
+      <HintPath>packages\Accord.2.15.0\lib\net45\Accord.dll</HintPath>
+    </Reference>
+    <Reference Include="Accord.Math">
+      <HintPath>packages\Accord.Math.2.15.0\lib\net45\Accord.Math.dll</HintPath>
+    </Reference>
+    <Reference Include="Accord.Statistics">
+      <HintPath>packages\Accord.Statistics.2.15.0\lib\net45\Accord.Statistics.dll</HintPath>
+    </Reference>
+    <Reference Include="Accord.MachineLearning">
+      <HintPath>packages\Accord.MachineLearning.2.15.0\lib\net45\Accord.MachineLearning.dll</HintPath>
+    </Reference>
+    <Reference Include="Accord.Imaging">
+      <HintPath>packages\Accord.Imaging.2.15.0\lib\net45\Accord.Imaging.dll</HintPath>
+    </Reference>
+    <Reference Include="nunit.framework">
+      <HintPath>packages\NUnit.2.6.4\lib\nunit.framework.dll</HintPath>
+    </Reference>
+    <Reference Include="MonoGame.Framework">
+      <HintPath>packages\MonoGame.Framework.Linux.3.3.0.0\lib\net40\MonoGame.Framework.dll</HintPath>
+    </Reference>
+    <Reference Include="OpenTK">
+      <HintPath>packages\MonoGame.Framework.Linux.3.3.0.0\lib\net40\OpenTK.dll</HintPath>
+    </Reference>
+    <Reference Include="Tao.Sdl">
+      <HintPath>packages\MonoGame.Framework.Linux.3.3.0.0\lib\net40\Tao.Sdl.dll</HintPath>
+    </Reference>
+    <Reference Include="AForge">
+      <HintPath>packages\manual\AForge.NET Framework-2.2.5\Release\Mono\AForge.dll</HintPath>
+    </Reference>
+    <Reference Include="AForge.Imaging">
+      <HintPath>packages\manual\AForge.NET Framework-2.2.5\Release\Mono\AForge.Imaging.dll</HintPath>
+    </Reference>
+    <Reference Include="AForge.Math">
+      <HintPath>packages\manual\AForge.NET Framework-2.2.5\Release\Mono\AForge.Math.dll</HintPath>
+    </Reference>
+    <Reference Include="NiWrapper.Net">
+      <HintPath>packages\manual\NiWrapper.Net.x86.2.2.0.34\lib\NiWrapper.Net.dll</HintPath>
+    </Reference>
+    <Reference Include="Accord.Extensions.Core">
+      <HintPath>packages\manual\Accord.Net.Extensions\bin\Release\Accord.Extensions.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Accord.Extensions.Imaging.GenericImage">
+      <HintPath>packages\manual\Accord.Net.Extensions\bin\Release\Accord.Extensions.Imaging.GenericImage.dll</HintPath>
+    </Reference>
+    <Reference Include="Accord.Extensions.Imaging.IO">
+      <HintPath>packages\manual\Accord.Net.Extensions\bin\Release\Accord.Extensions.Imaging.IO.dll</HintPath>
+    </Reference>
+    <Reference Include="Accord.Extensions.Math">
+      <HintPath>packages\manual\Accord.Net.Extensions\bin\Release\Accord.Extensions.Math.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ArrayExtensions.cs" />
@@ -114,11 +127,18 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="packages.config" />
+    <None Include="OpenTK.dll.config" />
+    <None Include="Tao.Sdl.dll.config" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Import Project="packages\Accord.Extensions.Imaging.IO.2.0.0\build\Accord.Extensions.Imaging.IO.targets" Condition="Exists('packages\Accord.Extensions.Imaging.IO.2.0.0\build\Accord.Extensions.Imaging.IO.targets')" />
+  <Import Project="packages\Baseclass.Contrib.Nuget.Output.2.0.0\build\net40\Baseclass.Contrib.Nuget.Output.targets" Condition="Exists('packages\Baseclass.Contrib.Nuget.Output.2.0.0\build\net40\Baseclass.Contrib.Nuget.Output.targets')" />
+  <Import Project="packages\Baseclass.Contrib.Nuget.Output.1.0.7\build\net40\Baseclass.Contrib.Nuget.Output.targets" Condition="Exists('packages\Baseclass.Contrib.Nuget.Output.1.0.7\build\net40\Baseclass.Contrib.Nuget.Output.targets')" />
   <PropertyGroup>
-    <PostBuildEvent>xcopy $(ProjectDir)additional $(TargetDir) /E /Y /D</PostBuildEvent>
+    <PostBuildEvent Condition=" '$(OS)' == 'Windows_NT' ">xcopy $(ProjectDir)additional $(TargetDir) /E /Y /D</PostBuildEvent>
+    <PostBuildEvent Condition=" '$(OS)' != 'Windows_NT' ">cp -ru $(ProjectDir)additional/* $(TargetDir)</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

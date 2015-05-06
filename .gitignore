@@ -1,7 +1,9 @@
 # Output files
 bin/*
 obj/*
+packages/*
 *.suo
 *.user
+*.userprefs
 additional/*.oni
 additional/*.in
