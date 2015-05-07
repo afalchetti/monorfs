@@ -296,9 +296,9 @@ public class Viewer : Manipulator
 				image.CopyTo(data);
 
 				int h = 0;
-				for (int i = 0; i < image.Width; i++) {
 				for (int k = 0; k < image.Height; k++) {
-					linear[h] = new Color(data[k, i].B, data[k, i].G, data[k, i].R);
+				for (int i = 0; i < image.Width; i++) {
+					linear[h++] = new Color(data[k, i].R, data[k, i].G, data[k, i].B);
 				}
 				}
 
