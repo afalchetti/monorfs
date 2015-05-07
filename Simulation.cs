@@ -58,6 +58,11 @@ public class Simulation : Manipulator
 	/// Every sidebar frame seen so far.
 	/// </summary>
 	public List<Texture2D> SidebarHistory;
+
+	/// <summary>
+	/// Measurement history.
+	/// </summary>
+	public List<Tuple<double, List<double[]>>> WayMeasurements { get; private set; }
 	
 	/// <summary>
 	/// Get a string representation of the real trajectory of the vehicle.
@@ -93,6 +98,18 @@ public class Simulation : Manipulator
 	}
 
 	/// <summary>
+	/// Get a string representation of the measurements in every time step
+	/// </summary>
+	public string SerializedMeasurements
+	{
+		get
+		{
+			return string.Join("\n", WayMeasurements.ConvertAll(m => m.Item1.ToString("F6") + ":" + string.Join(";",
+			                                                         m.Item2.ConvertAll(x => string.Join(" ", x)))));
+		}
+	}
+
+	/// <summary>
 	/// Get a string representation of the map models of the best particle;
 	/// may jump along with the best particle.
 	/// </summary>
@@ -101,7 +118,7 @@ public class Simulation : Manipulator
 		get
 		{
 			return string.Join("\n|\n", Navigator.WayMaps.ConvertAll(m => m.Item1.ToString("F6") + "\n" + string.Join("\n",
-			                                                             m.Item2.ConvertAll(g => g.LinearSerialization))));
+			                                                              m.Item2.ConvertAll(g => g.LinearSerialization))));
 		}
 	}
 
@@ -124,8 +141,10 @@ public class Simulation : Manipulator
 	                  bool onlymapping, bool realtime, float[] mapclip)
 		: base(explorer, new Navigator(explorer, particlecount, onlymapping), particlecount, realtime, mapclip)
 	{
-		Commands       = commands;
-		SidebarHistory = new List<Texture2D>();
+		Commands        = commands;
+		SidebarHistory  = new List<Texture2D>();
+		WayMeasurements = new List<Tuple<double, List<double[]>>>();
+		WayMeasurements.Add(Tuple.Create(0.0, new List<double[]>()));
 	}
 
 	/// <summary>
@@ -298,6 +317,7 @@ public class Simulation : Manipulator
 
 			if (time.TotalGameTime - lastnavigationupdate.TotalGameTime >= MeasureElapsed) {
 				List<double[]> measurements = Explorer.Measure();
+				WayMeasurements.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, measurements));
 			
 				Navigator.SlamUpdate(time, measurements, DoPredict, DoCorrect, DoPrune);
 

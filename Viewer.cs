@@ -20,8 +20,9 @@ using Accord.Extensions.Imaging;
 using Accord.Math;
 using System.Text;
 
-using TimedState    = System.Collections.Generic.List<System.Tuple<double, double[]>>;
-using TimedMapModel = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
+using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
+using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
+using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
 
 namespace monorfs
 {
@@ -50,6 +51,12 @@ public class Viewer : Manipulator
 	/// The first entry of each tuple is a time point in seconds; the second is the map model.
 	/// </summary>
 	public TimedMapModel Map { get; private set; }
+
+	/// <summary>
+	/// Recorded vehicle sensed noisy measurements.
+	/// The first entry of each tuple is a time point in seconds; the second is the measurement list.
+	/// </summary>
+	public TimedMeasurements Measurements { get; private set; }
 
 	/// <summary>
 	/// Sidebar video filename.
@@ -126,13 +133,15 @@ public class Viewer : Manipulator
 	/// <param name="mapclip">Initial observable area in the form [left, right, bottom, top]</param>
 	/// <param name="sidebarfile">Sidebar video filename.</param>
 	public Viewer(SimulatedVehicle explorer, TimedState trajectory, TimedState estimate,
-	              TimedMapModel map, double fps, float[] mapclip, string sidebarfile)
+	              TimedMapModel map, TimedMeasurements measurements,
+	              double fps, float[] mapclip, string sidebarfile)
 		: base(explorer, new Navigator(explorer, 1, false), 1, false, mapclip, fps)
 	{
-		Trajectory = trajectory;
-		Estimate  = estimate;
-		Map        = map;
-		i          = 0;
+		Trajectory   = trajectory;
+		Estimate     = estimate;
+		Map          = map;
+		Measurements = measurements;
+		i            = 0;
 
 		vehiclewaypoints  = new List<double[]>();
 		estimatewaypoints = new List<double[]>();
@@ -143,6 +152,10 @@ public class Viewer : Manipulator
 
 		foreach (var point in estimate) {
 			estimatewaypoints.Add(new double[1] {point.Item1}.Concatenate(point.Item2));
+		}
+
+		while (Measurements.Count < map.Count) {
+			Measurements.Add(Tuple.Create(map[Measurements.Count].Item1, new List<double[]>()));
 		}
 
 		mapindices = new int[trajectory.Count];
@@ -168,20 +181,29 @@ public class Viewer : Manipulator
 	/// <param name="estimatefile">Vehicle trajectory estimation descriptor file.</param>
 	/// <param name="mapfile">Map estimation descriptor file.</param>
 	/// <param name="sidebarfile">Sidebar history video file.</param>
-	/// <param name="scenefile">Scene descriptor filename, may be null or empty.</param>
+	/// <param name="measurefile">Vehicle sensed measurements file, may be null or empty.</param>
+	/// <param name="scenefile">Scene descriptor file, may be null or empty.</param>
 	/// <returns>Prepared visualization object.</returns>
 	/// <remarks>All file must be previously sorted by time value. This property is assumed.</remarks>
-	public static Viewer FromFiles(string vehiclefile, string estimatefile, string mapfile, string sidebarfile = "", string scenefile = "")
+	public static Viewer FromFiles(string vehiclefile, string estimatefile, string mapfile, string sidebarfile = "", string measurefile = "", string scenefile = "")
 	{
-		SimulatedVehicle explorer;
-		TimedState       trajectory;
-		TimedState       estimate;
-		TimedMapModel    map;
-		float[]          mapclip;
+		SimulatedVehicle  explorer;
+		TimedState        trajectory;
+		TimedState        estimate;
+		TimedMapModel     map;
+		TimedMeasurements measurements;
+		float[]           mapclip;
 
-		trajectory = trajectoryFromDescriptor(File.ReadAllLines(vehiclefile),  7);
-		estimate   = trajectoryFromDescriptor(File.ReadAllLines(estimatefile), 3);
-		map        = mapHistoryFromDescriptor(File.ReadAllText(mapfile));
+		trajectory   = trajectoryFromDescriptor(File.ReadAllLines(vehiclefile),  7);
+		estimate     = trajectoryFromDescriptor(File.ReadAllLines(estimatefile), 3);
+		map          = mapHistoryFromDescriptor(File.ReadAllText(mapfile));
+
+		if (!string.IsNullOrEmpty(measurefile)) {
+			measurements = measurementsFromDescriptor(File.ReadAllText(measurefile));
+		}
+		else {
+			measurements = new TimedMeasurements();
+		}
 
 		if (!string.IsNullOrEmpty(scenefile)) {
 			explorer = VehicleFromSimFile(File.ReadAllText(scenefile), out mapclip);
@@ -191,7 +213,7 @@ public class Viewer : Manipulator
 			mapclip = new float[4] {-6, 6, -3, 3};
 		}
 
-		return new Viewer(explorer, trajectory, estimate, map, 30, mapclip, sidebarfile);
+		return new Viewer(explorer, trajectory, estimate, map, measurements, 30, mapclip, sidebarfile);
 	}
 
 	/// <summary>
@@ -270,6 +292,62 @@ public class Viewer : Manipulator
 			}
 
 			history.Add(new Tuple<double, List<Gaussian>>(time, mapFromDescriptor(lines.Submatrix(1, lines.Length - 1), dim)));
+		}
+
+		return history;
+	}
+
+	/// <summary>
+	/// Get a measurement history from a formatted string descriptor.
+	/// </summary>
+	/// <param name="descriptor">Formatted measurement history descriptor through time.</param>
+	/// <param name="dim">Expected world dimension.</param>
+	/// <returns>The measurement history, list of vectors representing point measurements as a function of discrete time
+	/// (time is delivered as the first entry of each tuple).</returns>
+	private static TimedMeasurements measurementsFromDescriptor(string descriptor, int dim = 3)
+	{
+		string[]          frames  = descriptor.Split('\n');
+		TimedMeasurements history = new TimedMeasurements();
+
+		foreach (string frame in frames) {
+			string[] parts = frame.Split(':');
+			double time    = -1;
+
+			if (parts.Length != 2) {
+				throw new FormatException("bad measurement format: no ':' delimiter found");
+			}
+
+			try {
+				time = double.Parse(parts[0]);
+			}
+			catch (FormatException) {
+				throw new FormatException("bad measurement format: missing time");
+			}
+
+			string[]       points       = parts[1].Split(';');
+			List<double[]> measurements = new List<double[]>();
+
+			foreach (string point in points) {
+				if (point == "") {
+					continue;
+				}
+
+				string[] strcomps   = point.Split(' ');
+				double[] components = new double[strcomps.Length];
+
+				for (int i = 0; i < strcomps.Length; i++) {
+					try {
+						components[i] = double.Parse(strcomps[i]);
+					}
+					catch (FormatException) {
+						throw new FormatException("bad measurement format: invalid point");
+					}
+				}
+
+				measurements.Add(components);
+			}
+
+			history.Add(Tuple.Create(time, measurements));
 		}
 
 		return history;
@@ -355,12 +433,17 @@ public class Viewer : Manipulator
 			Paused = true;
 		}
 
+		SideBuffer2            = SidebarHistory[i];
 		Explorer .State        = Trajectory[i].Item2;
-		Navigator.MapModels[0] = Map[mapindices[i]].Item2;
 		Explorer .Waypoints    = VehicleWaypoints;
 		Navigator.Waypoints    = EstimateWaypoints;
+		Navigator.MapModels[0] = Map[mapindices[i]].Item2;
 		Navigator.VehicleParticles[0].Waypoints = EstimateWaypoints;
-		SideBuffer2            = SidebarHistory[i];
+
+		Explorer.MappedMeasurements.Clear();
+		foreach (double[] z in Measurements[mapindices[i]].Item2) {
+			Explorer.MappedMeasurements.Add(Explorer.MeasureToMap(z));
+		}
 
 		Message = string.Format("time = {0,12:N4}        frame = {1,5:N0}", Trajectory[i].Item1, i);
 		

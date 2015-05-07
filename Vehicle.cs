@@ -148,7 +148,7 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// Cached measurements from the update process for rendering purposes.
 	/// </summary>
-	protected List<double[]> MappedMeasurements { get; set; }
+	public List<double[]> MappedMeasurements { get; set; }
 
 	/// <summary>
 	/// Construct a vehicle with default constants.
@@ -244,6 +244,14 @@ public abstract class Vehicle : IDisposable
 		Waypoints.Clear();
 		Waypoints.Add(new double[1] {0}.Concatenate(state));
 	}
+
+	/// <summary>
+	/// Transform a measurement vector in measurement space
+	/// into a map-space vector.
+	/// </summary>
+	/// <param name="measurement">Measurement in measurement space.</param>
+	/// <returns>Measurement iin map space.</returns>
+	public abstract double[] MeasureToMap(double[] measurement);
 
 	/// <summary>
 	/// Render the vehicle on the graphics device.

@@ -273,7 +273,33 @@ public class KinectVehicle : Vehicle
 			ColorMatrixToTexture(colorsensed, colorframe);
 		}
 
+		MappedMeasurements.Clear();
+		foreach (double[] z in measurements) {
+			MappedMeasurements.Add(MeasureToMap(z));
+		}
+
 		return measurements;
+	}
+
+	/// <summary>
+	/// Transform a measurement vector in measurement space (pixel-range)
+	/// into a map-space vector  (x-y plane).
+	/// </summary>
+	/// <param name="measurement">Measurement expressed as pixel-range.</param>
+	/// <returns>Measurement expressed in x-y plane.</returns>
+	public override double[] MeasureToMap(double[] measurement)
+	{
+		double   px    = measurement[0];
+		double   py    = measurement[1];
+		double   range = measurement[2];
+
+		double   alpha = range / Math.Sqrt(VisionFocal * VisionFocal + px * px + py * py);
+		double[] diff  = new double[3] {alpha * px, alpha * py, alpha * VisionFocal};
+
+		Quaternion rotated = Orientation *
+			new Quaternion((float) diff[0], (float) diff[1], (float) diff[2], 0) * Quaternion.Conjugate(Orientation);
+
+		return new double[3] {X + rotated.X, Y + rotated.Y, Z + rotated.Z};
 	}
 
 	/// <summary>

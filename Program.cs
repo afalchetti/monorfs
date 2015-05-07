@@ -135,6 +135,7 @@ public class Program
 		string estimatefile  = "";
 		string mapfile       = "";
 		string sidebarfile   = "";
+		string measurefile   = "";
 		string scenefile     = "";
 		string commandfile   = "";
 		int    particlecount = 1;
@@ -156,6 +157,7 @@ public class Program
 			{ "e|estimate=",   "Prerecorded estimation file.",                                 e       => estimatefile  = e },
 			{ "m|map=",        "Prerecorded map history file.",                                m       => mapfile       = m },
 			{ "b|sidebar=",    "Prerecorded sidebar video file.",                              b       => sidebarfile   = b },
+			{ "x|measure=",    "Prerecorded measurement history file.",                        m       => measurefile   = m },
 			{ "h|help",        "Show this message and exit",                                   h       => showhelp      = h != null }
 		};
 
@@ -180,7 +182,7 @@ public class Program
 		}
 
 		if (viewer) {
-			using (Viewer sim = Viewer.FromFiles(vehiclefile, estimatefile, mapfile, sidebarfile, scenefile)) {
+			using (Viewer sim = Viewer.FromFiles(vehiclefile, estimatefile, mapfile, sidebarfile, measurefile, scenefile)) {
 				sim.Run();
 			}
 		}
@@ -189,9 +191,10 @@ public class Program
 				sim.Run();
 
 				Console.WriteLine("writing output");
-				File.WriteAllText("trajectory.out", sim.SerializedTrajectory);
-				File.WriteAllText("estimate.out",   sim.SerializedEstimate);
-				File.WriteAllText("maps.out",       sim.SerializedMaps);
+				File.WriteAllText("trajectory.out",   sim.SerializedTrajectory);
+				File.WriteAllText("estimate.out",     sim.SerializedEstimate);
+				File.WriteAllText("maps.out",         sim.SerializedMaps);
+				File.WriteAllText("measurements.out", sim.SerializedMeasurements);
 				
 				Console.WriteLine("Writing snapshot");
 				SaveAsPng(sim.SceneBuffer, "final.png");

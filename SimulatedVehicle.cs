@@ -299,12 +299,12 @@ public class SimulatedVehicle : Vehicle
 	}
 
 	/// <summary>
-	/// Transform a measurement vector in measure-space (pixel-range)
-	/// into a map-space vector  (x-y plane)
+	/// Transform a measurement vector in measurement space (pixel-range)
+	/// into a map-space vector  (x-y plane).
 	/// </summary>
 	/// <param name="measurement">Measurement expressed as pixel-range.</param>
-	/// <returns>Measurement expressed in x-y plane</returns>
-	public double[] MeasureToMap(double[] measurement)
+	/// <returns>Measurement expressed in x-y plane.</returns>
+	public override double[] MeasureToMap(double[] measurement)
 	{
 		double   px    = measurement[0];
 		double   py    = measurement[1];
