@@ -17,6 +17,10 @@ using AForge;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using NUnit.Framework;
+using System.Timers;
+
+using TimedState    = System.Collections.Generic.List<System.Tuple<double, double[]>>;
+using TimedMapModel = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
 
 namespace monorfs
 {
@@ -91,16 +95,6 @@ public class Navigator
 	private List<double[]>[] toexplore;
 
 	/// <summary>
-	/// Expected number of landmarks after the prediction step.
-	/// </summary>
-	private double[] mpredicted;
-
-	/// <summary>
-	/// Expected number of landmarks after the correction step.
-	/// </summary>
-	private double[] mcorrected;
-
-	/// <summary>
 	/// Index of the particle with the biggest weight.
 	/// </summary>
 	public int BestParticle { get; private set; }
@@ -152,7 +146,7 @@ public class Navigator
 	/// <summary>
 	/// Best map history.
 	/// </summary>
-	public List<Tuple<double, List<Gaussian>>> WayMaps { get; private set; }
+	public TimedMapModel WayMaps { get; private set; }
 
 	/// <summary>
 	/// Construct a Navigator using the indicated vehicle as a reference.
@@ -187,15 +181,13 @@ public class Navigator
 			toexplore       [i] = new List<double[]>();
 		}
 
-		mpredicted   = new double[particlecount];
-		mcorrected   = new double[particlecount];
 		BestParticle = 0;
 
 		Waypoints = new List<double[]>();
 		Waypoints.Add(new double[4] {0, vehicle.X, vehicle.Y, vehicle.Z});
 
-		WayMaps = new List<Tuple<double, List<Gaussian>>>();
-		WayMaps.Add(new Tuple<double, List<Gaussian>>(0, new List<Gaussian>()));
+		WayMaps = new TimedMapModel();
+		WayMaps.Add(Tuple.Create(0.0, new List<Gaussian>()));
 
 		const int segments = 32;
 		pinterval = new double[segments][];
@@ -256,8 +248,6 @@ public class Navigator
 			toexplore       [i] = new List<double[]>(prevexplore);
 		}
 
-		mpredicted   = new double[particlecount];
-		mcorrected   = new double[particlecount];
 		BestParticle = 0;
 	}
 
@@ -286,8 +276,8 @@ public class Navigator
 		Waypoints = new List<double[]>();
 		Waypoints.Add(new double[4] {0, VehicleParticles[BestParticle].X, VehicleParticles[BestParticle].Y, VehicleParticles[BestParticle].Z});
 
-		WayMaps = new List<Tuple<double, List<Gaussian>>>();
-		WayMaps.Add(new Tuple<double, List<Gaussian>>(0, new List<Gaussian>()));
+		WayMaps = new TimedMapModel();
+		WayMaps.Add(Tuple.Create(0.0, new List<Gaussian>()));
 	}
 
 	/// <summary>
@@ -317,16 +307,7 @@ public class Navigator
 		}
 
 		Vehicle best = VehicleParticles[BestParticle];
-		
-		double[] prevloc = new double[3] {Waypoints[Waypoints.Count - 1][1],
-		                                  Waypoints[Waypoints.Count - 1][2],
-		                                  Waypoints[Waypoints.Count - 1][3]};
-		
-		 // FIXME this "too close to matter" efficiency option is disabled as a workaround to make
-		// viewer work smoothly but should eventually be reinstated and a smarter interpolation should be done there
-		//if (best.Location.Subtract(prevloc).SquareEuclidean() >= 1e-2f) {
-			Waypoints.Add(new double[4] {time.TotalGameTime.TotalSeconds, best.X, best.Y, best.Z});
-		//}
+		Waypoints.Add(new double[4] {time.TotalGameTime.TotalSeconds, best.X, best.Y, best.Z});
 	}
 
 	/// <summary>
@@ -373,7 +354,7 @@ public class Navigator
 			}
 		}
 
-		WayMaps.Add(new Tuple<double, List<Gaussian>>(time.TotalGameTime.TotalSeconds, MapModels[BestParticle]));
+		WayMaps.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, MapModels[BestParticle]));
 	}
 
 	/// <summary>
@@ -891,8 +872,6 @@ public class Navigator
 
 		double[,]  rotation = decomp.Eigenvectors;
 		double[][] linear   = rotation.Multiply(stddev).ToArray();
-
-		double[][] recover = linear.Multiply(linear);
 
 		if (linear.Determinant() < 0) {
 			linear = linear.ReverseColumns();

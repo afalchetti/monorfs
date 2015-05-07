@@ -183,16 +183,7 @@ public class SimulatedVehicle : Vehicle
 		State       = State.Add(time.ElapsedGameTime.TotalSeconds.Multiply(
 		                             U.RandomGaussianVector(new double[7] {0, 0, 0, 0, 0, 0, 0}, MotionCovariance)));
 		Orientation = Quaternion.Normalize(Orientation);
-
-		double[] prevloc = new double[3] {Waypoints[Waypoints.Count - 1][1],
-		                                  Waypoints[Waypoints.Count - 1][2],
-		                                  Waypoints[Waypoints.Count - 1][3]};
-
-		 // FIXME this "too close to matter" efficiency option is disabled as a workaround to make
-		// viewer work smoothly but should eventually be reinstated and a smarter interpolation should be done there
-		//if (Location.Subtract(prevloc).SquareEuclidean() >= 1e-2f) {
-			Waypoints.Add(new double[1] {time.TotalGameTime.TotalSeconds}.Concatenate(State));
-		//}
+		Waypoints.Add(new double[1] {time.TotalGameTime.TotalSeconds}.Concatenate(State));
 	}
 	
 	/// <summary>

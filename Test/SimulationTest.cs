@@ -82,7 +82,6 @@ class SimulationTest
 		double   dyaw    = autocmd[1];
 		double   dpitch  = autocmd[2];
 		double   droll   = autocmd[3];
-		double   dcam    = autocmd[4];
 
 		explorer .Update(time, 0, 0, ds, dyaw, dpitch, droll);
 		navigator.Update(time, 0, 0, ds, dyaw, dpitch, droll);

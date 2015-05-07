@@ -497,8 +497,6 @@ public class SparseMatrix : IEnumerable<SparseItem>
 		return Compact(out rows, out columns);
 	}
 
-	private object xlock = new object();
-
 	/// <summary>
 	/// Remove all empty rows and columns and then reindex the remaining data.
 	/// </summary>

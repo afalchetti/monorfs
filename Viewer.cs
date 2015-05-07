@@ -262,7 +262,7 @@ public class Viewer : Manipulator
 			double   time  = values[0];
 			double[] state = values.Submatrix(1, values.Length - 1);
 
-			trajectory.Add(new Tuple<double, double[]>(time, state));
+			trajectory.Add(Tuple.Create(time, state));
 		}
 
 		return trajectory;
@@ -291,7 +291,7 @@ public class Viewer : Manipulator
 				throw new FormatException("bad map format: missing time");
 			}
 
-			history.Add(new Tuple<double, List<Gaussian>>(time, mapFromDescriptor(lines.Submatrix(1, lines.Length - 1), dim)));
+			history.Add(Tuple.Create(time, mapFromDescriptor(lines.Submatrix(1, lines.Length - 1), dim)));
 		}
 
 		return history;

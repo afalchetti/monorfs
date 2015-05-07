@@ -19,6 +19,8 @@ using Microsoft.Xna.Framework.Input;
 using Accord.Math;
 using System.Text;
 
+using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
+
 namespace monorfs
 {
 /// <summary>
@@ -62,7 +64,7 @@ public class Simulation : Manipulator
 	/// <summary>
 	/// Measurement history.
 	/// </summary>
-	public List<Tuple<double, List<double[]>>> WayMeasurements { get; private set; }
+	public TimedMeasurements WayMeasurements { get; private set; }
 	
 	/// <summary>
 	/// Get a string representation of the real trajectory of the vehicle.
@@ -143,7 +145,7 @@ public class Simulation : Manipulator
 	{
 		Commands        = commands;
 		SidebarHistory  = new List<Texture2D>();
-		WayMeasurements = new List<Tuple<double, List<double[]>>>();
+		WayMeasurements = new TimedMeasurements();
 		WayMeasurements.Add(Tuple.Create(0.0, new List<double[]>()));
 	}
 
