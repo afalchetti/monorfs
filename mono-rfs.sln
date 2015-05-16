@@ -5,6 +5,8 @@ VisualStudioVersion = 12.0.21005.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "mono-rfs", "mono-rfs.csproj", "{4CDBBDE8-05E3-4F78-A4EC-2945427BDD7B}"
 EndProject
+Project("{2857B73E-F847-4B02-9238-064979017E93}") = "isam2", "isam2\isam2.cproj", "{55AB62F6-DA11-4F72-8D9F-FA95F677E3FD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{4CDBBDE8-05E3-4F78-A4EC-2945427BDD7B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4CDBBDE8-05E3-4F78-A4EC-2945427BDD7B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4CDBBDE8-05E3-4F78-A4EC-2945427BDD7B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{55AB62F6-DA11-4F72-8D9F-FA95F677E3FD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{55AB62F6-DA11-4F72-8D9F-FA95F677E3FD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{55AB62F6-DA11-4F72-8D9F-FA95F677E3FD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{55AB62F6-DA11-4F72-8D9F-FA95F677E3FD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(MonoDevelopProperties) = preSolution
 		Policies = $0

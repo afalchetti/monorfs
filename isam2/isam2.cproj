@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{55AB62F6-DA11-4F72-8D9F-FA95F677E3FD}</ProjectGuid>
+    <Compiler>
+      <Compiler ctype="GppCompiler" />
+    </Compiler>
+    <Language>CPP</Language>
+    <Target>Bin</Target>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\Debug</OutputPath>
+    <OutputName>isam2</OutputName>
+    <CompileTarget>SharedLibrary</CompileTarget>
+    <DefineSymbols>DEBUG MONODEVELOP</DefineSymbols>
+    <SourceDirectory>.</SourceDirectory>
+    <Includes>
+      <Includes>
+        <Include>${ProjectDir}/gtsam/include</Include>
+      </Includes>
+    </Includes>
+    <Libs>
+      <Libs>
+        <Lib>boost_system</Lib>
+        <Lib>tbb</Lib>
+        <Lib>tbbmalloc</Lib>
+        <Lib>:libgtsam.so.3.2.1</Lib>
+      </Libs>
+    </Libs>
+    <Externalconsole>true</Externalconsole>
+    <ExtraLinkerArguments>-Wl,-rpath='$ORIGIN'</ExtraLinkerArguments>
+    <ExtraCompilerArguments>-std=c++11</ExtraCompilerArguments>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <OutputPath>bin\Release</OutputPath>
+    <OutputName>isam2</OutputName>
+    <CompileTarget>SharedLibrary</CompileTarget>
+    <OptimizationLevel>3</OptimizationLevel>
+    <DefineSymbols>MONODEVELOP</DefineSymbols>
+    <SourceDirectory>.</SourceDirectory>
+    <Includes>
+      <Includes>
+        <Include>${ProjectDir}/gtsam/include</Include>
+      </Includes>
+    </Includes>
+    <Libs>
+      <Libs>
+        <Lib>boost_system</Lib>
+        <Lib>tbb</Lib>
+        <Lib>tbbmalloc</Lib>
+        <Lib>:libgtsam.so.3.2.1</Lib>
+      </Libs>
+    </Libs>
+    <Externalconsole>true</Externalconsole>
+    <ExtraCompilerArguments>-std=c++11</ExtraCompilerArguments>
+    <ExtraLinkerArguments>-Wl,-rpath='$ORIGIN'</ExtraLinkerArguments>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="isam2.cpp" />
+    <Compile Include="PixelRangeFactor.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="PixelRangeFactor.h" />
+  </ItemGroup>
+  <ProjectExtensions>
+    <MonoDevelop>
+      <Properties>
+        <Policies>
+          <TextStylePolicy TabsToSpaces="False" inheritsSet="VisualStudio" inheritsScope="text/plain" scope="text/x-c++src" />
+          <TextStylePolicy TabsToSpaces="False" RemoveTrailingWhitespace="False" inheritsSet="VisualStudio" inheritsScope="text/plain" scope="text/plain" />
+        </Policies>
+      </Properties>
+    </MonoDevelop>
+  </ProjectExtensions>
+</Project>

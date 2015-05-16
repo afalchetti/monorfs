@@ -1,0 +1,7 @@
+// build output
+bin/*
+obj/*
+*.md.pc
+
+//library complete folder
+gtsam/*
