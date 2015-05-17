@@ -14,15 +14,19 @@
 #include <gtsam/nonlinear/Values.h>
 #include <gtsam/nonlinear/ISAM2.h>
 #include <gtsam/slam/PriorFactor.h>
+#include <gtsam/slam/BetweenFactor.h>
 #include "PixelRangeFactor.h"
 
 #include <vector>
 
 using namespace std;
 using namespace gtsam;
+using namespace boost;
 using namespace monorfs;
 
 extern "C" {
+typedef boost::shared_ptr<noiseModel::Base> Noise;
+
 typedef struct {
 	int                  t;
 	int                  tlength;
@@ -34,8 +38,8 @@ typedef struct {
 	NonlinearFactorGraph graph;
 	Values               estimate;
 	double               focal;
-
-	noiseModel::Isotropic::shared_ptr measurementNoise;
+	Noise                measurementnoise;
+	Noise                motionnoise;
 } ISAM2Navigator;
 
 // write a pose state into a list;
@@ -84,14 +88,22 @@ Pose3 unmarshalpose(const double* list, const int n)
 
 // create a new isam2 slam solver with
 // all its necessary context
-ISAM2Navigator* newnavigator(double* measurementnoise, double focal)
+// the motion noise format is [syaw, spitch, sroll, sx, sy, sz] (in local coords)
+// the measurement noise format is [sx, sy, srange]
+ISAM2Navigator* newnavigator(double* measurementnoise, double* motionnoise, double focal)
 {
+	Vector3 measurementsigma;
+	Vector6 motionsigma;
+
+	measurementsigma << measurementnoise[0], measurementnoise[1], measurementnoise[2];
+	motionsigma << motionnoise[0], motionnoise[1], motionnoise[2],
+	               motionnoise[3], motionnoise[4], motionnoise[5];
+	
 	ISAM2Navigator* navigator =
 	    new ISAM2Navigator{0, 1, 0, vector<double>{0.0, 0.0, 0.0}, vector<double>(), vector<int>(),
 	                       ISAM2(), NonlinearFactorGraph(), Values(), focal,
-	                       noiseModel::Isotropic::Sigma(measurementnoise[0],
-	                                                    measurementnoise[1],
-	                                                    measurementnoise[2])};
+	                       noiseModel::Diagonal::Sigmas(measurementsigma),
+	                       noiseModel::Diagonal::Sigmas(motionsigma)};
 	
 	Pose3 initpose = Pose3(Rot3(Quaternion(1, 0, 0, 0)), Point3(0, 0, 0));
 	noiseModel::Diagonal::shared_ptr posenoise =
@@ -110,11 +122,13 @@ void deletenavigator(ISAM2Navigator* navigator)
 }
 
 // update the navigator estimate using new information:
-// a measurement list from the last step;
+// odometry and  measurement lists from the last step;
+// 'odometry' format is an array with [dx, dy, dz, dyaw, dpitch, droll]
+// in loca coordinates;
 // 'measurements' format must be a 3*n double array with the
 // x-y-z coordinates for each one of them;
 // each measurement must be associated to a labeled (int) landmark;
-void update(ISAM2Navigator* navigator, double* measurements, int* labels, int nmeasurements)
+void update(ISAM2Navigator* navigator, double* odometry, double* measurements, int* labels, int nmeasurements)
 {
 	// add new measurements
 	for (int i = 0, k = 0; i < nmeasurements; ++i, k += 4) {
@@ -125,7 +139,16 @@ void update(ISAM2Navigator* navigator, double* measurements, int* labels, int nm
 
 		navigator->graph.push_back(PixelRangeFactor(Symbol('x', navigator->t), Symbol('l', l),
 		                                            px, py, range,
-		                                            navigator->measurementNoise, navigator->focal));
+		                                            navigator->measurementnoise, navigator->focal));
+	}
+
+	if (odometry != nullptr) {
+		Pose3 delta(Rot3::ypr(odometry[3], odometry[4], odometry[5]),
+	                Point3(odometry[0], odometry[1], odometry[2]));
+	    
+		navigator->graph.push_back(BetweenFactor<Pose3>(Symbol('x', navigator->t),
+		                                                Symbol('x', navigator->t - 1),
+		                                                delta, navigator->motionnoise));
 	}
 
 	// add new estimate for new pose (estimate using last pose)
