@@ -91,7 +91,7 @@ class SimulationTest
 			List<double[]> measurements = explorer.Measure();
 			measurehook();
 			
-			navigator.SlamUpdate(time, measurements, true, true, true);
+			navigator.SlamUpdate(time, measurements);
 			slamhook();
 
 			lastnavigationupdate = new GameTime(time.TotalGameTime, time.ElapsedGameTime);

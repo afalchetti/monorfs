@@ -184,16 +184,7 @@ public abstract class Navigator
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
-	/// <param name="predict">Predict flag; if false, no prediction step is done.</param>
-	/// <param name="correct">Correct flag; if false, no correction step is done.</param>
-	/// <param name="prune">Prune flag; if false, no prune step is done.</param>
-	public abstract void SlamUpdate(GameTime time, List<double[]> measurements,
-	                                bool predict, bool correct, bool prune);
-	// FIXME predict, correct, prune should NOT be arguments as it is not general to all Navigators
-	//       and honestly, they are not used anymore, they were useful as debugging while coding this
-	//       but now it's done and works perfectly (maybe add them as an optional alternative
-	//       for PHDNavigator debugging).
-	//       I think they can be removed (or put as configuration constants)
+	public abstract void SlamUpdate(GameTime time, List<double[]> measurements);
 	
 	/// <summary>
 	/// Update the trajectory history with the

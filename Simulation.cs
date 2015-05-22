@@ -304,10 +304,6 @@ public class Simulation : Manipulator
 				commandindex = 0;
 			}
 
-			bool DoPredict = !keyboard.IsKeyDown(Keys.P);
-			bool DoCorrect = !keyboard.IsKeyDown(Keys.C);
-			bool DoPrune   = !keyboard.IsKeyDown(Keys.Q);
-
 			Explorer.Update(time, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
 
 			if (UseOdometry) {
@@ -321,7 +317,7 @@ public class Simulation : Manipulator
 				List<double[]> measurements = Explorer.Measure();
 				WayMeasurements.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, measurements));
 			
-				Navigator.SlamUpdate(time, measurements, DoPredict, DoCorrect, DoPrune);
+				Navigator.SlamUpdate(time, measurements);
 
 				lastnavigationupdate = new GameTime(time.TotalGameTime, time.ElapsedGameTime);
 			}
