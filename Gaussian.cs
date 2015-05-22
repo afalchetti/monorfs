@@ -136,6 +136,40 @@ public class Gaussian
 	}
 
 	/// <summary>
+	/// Queries if two gaussians are close to each other taking their
+	/// "standard deviation" and a given threshold into consideration.
+	/// </summary>
+	/// <param name="a">First gaussian.</param>
+	/// <param name="b">Second gaussian.</param>
+	/// <returns>True if the gaussians are close enough to merge; false otherwise.</returns>
+	public static bool AreClose(Gaussian a, Gaussian b, double threshold)
+	{
+		return a.MahalanobisSquared(b.Mean) < threshold * threshold;
+	}
+
+	/// <summary>
+	/// Obtain the Mahalanobis distance between the gaussian distribution and a point.
+	/// </summary>
+	/// <param name="point">Point in R^N space.</param>
+	/// <returns>Distance between distribution and point.</returns>
+	public double Mahalanobis(double[] point)
+	{
+		double[] diff = Mean.Subtract(point);
+		return Math.Sqrt(Accord.Math.Matrix.InnerProduct(diff, CovarianceInverse.Multiply(diff)));
+	}
+
+	/// <summary>
+	/// Obtain the squared Mahalanobis distance between the gaussian distribution and a point.
+	/// </summary>
+	/// <param name="point">Point in R^N space.</param>
+	/// <returns>Squared distance between distribution and point.</returns>
+	public double MahalanobisSquared(double[] point)
+	{
+		double[] diff = Mean.Subtract(point);
+		return Accord.Math.Matrix.InnerProduct(diff, CovarianceInverse.Multiply(diff));
+	}
+
+	/// <summary>
 	/// Get a linear string representation in column-major order.
 	/// </summary>
 	public string LinearSerialization

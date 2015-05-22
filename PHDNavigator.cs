@@ -360,7 +360,7 @@ public class PHDNavigator : Navigator
 
 		for (int i = 0; i < zprobs.Length;      i++) {
 		for (int k = 0; k < measurements.Count; k++) {
-			double d = Mahalanobis(zprobs[i], measurements[k]);
+			double d = zprobs[i].Mahalanobis(measurements[k]);
 			if (d < 3) {
 				// prob = log (pD * zprob(measurement))
 				// this way multiplying probabilities equals to adding (negative) profits
@@ -586,7 +586,7 @@ public class PHDNavigator : Navigator
 			}
 
 			for (int i = 0; i < q.Length; i++) {
-				if (Mahalanobis(q[i], measurement) > 3) {
+				if (q[i].Mahalanobis(measurement) > 3) {
 					continue;
 				}
 
@@ -625,7 +625,7 @@ public class PHDNavigator : Navigator
 			close     = new List<Gaussian>();
 
 			for (int k = i + 1; k < Math.Min(MaxQuantity, model.Count); k++) {
-				if (AreClose(model[i], model[k])) {
+				if (Gaussian.AreClose(model[i], model[k], MergeThreshold)) {
 					close.Add(model[k]);
 					model.RemoveAt(k--);
 				}
@@ -639,18 +639,6 @@ public class PHDNavigator : Navigator
 		}
 
 		return pruned;
-	}
-
-	/// <summary>
-	/// Queries if two gaussians are close to each other taking their
-	/// "standard deviation" and a given threshold into consideration.
-	/// </summary>
-	/// <param name="a">First gaussian.</param>
-	/// <param name="b">Second gaussian.</param>
-	/// <returns>True if the gaussians are close enough to merge; false otherwise.</returns>
-	private bool AreClose(Gaussian a, Gaussian b)
-	{
-		return Mahalanobis(a, b.Mean) < MergeThreshold;
 	}
 
 	/// <summary>
@@ -681,33 +669,6 @@ public class PHDNavigator : Navigator
 		covariance = covariance.Divide(weight);
 
 		return new Gaussian(mean, covariance, weight);
-	}
-
-	// FIXME Mahalanobis(), M...Squared() and AreClose() should probably be on
-	//       the Gaussian class
-
-	/// <summary>
-	/// Obtain the Mahalanobis distance between a gaussian distribution and a point.
-	/// </summary>
-	/// <param name="distribution">Gaussian distribution in R^N space.</param>
-	/// <param name="point">Point in R^N space.</param>
-	/// <returns>Distance between distribution and point.</returns>
-	private double Mahalanobis(Gaussian distribution, double[] point)
-	{
-		double[] diff = distribution.Mean.Subtract(point);
-		return Math.Sqrt(Accord.Math.Matrix.InnerProduct(diff, distribution.CovarianceInverse.Multiply(diff)));
-	}
-
-	/// <summary>
-	/// Obtain the squared Mahalanobis distance between a gaussian distribution and a point.
-	/// </summary>
-	/// <param name="distribution">Gaussian distribution in R^N space.</param>
-	/// <param name="point">Point in R^N space.</param>
-	/// <returns>Distance between distribution and point.</returns>
-	private double MahalanobisSquared(Gaussian distribution, double[] point)
-	{
-		double[] diff = distribution.Mean.Subtract(point);
-		return Accord.Math.Matrix.InnerProduct(diff, distribution.CovarianceInverse.Multiply(diff));
 	}
 
 	/// <summary>
