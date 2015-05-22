@@ -27,7 +27,7 @@ class SimulationTest
 {
 	private Simulation               simulation;
 	private Vehicle                  explorer;
-	private Navigator                navigator;
+	private PHDNavigator             navigator;
 	private GameTime                 lastnavigationupdate;
 	private CircularBuffer<double[]> commands;
 
@@ -48,7 +48,7 @@ class SimulationTest
 			simulation = Simulation.FromFiles("test.world", "test.in", 1, false, true, false);
 			commands   = simulation.Commands;
 			explorer   = simulation.Explorer;
-			navigator  = simulation.Navigator;
+			navigator  = simulation.Navigator as PHDNavigator;
 		}
 		catch (Exception) {
 			if (simulation != null) {

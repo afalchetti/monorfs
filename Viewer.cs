@@ -135,7 +135,7 @@ public class Viewer : Manipulator
 	public Viewer(SimulatedVehicle explorer, TimedState trajectory, TimedState estimate,
 	              TimedMapModel map, TimedMeasurements measurements,
 	              double fps, float[] mapclip, string sidebarfile)
-		: base(explorer, new Navigator(explorer, 1, false), 1, false, mapclip, fps)
+		: base(explorer, new PHDNavigator(explorer, 1, false), false, mapclip, fps)
 	{
 		Trajectory   = trajectory;
 		Estimate     = estimate;
@@ -437,8 +437,8 @@ public class Viewer : Manipulator
 		Explorer .State        = Trajectory[i].Item2;
 		Explorer .Waypoints    = VehicleWaypoints;
 		Navigator.Waypoints    = EstimateWaypoints;
-		Navigator.MapModels[0] = Map[mapindices[i]].Item2;
-		Navigator.VehicleParticles[0].Waypoints = EstimateWaypoints;
+		Navigator.BestMapModel = Map[mapindices[i]].Item2;
+		Navigator.BestEstimate.Waypoints = EstimateWaypoints;
 
 		Explorer.MappedMeasurements.Clear();
 		foreach (double[] z in Measurements[mapindices[i]].Item2) {

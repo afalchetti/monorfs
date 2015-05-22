@@ -37,11 +37,6 @@ public abstract class Manipulator : Game
 	public Navigator Navigator { get; private set; }
 
 	/// <summary>
-	/// Number of localization Montecarlo filter particles.
-	/// </summary>
-	public int ParticleCount { get; private set; }
-
-	/// <summary>
 	/// Frame period (frames per second inverse).
 	/// </summary>
 	public readonly TimeSpan FrameElapsed;
@@ -146,11 +141,10 @@ public abstract class Manipulator : Game
 	/// <summary>
 	/// Construct a Manipulator from its components.
 	/// </summary>
-	public Manipulator(Vehicle explorer, Navigator navigator, int particlecount, bool realtime, float[] mapclip, double fps = 30)
+	public Manipulator(Vehicle explorer, Navigator navigator, bool realtime, float[] mapclip, double fps = 30)
 	{
 		Explorer      = explorer;
 		Navigator     = navigator;
-		ParticleCount = particlecount;
 		Realtime      = realtime;
 		MapClip       = mapclip;
 

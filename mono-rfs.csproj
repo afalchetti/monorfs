@@ -125,6 +125,7 @@
     <Compile Include="Util.cs" />
     <Compile Include="SimulatedVehicle.cs" />
     <Compile Include="Vehicle.cs" />
+    <Compile Include="PHDNavigator.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

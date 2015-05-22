@@ -141,7 +141,7 @@ public class Simulation : Manipulator
 	/// <param name="mapclip">Initial observable area in the form [left, right, bottom, top]</param>
 	public Simulation(Vehicle explorer, CircularBuffer<double[]> commands, int particlecount,
 	                  bool onlymapping, bool realtime, float[] mapclip)
-		: base(explorer, new Navigator(explorer, particlecount, onlymapping), particlecount, realtime, mapclip)
+		: base(explorer, new PHDNavigator(explorer, particlecount, onlymapping), realtime, mapclip)
 	{
 		Commands        = commands;
 		SidebarHistory  = new List<Texture2D>();
@@ -332,11 +332,11 @@ public class Simulation : Manipulator
 			}
 
 			if (forcereset) {
-				Navigator.ResetModels();
+				Navigator.ResetMapModel();
 			}
 
 			if (forceslam) {
-				Navigator.StartSlam(ParticleCount);
+				Navigator.StartSlam();
 			}
 			else if (forcemapping) {
 				Navigator.StartMapping();
