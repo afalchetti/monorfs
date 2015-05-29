@@ -27,6 +27,24 @@ namespace monorfs
 public abstract class Vehicle : IDisposable
 {
 	/// <summary>
+	/// Motion model covariance matrix.
+	/// </summary>
+	public double[][] MotionCovariance = new double[7][] {new double[7] {5e-3, 0, 0, 0, 0, 0, 0},
+	                                                      new double[7] {0, 5e-3, 0, 0, 0, 0, 0},
+	                                                      new double[7] {0, 0, 5e-3, 0, 0, 0, 0},
+	                                                      new double[7] {0, 0, 0, 2e-4, 0, 0, 0},
+	                                                      new double[7] {0, 0, 0, 0, 2e-4, 0, 0},
+	                                                      new double[7] {0, 0, 0, 0, 0, 2e-4, 0},
+	                                                      new double[7] {0, 0, 0, 0, 0, 0, 2e-4}};
+
+	/// <summary>
+	/// Measurement model covariance matrix.
+	/// </summary>
+	public double[][] MeasurementCovariance = new double[3][] {new double[3] {2e-1, 0, 0},
+	                                                           new double[3] {0, 2e-1, 0},
+	                                                           new double[3] {0, 0, 2e-4}};
+	
+	/// <summary>
 	/// Internal vehicle pose state.
 	/// </summary>
 	private double[] state;
@@ -252,6 +270,19 @@ public abstract class Vehicle : IDisposable
 	/// <param name="measurement">Measurement in measurement space.</param>
 	/// <returns>Measurement iin map space.</returns>
 	public abstract double[] MeasureToMap(double[] measurement);
+
+	/// <summary>
+	/// Compute the difference between the state of two vehicles.
+	/// </summary>
+	/// <returns>State difference in 'b' local coordinates: (dx, dy, dz, dyaw, dpitch, droll),
+	/// such that b + ds = a.</returns>
+	/// <param name="a">Final vehicle.</param>
+	/// <param name="b">Start vehicle.</param>
+	public static double[] StateDiff(Vehicle a, Vehicle b)
+	{
+		// TODO implement this
+		return new double[6];
+	}
 
 	/// <summary>
 	/// Render the vehicle on the graphics device.

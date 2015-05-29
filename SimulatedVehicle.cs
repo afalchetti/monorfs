@@ -32,24 +32,6 @@ namespace monorfs
 public class SimulatedVehicle : Vehicle
 {
 	/// <summary>
-	/// Motion model covariance matrix.
-	/// </summary>
-	public readonly double[][] MotionCovariance = new double[7][] {new double[7] {5e-3, 0, 0, 0, 0, 0, 0},
-	                                                               new double[7] {0, 5e-3, 0, 0, 0, 0, 0},
-	                                                               new double[7] {0, 0, 5e-3, 0, 0, 0, 0},
-	                                                               new double[7] {0, 0, 0, 2e-4, 0, 0, 0},
-	                                                               new double[7] {0, 0, 0, 0, 2e-4, 0, 0},
-	                                                               new double[7] {0, 0, 0, 0, 0, 2e-4, 0},
-	                                                               new double[7] {0, 0, 0, 0, 0, 0, 2e-4}};
-
-	/// <summary>
-	/// Measurement model covariance matrix.
-	/// </summary>
-	public readonly double[][] MeasurementCovariance = new double[3][] {new double[3] {2e-1,  0, 0},
-	                                                                    new double[3] {0,  2e-1, 0},
-	                                                                    new double[3] {0, 0, 2e-4}};
-
-	/// <summary>
 	/// Probability of detection.
 	/// </summary>
 	private readonly double detectionProbability = 0.9;

@@ -27,7 +27,7 @@ namespace monorfs
 /// <summary>
 /// Abstract SLAM solver.
 /// </summary>
-public abstract class Navigator
+public abstract class Navigator : IDisposable
 {
 	/// <summary>
 	/// Reference vehicle. Only used if mapping mode is enabled (no localization).
@@ -311,5 +311,10 @@ public abstract class Navigator
 		Graphics.DrawUserIndexedPrimitives(PrimitiveType.TriangleStrip, vertices, 0, vertices.Length, index, 0, vertices.Length - 2);
 		Graphics.DrawUser2DPolygon(points, (float) weight, outcolor, true);
 	}
+
+	/// <summary>
+	/// Dispose of any resources.
+	/// </summary>
+	public virtual void Dispose() {}
 }
 }

@@ -488,6 +488,10 @@ public abstract class Manipulator : Game
 				Explorer.Dispose();
 			}
 
+			if (Navigator != null) {
+				Navigator.Dispose();
+			}
+
 			base.Dispose(disposing);
 		}
 	}
