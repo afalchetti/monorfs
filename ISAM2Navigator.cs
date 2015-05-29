@@ -32,6 +32,11 @@ namespace monorfs
 public class ISAM2Navigator : Navigator
 {
 	/// <summary>
+	/// Maximum distance at which a match is considered valid; otherwise a new landmark is generated.
+	/// </summary>
+	public const double MatchThreshold = 0.3;
+
+	/// <summary>
 	/// The handle.
 	/// </summary>
 	private HandleRef handle;
@@ -97,6 +102,16 @@ public class ISAM2Navigator : Navigator
 	}
 
 	/// <summary>
+	/// Next unused label id.
+	/// </summary>
+	private int nextlabel;
+
+	/// <summary>
+	/// Generate a new unused label id.
+	/// </summary>
+	private int NextLabel { get { return nextlabel++; } }
+
+	/// <summary>
 	/// Construct a PHDNavigator using the indicated vehicle as a reference.
 	/// </summary>
 	/// <param name="vehicle">Vehicle to track.</param>
@@ -120,6 +135,8 @@ public class ISAM2Navigator : Navigator
 		}
 
 		handle = NewNavigator(measurementnoise, motionnoise, focal);
+
+		nextlabel = 0;
 	}
 
 	/// <summary>
@@ -183,7 +200,7 @@ public class ISAM2Navigator : Navigator
 		//       of PHD SLAM and only getting the current one is more suitable for
 		//       real-time simulation
 		List<double[]> trajectory = GetTrajectory();
-		BestEstimate.State = trajectory[trajectory.Count - 1];
+		estimate.State            = trajectory[trajectory.Count - 1];
 
 		List<Gaussian> mapmodel = GetMapModel();
 		WayMaps.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, mapmodel));
@@ -199,8 +216,25 @@ public class ISAM2Navigator : Navigator
 	/// <returns>Association labels.</returns>
 	public int[] findLabels(List<double[]> measurements)
 	{
-		// TODO implement this
-		return new int[measurements.Count];
+		int[] labels = new int[measurements.Count];
+
+		for (int i =  0; i < measurements.Count; i++) {
+			double bestmatch = double.MaxValue;
+
+			for (int k = 0; k < mapmodel.Count; k++) {
+				double distance2 = mapmodel[k].Mean.SquareEuclidean(measurements[i]);
+				if (distance2 < bestmatch) {
+						bestmatch = distance2;
+						labels[i] = k;
+				}
+			}
+
+			if (bestmatch > MatchThreshold * MatchThreshold) {
+				labels[i] = NextLabel;
+			}
+		}
+
+		return labels;
 	}
 
 	/// <summary>
