@@ -274,14 +274,29 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// Compute the difference between the state of two vehicles.
 	/// </summary>
-	/// <returns>State difference in 'b' local coordinates: (dx, dy, dz, dyaw, dpitch, droll),
+	/// <returns>State difference in local coordinates: (dx, dy, dz, dyaw, dpitch, droll),
 	/// such that b + ds = a.</returns>
 	/// <param name="a">Final vehicle.</param>
 	/// <param name="b">Start vehicle.</param>
 	public static double[] StateDiff(Vehicle a, Vehicle b)
 	{
-		// TODO implement this
-		return new double[6];
+		Quaternion dq          = Quaternion.Conjugate(b.Orientation) * a.Orientation;
+		Quaternion midrotation = Quaternion.Slerp(a.Orientation, b.Orientation, 0.5f);
+		double[]   dxglobal    = a.Location.Subtract(b.Location);
+		Quaternion dx          = Quaternion.Conjugate(midrotation) *
+		                             new Quaternion((float) dxglobal[0], (float) dxglobal[1], (float) dxglobal[2], 0) *
+		                             midrotation;
+
+		double x = dq.X;
+		double y = dq.Y;
+		double z = dq.Z;
+		double w = dq.W;
+
+		double dyaw   = Math.Atan2(2 * (w * y + x * z), 1 - 2 * (y * y + x * x));
+		double dpitch = Math.Asin (2 * (w * x - z * y));
+		double droll  = Math.Atan2(2 * (w * z + y * x), 1 - 2 * (x * x + z * z));
+
+		return new double[6] {dx.X, dx.Y, dx.Z, dyaw, dpitch, droll};
 	}
 
 	/// <summary>
