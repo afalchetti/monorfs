@@ -116,9 +116,9 @@ Vector PixelRangeFactor::evaluateError(const Pose3& pose, const Point3& point,
 		jquath << dqwh * diff, dqxh * diff, dqyh * diff, dqzh * diff;
 		
 		// full state quaternion jacobian, including local coordinates
-		Matrix jquaternion;
-		jquaternion << jposition, 2 * jprojection * jquath;
+		Matrix jquaternion = 2 * jprojection * jquath;
 		
+		H1->resize(3, 7);
 		*H1 << jposition, jquaternion;
 	}
 	
