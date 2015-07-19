@@ -120,9 +120,9 @@ Matrix getcovariance(Noise noise)
 
 // create a new isam2 slam solver with
 // all its necessary context
-// the motion noise format is [syaw, spitch, sroll, sx, sy, sz] (in local coords)
+// the motion noise format is [sx, sy, sz, syaw, spitch, sroll] (in local coords)
 // the measurement noise format is [sx, sy, srange]
-ISAM2Navigator* newnavigator(double* measurementnoise, double* motionnoise, double focal)
+ISAM2Navigator* newnavigator(double* initstate, double* measurementnoise, double* motionnoise, double focal)
 {
 	Vector3 measurementsigma;
 	Vector6 motionsigma;
@@ -131,7 +131,9 @@ ISAM2Navigator* newnavigator(double* measurementnoise, double* motionnoise, doub
 	motionsigma << motionnoise[0], motionnoise[1], motionnoise[2],
 	               motionnoise[3], motionnoise[4], motionnoise[5];
 	
-	Pose3 initpose = Pose3(Rot3(Quaternion(1, 0, 0, 0)), Point3(0, 0, 0));
+	Pose3 initpose = Pose3(Rot3(Quaternion(initstate[3], initstate[4], initstate[5], initstate[6])),
+	                       Point3(initstate[0], initstate[1], initstate[2]));
+
 	noiseModel::Diagonal::shared_ptr posenoise =
 	    noiseModel::Diagonal::Sigmas((Vector(6) << Vector3::Constant(0),Vector3::Constant(0)));
 

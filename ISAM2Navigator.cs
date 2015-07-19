@@ -134,8 +134,14 @@ public class ISAM2Navigator : Navigator
 			motionnoise[i] = vehicle.MotionCovariance[i][i];
 		}
 
-		handle = NewNavigator(measurementnoise, motionnoise, focal);
+		estimate     = new SimulatedVehicle();
+		prevestimate = new SimulatedVehicle();
+		mapmodel     = new List<Gaussian>();
 
+		vehicle.State.CopyTo(estimate    .State, 0);
+		vehicle.State.CopyTo(prevestimate.State, 0);
+
+		handle    = NewNavigator(vehicle.State, measurementnoise, motionnoise, focal);
 		nextlabel = 0;
 	}
 
@@ -244,14 +250,17 @@ public class ISAM2Navigator : Navigator
 	{
 		deletenavigator(handle);
 	}
-	
-	private unsafe HandleRef NewNavigator(double[] measurementNoise, double[] motionNoise, double focal)
+	private unsafe HandleRef NewNavigator(double[] initPose, double[] measurementNoise,
+	                                      double[] motionNoise, double focal)
 	{
 		IntPtr ptr = IntPtr.Zero;
 
+		fixed(double* ptrInitPose         = initPose) {
 		fixed(double* ptrMeasurementNoise = measurementNoise) {
 		fixed(double* ptrMotionNoise      = motionNoise) {
-			ptr = newnavigator((IntPtr) ptrMeasurementNoise, (IntPtr) ptrMotionNoise, focal);
+			ptr = newnavigator((IntPtr) ptrInitPose, (IntPtr) ptrMeasurementNoise,
+			                   (IntPtr) ptrMotionNoise, focal);
+		}
 		}
 		}
 
@@ -326,7 +335,7 @@ public class ISAM2Navigator : Navigator
 	}
 
 	[DllImport("libisam2.so")]
-	private extern static IntPtr newnavigator(IntPtr measurementnoise, IntPtr motionnoise, double focal);
+	private extern static IntPtr newnavigator(IntPtr initstate, IntPtr measurementnoise, IntPtr motionnoise, double focal);
 
 	[DllImport("libisam2.so")]
 	private extern static void deletenavigator(HandleRef navigator);
