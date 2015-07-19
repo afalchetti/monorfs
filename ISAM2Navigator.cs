@@ -211,6 +211,7 @@ public class ISAM2Navigator : Navigator
 		List<Gaussian> mapmodel = GetMapModel();
 		WayMaps.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, mapmodel));
 
+		estimate.State.CopyTo(prevestimate.State, 0);
 		UpdateMapHistory(time);
 	}
 
