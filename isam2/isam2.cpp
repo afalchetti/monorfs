@@ -27,22 +27,29 @@ using namespace monorfs;
 extern "C" {
 typedef boost::shared_ptr<noiseModel::Gaussian> Noise;
 
-typedef struct {
-	int                  t;
-	int                  tlength;
-	int                  msize;
-	vector<double>       trajectory;
-	vector<double>       mapmodel;
-	vector<double>       tmarginals;
-	vector<double>       mmarginals;
-	vector<int>          mlabels;
-	ISAM2                isam;
-	NonlinearFactorGraph graph;
-	Values               estimate;
-	double               focal;
-	Noise                measurementnoise;
-	Noise                motionnoise;
-} ISAM2Navigator;
+class ISAM2Navigator {
+public:
+	int            t;
+	int            tlength;
+	int            msize;
+	vector<double> trajectory;
+	vector<double> mapmodel;
+	vector<double> tmarginals;
+	vector<double> mmarginals;
+	vector<int>    mlabels;
+	ISAM2          isam;
+	Values         estimate;
+	double         focal;
+	Noise          measurementnoise;
+	Noise          motionnoise;
+
+	ISAM2Navigator(double focal, Noise measurementnoise, Noise motionnoise)
+		: t(0), tlength(1), msize(0),
+		  trajectory(vector<double>{0.0, 0.0, 0.0}), mapmodel(vector<double>()),
+		  tmarginals(vector<double>(36)), mmarginals(vector<double>()), mlabels(vector<int>()),
+		  isam(), estimate(), focal(focal),
+		  measurementnoise(measurementnoise), motionnoise(motionnoise) {}
+};
 
 // write a pose state into a list;
 // an element offset sets the distance
@@ -127,17 +134,19 @@ ISAM2Navigator* newnavigator(double* measurementnoise, double* motionnoise, doub
 	Pose3 initpose = Pose3(Rot3(Quaternion(1, 0, 0, 0)), Point3(0, 0, 0));
 	noiseModel::Diagonal::shared_ptr posenoise =
 	    noiseModel::Diagonal::Sigmas((Vector(6) << Vector3::Constant(0),Vector3::Constant(0)));
-	
-	ISAM2Navigator* navigator =
-	    new ISAM2Navigator{0, 1, 0, vector<double>{0.0, 0.0, 0.0}, vector<double>(),
-	                       vector<double>(9), vector<double>(), vector<int>(),
-	                       ISAM2(), NonlinearFactorGraph(), Values(), focal,
-	                       noiseModel::Diagonal::Sigmas(measurementsigma),
-	                       noiseModel::Diagonal::Sigmas(motionsigma)};
+
+	ISAM2Navigator* navigator = new ISAM2Navigator(focal,
+	                                               noiseModel::Diagonal::Sigmas(measurementsigma),
+	                                               noiseModel::Diagonal::Sigmas(motionsigma));
 
 	marshalmarginal(&navigator->tmarginals[0], getcovariance(posenoise), 0);
 	navigator->estimate.insert(Symbol('x', 0), initpose);
-	navigator->graph.push_back(PriorFactor<Pose3>(Symbol('x', 0), initpose, posenoise));
+
+	NonlinearFactorGraph graph;
+	graph.push_back(PriorFactor<Pose3>(Symbol('x', 0), initpose, posenoise));
+
+	navigator->isam.update(graph, navigator->estimate);
+	++navigator->t;
 
 	return navigator;
 }
@@ -146,6 +155,16 @@ ISAM2Navigator* newnavigator(double* measurementnoise, double* motionnoise, doub
 void deletenavigator(ISAM2Navigator* navigator)
 {
 	delete navigator;
+}
+
+// estimate a landmark from an estimated pose and the raw measurement
+Point3 landmarkestimate(double px, double py, double range, Pose3 pose, double focal)
+{
+	double localz = range * focal / sqrt(px*px + py*py + focal*focal);
+	double localx = localz * px / focal;
+	double localy = localz * py / focal;
+
+	return pose.translation() + pose.rotation() * Point3(localx, localy, localz);
 }
 
 // update the navigator estimate using new information:
@@ -157,38 +176,50 @@ void deletenavigator(ISAM2Navigator* navigator)
 // each measurement must be associated to a labeled (int) landmark;
 void update(ISAM2Navigator* navigator, double* odometry, double* measurements, int* labels, int nmeasurements)
 {
-	// add new measurements
-	for (int i = 0, k = 0; i < nmeasurements; ++i, k += 4) {
-		int    l     = measurements[k];
-		double px    = measurements[k + 1];
-		double py    = measurements[k + 2];
-		double range = measurements[k + 3];
+	NonlinearFactorGraph graph;
+	Values               newestimates;
 
-		navigator->graph.push_back(PixelRangeFactor(Symbol('x', navigator->t), Symbol('l', l),
-		                                            px, py, range,
-		                                            navigator->measurementnoise, navigator->focal));
+	// add new estimate for new pose (estimate using last pose)
+	Pose3 pestimate = navigator->estimate.at<Pose3>(Symbol('x', navigator->t - 1));
+
+	newestimates.insert(Symbol('x', navigator->t), pestimate);
+
+	// add new measurements
+	for (int i = 0, k = 0; i < nmeasurements; ++i, k += 3) {
+		int    l     = labels[i];
+		double px    = measurements[k + 0];
+		double py    = measurements[k + 1];
+		double range = measurements[k + 2];
+
+		graph.push_back(PixelRangeFactor(Symbol('x', navigator->t), Symbol('l', l),
+		                                 px, py, range,
+		                                 navigator->measurementnoise, navigator->focal));
+
+		if (!navigator->estimate.exists(Symbol('l', l))) {
+			newestimates.insert(Symbol('l', l),
+			                    landmarkestimate(px, py, range, pestimate, navigator->focal));
+		}
 	}
 
 	if (odometry != nullptr) {
-		Pose3 delta(Rot3::ypr(odometry[3], odometry[4], odometry[5]),
+		// note that dorientation is shifted since the coordinate
+		// system is not the same in this framework: roll doesn't
+		// really roll the vehicle, but changes the pitch, etc.
+		Pose3 delta(Rot3::ypr(odometry[5], odometry[3], odometry[4]),
 	                Point3(odometry[0], odometry[1], odometry[2]));
 	    
-		navigator->graph.push_back(BetweenFactor<Pose3>(Symbol('x', navigator->t),
-		                                                Symbol('x', navigator->t - 1),
-		                                                delta, navigator->motionnoise));
+		graph.push_back(BetweenFactor<Pose3>(Symbol('x', navigator->t - 1),
+		                                     Symbol('x', navigator->t),
+		                                     delta, navigator->motionnoise));
 	}
 
-	// add new estimate for new pose (estimate using last pose)
-	Pose3 pestimate = unmarshalpose(&navigator->trajectory[0], navigator->tlength - 1);
-	navigator->estimate.insert(Symbol('x', navigator->t), pestimate);
-
 	// isam2 magic bayes tree update
-	navigator->isam.update(navigator->graph, navigator->estimate);
-	Values estimate = navigator->isam.calculateEstimate();
+	navigator->isam.update(graph, newestimates);
+	navigator->estimate = navigator->isam.calculateEstimate();
 
 	// update the public estimates (interop)
 	navigator->tlength = navigator->tlength + 1;
-	navigator->msize   = estimate.size() - navigator->tlength;
+	navigator->msize   = navigator->estimate.size() - navigator->tlength;
 
 	navigator->trajectory.resize(7 * navigator->tlength);  // mean + covariance
 	navigator->mapmodel  .resize(3 * navigator->msize);
@@ -196,7 +227,7 @@ void update(ISAM2Navigator* navigator, double* odometry, double* measurements, i
 	navigator->mmarginals.resize((3 * 3) * navigator->msize);
 	navigator->mlabels   .resize(3 * navigator->msize);
 
-	for (auto item = estimate.begin(); item != estimate.end(); ++item) {
+	for (auto item = navigator->estimate.begin(); item != navigator->estimate.end(); ++item) {
 		Symbol key(item->key);
 
 		Matrix covariance = navigator->isam.marginalCovariance(key);
@@ -210,11 +241,6 @@ void update(ISAM2Navigator* navigator, double* odometry, double* measurements, i
 			marshalmarginal(&navigator->mmarginals[0], covariance, key.index());
 		}
 	}
-
-	// clear for next round (note that graph + estimate
-	// indicate only the __new__ landmarks and estimates)
-	navigator->graph.resize(0);
-	navigator->estimate.clear();
 
 	++navigator->t;
 }
