@@ -1,0 +1,50 @@
+MonoRFS
+Visual SLAM system using Random Finite Sets
+
+Author:  Angelo Falchetti
+Version: 0.3
+
+This is a simple program that implements a Rao-Blackwellized PHD filter for
+autonomous navigation in 3D space. It consists of several components:
+
+* A SLAM solver unit, which is the responsible of handling the Bayes updates
+  over the map and pose state of a vehicle.
+  
+* A simulator, which gives live feedback to the user about the state of the
+  system and allows him to control the autonomous device.
+  
+* A viewer, that can reproduce previously recorded runs of the simulator, to
+  present to others or for fine-grain analysis.
+  
+* A device interface, which can talk to a RGBD camera and process its output
+  images (both color and depth) and generate the necessary data for the SLAM
+  solver to work on.
+  
+* A device faker unit, which takes PNG streams and creates oni files suitable as
+  input to the device interface, allowing video reuse and easy reproducibility.
+  
+* A post-processing script that generates useful plots about the simulated run.
+
+* An alternative SLAM solver, which uses the iSAM2 algorithm to estimate the
+  world state. It uses the gtsam library.
+
+--- Sample uses ----------------------------------------------------------------
+
+# Start analyzing a live RGBD stream with assumed odometry "movroom.in",
+# 200 particles and solving both mapping and localization
+monorfs -c=movroom.in -p=200
+
+# Start analyzing a recorded RGBD stream from file "room.oni" with assumed
+# odometry "movroom.in", 40 particles and perfect localization
+monorfs -f=room.oni -c=movroom.in -p=40 -y
+
+# Start a new simulation with a world description given in file "map.world",
+# movement commands in "moves.in" (odometry), with 20 particles and
+# assuming perfect localization (at startup, this can be changed later)
+monorfs -s -f=map.world -c=movements.in -p=20 -y
+
+# Similar to above but use isam2 SLAM algorithm
+monorfs -s -f=map.world -c=movements.in -p=20 -y -a=isam2
+
+# Open a previous run with a Viewer
+monorfs -v -f=map.world -t=trajectory.out -e=estimate.out -m=maps.out -b=sidebar.avi -x=measurements.out
