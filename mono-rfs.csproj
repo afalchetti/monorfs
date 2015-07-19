@@ -24,8 +24,7 @@
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Externalconsole>true</Externalconsole>
-    <ConsolePause>false</ConsolePause>
-    <Commandlineparameters>-s -f=map.world -c=movements.in -p=20 -y</Commandlineparameters>
+    <Commandlineparameters>-s -f=map.world -c=movements.in -p=20 -y -a=isam2</Commandlineparameters>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>x86</PlatformTarget>
@@ -36,6 +35,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ConsolePause>false</ConsolePause>
     <Externalconsole>true</Externalconsole>
+    <Commandlineparameters>-s -f=map.world -c=movements.in -p=20 -y -a=isam2</Commandlineparameters>
   </PropertyGroup>
   <PropertyGroup>
     <RunPostBuildEvent>Always</RunPostBuildEvent>
@@ -150,4 +150,10 @@
   <Target Name="AfterBuild">
   </Target>
   -->
+  <ItemGroup>
+    <ProjectReference Include="isam2\isam2.cproj">
+      <Project>{55AB62F6-DA11-4F72-8D9F-FA95F677E3FD}</Project>
+      <Name>isam2</Name>
+    </ProjectReference>
+  </ItemGroup>
 </Project>

@@ -145,6 +145,8 @@ public class Program
 		bool   viewer        = false;
 		bool   showhelp      = false;
 
+		NavigationAlgorithm algorithm = NavigationAlgorithm.PHD;
+
 		OptionSet options = new OptionSet() {
 			{ "f|file=",       "Scene description file. Simulated, recorded or device id.",    f       => scenefile     = f },
 			{ "c|command=",    "Auto-command file (simulates user input).",                    c       => commandfile   = c },
@@ -158,6 +160,7 @@ public class Program
 			{ "m|map=",        "Prerecorded map history file.",                                m       => mapfile       = m },
 			{ "b|sidebar=",    "Prerecorded sidebar video file.",                              b       => sidebarfile   = b },
 			{ "x|measure=",    "Prerecorded measurement history file.",                        m       => measurefile   = m },
+			{ "a|algorithm=",  "SLAM solver algorithm (phd or isam2)",                         a       => algorithm     = (a != "isam2") ? NavigationAlgorithm.PHD : NavigationAlgorithm.ISAM2 },
 			{ "h|help",        "Show this message and exit",                                   h       => showhelp      = h != null }
 		};
 
@@ -187,7 +190,7 @@ public class Program
 			}
 		}
 		else {
-			using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, onlymapping, simulate, realtime)) {
+			using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, onlymapping, simulate, realtime, algorithm)) {
 				sim.Run();
 
 				Console.WriteLine("writing output");
