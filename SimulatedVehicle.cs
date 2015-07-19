@@ -65,6 +65,13 @@ public class SimulatedVehicle : Vehicle
 	private PoissonDistribution clutterGen;
 
 	/// <summary>
+	/// Construct a new Vehicle from a "zero initial state", i.e. location = {0, 0, 0},
+	/// theta = 0 and rotation axis = {1, 0, 0} with no landmarks.
+	/// </summary>
+	public SimulatedVehicle()
+		: this(new double[3] {0, 0, 0}, 0, new double[3] {1, 0, 0}, new List<double[]>()) {}
+
+	/// <summary>
 	/// Construct a new Vehicle object from its initial state.
 	/// </summary>
 	/// <param name="location">Spatial coordinates.</param>
