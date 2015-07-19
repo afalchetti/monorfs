@@ -51,27 +51,23 @@ bool PixelRangeFactor::equals(const NonlinearFactor& thatfactor, double eps) con
 	       fabs(this->range - that->range) < eps;
 }
 
-// calculate h(m) - z, using the RGBD equation
-// h(m) = [|m-x|, (f x/z)L, (f y/z)L]
+// calculate h(p, m) - z, using the RGBD equation
+// h(p, m) = [|m-p|, (f x/z)L, (f y/z)L]
 // 
 // where |a-b| is the euclidean distance between a and b and
 // (.)L is performed on the local axis
 Vector PixelRangeFactor::evaluateError(const Pose3& pose, const Point3& point,
 	                                   boost::optional<Matrix&> H1, boost::optional<Matrix&> H2) const
 {
-	Vector3    diff  = (point - pose.translation()).vector();
-	Quaternion qdiff(0, diff.x(), diff.y(), diff.z());
-	Quaternion rotation = pose.rotation().toQuaternion();
-	Quaternion local = rotation.conjugate() * qdiff * rotation;
+	Matrix jlocalpose, jlocalpoint;
+	Point3 local = pose.transform_to(point, jlocalpose, jlocalpoint);
 
-	double erange  = diff.norm();
-	double epx     = focal * local.x() / local.z();
-	double epy     = focal * local.y() / local.z();
-	
+	double erange = local.norm();
+	double epx    = focal * local.x() / local.z();
+	double epy    = focal * local.y() / local.z();
+
 	// jacobians
-	
 	Matrix3 jprojection;
-	Matrix3 jrotation;
 	
 	if (H1 || H2) {
 		// the jacobian of the homography projection
@@ -79,54 +75,17 @@ Vector PixelRangeFactor::evaluateError(const Pose3& pose, const Point3& point,
 		jprojection << focal / local.z(), 0,                     -focal * local.x() / (local.z() * local.z()),
 		               0,                     focal / local.z(), -focal * local.y() / (local.z() * local.z()),
 		               local.x() / mag,       local.y() / mag,    local.z() /mag;
-		
-		// the jacobian of the rotation (the rotation matrix itself) 
-		Matrix3 jrotation = pose.rotation().matrix();
 	}
-	
+
 	if (H1) {
-		Matrix3 jposition = -jprojection * jrotation;
-		Matrix3 dqwh, dqxh, dqyh, dqzh;  // h suffix = half (no need to x2 more than once at the end)
-		
-		double w = rotation.w();
-		double x = rotation.x();
-		double y = rotation.y();
-		double z = rotation.z();
-		
-		// quaternion rotation derivatives wrt to the quaternion itself
-		// note that this is a rank-3 tensor
-		dqwh <<  w, -z,  y,
-		         z,  w, -x,
-		        -y,  x,  w;
-		        
-		dqxh <<  x,  y,  z,
-		         y, -x, -w,
-		         z,  w, -x;
-		        
-		dqyh << -y,  x,  w,
-		         x,  y,  z,
-		        -w,  z, -y;
-		        
-		dqzh << -z, -w,  x,
-		         w, -z,  y,
-		         x,  y,  z;
-		
-		// quaternion rotation jacobian
-		Matrix jquath;
-		jquath << dqwh * diff, dqxh * diff, dqyh * diff, dqzh * diff;
-		
-		// full state quaternion jacobian, including local coordinates
-		Matrix jquaternion = 2 * jprojection * jquath;
-		
-		H1->resize(3, 7);
-		*H1 << jposition, jquaternion;
+		*H1 = jprojection * jlocalpose;
 	}
-	
+
 	if (H2) {
-		*H2 = jprojection * jrotation;
+		*H2 = jprojection * jlocalpoint;
 	}
-	
-	return Vector3(epx - px , epy - py, erange - range);
+
+	return Vector3(epx - px, epy- py, erange - range);
 }
 
 // get the internal measurement data as the tuple (px, py, range)
