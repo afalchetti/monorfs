@@ -200,11 +200,11 @@ public class ISAM2Navigator : Navigator
 
 		Update(odometry, marshalmeasurements, findLabels(measurements), measurements.Count);
 
-		// FIXME note that the whole path could change retroactively but that requires
-		//       more comprehensive structural changes so, for now, only update the
-		//       "current position"; this is similar to the "best retroactive particle"
-		//       of PHD SLAM and only getting the current one is more suitable for
-		//       real-time simulation
+		// NOTE the whole path could change retroactively but that requires more
+		//      comprehensive structural changes so, for now, only update the
+		//      "current position"; this is similar to the "best retroactive particle"
+		//      of PHD SLAM and only getting the current one is more suitable for
+		//      real-time simulation
 		List<double[]> trajectory = GetTrajectory();
 		estimate.State            = trajectory[trajectory.Count - 1];
 
@@ -251,6 +251,15 @@ public class ISAM2Navigator : Navigator
 	{
 		deletenavigator(handle);
 	}
+
+	/// <summary>
+	/// Construct a new ISAM2Navigator from unmanaged code.
+	/// </summary>
+	/// <param name="initPose">Initial pose.</param>
+	/// <param name="measurementNoise">Vectorized measurement noise.</param>
+	/// <param name="motionNoise">Vectorized motion noise.</param>
+	/// <param name="focal">Focal length.</param>
+	/// <returns>New navigator.</returns>
 	private unsafe HandleRef NewNavigator(double[] initPose, double[] measurementNoise,
 	                                      double[] motionNoise, double focal)
 	{
@@ -268,6 +277,13 @@ public class ISAM2Navigator : Navigator
 		return new HandleRef(this, ptr);
 	}
 
+	/// <summary>
+	/// Update the solver estimates from unmanaged code.
+	/// </summary>
+	/// <param name="odometry">Odometry readings as [dx, dy, dz, dyaw, dpitch, droll].</param>
+	/// <param name="measurements">Vectorized measurement list as [x1, y1, z1, x2, y2, z2, ...].</param>
+	/// <param name="labels">Data association labels, one per measurement.</param>
+	/// <param name="nmeasurements">Number of measurements.</param>
 	private unsafe void Update(double[] odometry, double[] measurements, int[] labels, int nmeasurements)
 	{
 		fixed(double* ptrOdometry     = odometry) {
@@ -279,6 +295,10 @@ public class ISAM2Navigator : Navigator
 		}
 	}
 
+	/// <summary>
+	/// Get the trajectory estimate from unmanaged code.
+	/// </summary>
+	/// <returns>Trajectory estimate.</returns>
 	private unsafe List<double[]> GetTrajectory()
 	{
 		int            length;
@@ -302,6 +322,10 @@ public class ISAM2Navigator : Navigator
 		return trajectory;
 	}
 
+	/// <summary>
+	/// Get the map estimate.
+	/// </summary>
+	/// <returns>Map estimate.</returns>
 	private unsafe List<Gaussian> GetMapModel()
 	{
 		int            length;
