@@ -126,6 +126,10 @@ public class ISAM2Navigator : Navigator
 		double[] motionnoise      = new double[nmotion];
 		double   focal            = vehicle.VisionFocal;
 
+		// NOTE the iSAM2 interface assumes independent noise in each component,
+		//      discarding every entry that's not in the diagonal;
+		//      although it is possible to define a complete matrix,
+		//      it doesn't seem to be worth it when comparing performance
 		for (int i = 0; i < nmeasurement; ++i) {
 			measurementnoise[i] = vehicle.MeasurementCovariance[i][i];
 		}

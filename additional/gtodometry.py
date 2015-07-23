@@ -19,8 +19,6 @@ class Quaternion:
 		self.x = x
 		self.y = y
 		self.z = z
-		
-		#assert w == 0 or abs(abs(self) - 1) < 1e-3, abs(self)
 	
 	def __add__(self, other):
 		return Quaternion(self.w + other.w, self.x + other.x, self.y + other.y, self.z + other.z)
@@ -55,19 +53,7 @@ class Quaternion:
 		return Quaternion(self.w, -self.x, -self.y, -self.z)
 	
 	def conjugateby(self, other):
-		#return other.conjugate() * self * other
 		return other * self * other.conjugate()
-	
-	#def __pow__(self, n):
-	#	magnitude = abs(self)
-	#	ct        = self.w / magnitude
-	#	st        = sqrt(self.x**2 + self.y**2 + self.z**2) / magnitude
-	#	theta     = atan2(st, ct)
-	#	expmag    = magnitude**n
-	#	alpha     = expmag * cos(n * theta) #/ ct
-	#	beta      = expmag * sin(n * theta) / st
-	#	
-	#	return Quaternion(alpha, beta * self.x, beta * self.y, beta * self.z)
 	
 	def slerp(self, other, amount):
 		inner = self.w * other.w + self.x * other.x + self.y * other.y + self.z * other.z
@@ -89,11 +75,7 @@ class Quaternion:
 		                  alpha * self.y + beta * other.y,
 		                  alpha * self.z + beta * other.z)
 	
-	#def slerp(self, other, alpha):
-	#	return (other * self.conjugate())**alpha * self
-	
 	def diff(self, other):
-		#return self * other.conjugate()
 		return self.conjugate() * other
 	
 	def ypr(self):
@@ -106,9 +88,6 @@ class Quaternion:
 		pitch = asin (2 * (w * x - z * y))
 		roll  = atan2(2 * (w * z + y * x), 1 - 2 * (x * x + z * z))
 		
-		#yaw   = asin (2 * x * y + 2 * z * w)
-		#pitch = atan2(2 * x * w - 2 * y * z, 1 - 2 * x * x - 2 * z * z)
-		#roll  = atan2(2 * y * w - 2 * x * z, 1 - 2 * y * y - 2 * z * z)
 		return (yaw, pitch, roll)
 	
 	@staticmethod
@@ -189,8 +168,6 @@ def tolocalcoords(x, y, z, qw, qx, qy, qz):
 	dy = np.diff(y)
 	dz = np.diff(z)
 	
-	#print "\ntolocal"
-	
 	dpos     = [Quaternion(0, px, py, pz)                     for (px, py, pz)     in zip(dx, dy, dz)]
 	quats    = [Quaternion(pw, px, py, pz).normalize()        for (pw, px, py, pz) in zip(qw, qx, qy, qz)]
 	halfquat = [quats[i].slerp(quats[i + 1], 0.5)             for i                in xrange(len(quats) - 1)]
@@ -206,15 +183,6 @@ def tolocalcoords(x, y, z, qw, qx, qy, qz):
 	
 	dyaw, dpitch, droll = zip(*dangle)
 	
-	#for i in xrange(len(dpos)):
-	#	print i, "=>"
-	#	print "input... location=", Point(x[i], y[i], z[i]), "orientation=", Quaternion(qw[i], qx[i], qy[i], qz[i])
-	#	print "dpos:", dpos[i]
-	#	print "halfquat:", halfquat[i]
-	#	print "dquat:", dquat[i]
-	#	print "dlocal:", dlocal[i]
-	#	print "dangle:", dangle[i]
-	
 	return dlocx, dlocy, dlocz, dyaw, dpitch, droll
 
 def toglobalcoords(dlocx, dlocy, dlocz, dyaw, dpitch, droll):
@@ -229,10 +197,7 @@ def toglobalcoords(dlocx, dlocy, dlocz, dyaw, dpitch, droll):
 	qy = [orientation.y]
 	qz = [orientation.z]
 	
-	#print "\ntoglobal"
-	
 	for i in xrange(len(dlocx)):
-		#print i, "=>"
 		location, orientation = update(location, orientation, dlocx[i], dlocy[i], dlocz[i], dyaw[i], dpitch[i], droll[i])
 		x .append(location.x)
 		y .append(location.y)
@@ -254,31 +219,7 @@ def update(location, orientation, dlocx, dlocy, dlocz, dyaw, dpitch, droll):
 	orientation    = neworientation
 	orientation    = orientation.normalize()
 	
-	#print "input... dlocx=", dlocx, "dlocy=", dlocy, "dlocz=", dlocz, "dyaw=", dyaw, "dpitch=", dpitch, "droll=", droll
-	#print "dorientation:", dorientation
-	#print "neworientation:", neworientation
-	#print "midrotation:", midrotation
-	#print "dlocation:", dlocation
-	#print "location:", location
-	#print "orientation:", orientation
-	
 	return location, orientation
-
-def newplot(fignum, x, y, z):
-	fig  = plot.figure(fignum)
-	axis = fig.add_subplot(111, projection="3d")
-	axis.plot(xs=x, ys=y, zs=z)
-	
-	# Create cubic bounding box to simulate equal aspect ratio
-	max_range = np.array([max(x)-min(x), max(y)-min(y), max(z)-min(z)]).max()
-	Xb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][0].flatten() + 0.5*(max(x)+min(x))
-	Yb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][1].flatten() + 0.5*(max(y)+min(y))
-	Zb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][2].flatten() + 0.5*(max(z)+min(z))
-	# Comment or uncomment following both lines to test the fake bounding box:
-	for xb, yb, zb in zip(Xb, Yb, Zb):
-	   axis.plot([xb], [yb], [zb], 'w')
-	
-	axis.grid()
 
 def writemovements(filename, dx, dy, dz, dyaw, dpitch, droll):
 	with open(filename, 'w') as odofile:
@@ -296,19 +237,8 @@ if __name__ == '__main__':
 		print "usage: python", __file__, "groundtruth.txt depth.txt output.in"
 		sys.exit(1)
 	
-	# debug
-	#print Quaternion.FromYPR(0.3, 0.1, 0.4).ypr()          #should be (0.3, 0.1, 0.4)
-	#print Quaternion(1, 0, 0, 0) * Quaternion(1, 0, 0, 0)  # should be  1
-	#print Quaternion(0, 1, 0, 0) * Quaternion(0, 1, 0, 0)  # should be -1
-	#print Quaternion(0, 0, 1, 0) * Quaternion(0, 0, 1, 0)  # should be -1
-	#print Quaternion(0, 0, 0, 1) * Quaternion(0, 0, 0, 1)  # should be -1
-	
 	print "reading groundtruth"
 	timegt, tx, ty, tz, qw, qx, qy, qz = readgroundtruth(sys.argv[1])
-	
-	newplot(1, tx, ty, tz)
-	#ax1.scatter(xs=tx[0],  ys=ty[0],  zs=tz[0],  c='b', marker='o')
-	#ax1.scatter(xs=tx[-1], ys=ty[-1], zs=tz[-1], c='r', marker='s')
 	
 	print "reading depth timestamps"
 	timedepth = readdepth(sys.argv[2])
@@ -322,37 +252,9 @@ if __name__ == '__main__':
 	qy = np.interp(timedepth, timegt, qy)
 	qz = np.interp(timedepth, timegt, qz)
 	
-	#timedepth =  timedepth[0:3]
-	#tx = tx[0:3]
-	#ty = ty[0:3]
-	#tz = tz[0:3]
-	#qw = qw[0:3]
-	#qx = qx[0:3]
-	#qy = qy[0:3]
-	#qz = qz[0:3]
-	
-	#tx[0] = ty[0] = tz[0] = qw[0] = qx[0] = qy[0] = qz[0] = 0
-	#qx[0] = 1
-	
-	newplot(2, tx, ty, tz)
-	
-	#for i in xrange(min(20, len(tx))):
-	#	print "{: .4f}".format(tx[i] - tx[0]),
-	#	print "{: .4f}".format(ty[i] - ty[0]),
-	#	print "{: .4f}".format(tz[i] - tz[0]),
-	#	print "{: .4f}".format(qw[i] - qw[0]),
-	#	print "{: .4f}".format(qx[i] - qx[0]),
-	#	print "{: .4f}".format(qy[i] - qy[0]),
-	#	print "{: .4f}".format(qz[i] - qz[0])
-	
 	print "calculating local differential forms"
 	dx, dy, dz, dyaw, dpitch, droll = tolocalcoords(tx, ty, tz, qw, qx, qy, qz)
 	x2, y2, z2, qw2, qx2, qy2, qz2  = toglobalcoords(dx, dy, dz, dyaw, dpitch, droll)
 	
-	newplot(3, dx, dy, dz)
-	newplot(4, x2, y2, z2)
-	
 	print "writing to file"
 	writemovements(sys.argv[3], dx, dy, dz, dyaw, dpitch, droll)
-	
-	#plot.show()

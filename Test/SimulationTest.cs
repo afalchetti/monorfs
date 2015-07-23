@@ -16,7 +16,6 @@ using Microsoft.Xna.Framework;
 using NUnit.Framework;
 using AE = monorfs.ArrayExtensions;
 
-// "D:\applications\NUnit 2.6.3\bin\nunit.exe" "$(TargetPath)"
 namespace monorfs.Test
 {
 /// <summary>
@@ -174,7 +173,6 @@ class SimulationTest
 			navigator.VehicleWeights  [4] = 0.3;
 			
 			navigator.ResampleParticles();
-			//Console.WriteLine(string.Join(", ", Array.ConvertAll(navigator.VehicleParticles, p => p.X.ToString("F0"))));
 
 			// these three have probabilities higher than 0.2 so they must always be in the resampled particles
 			Assert.IsTrue(navigator.VehicleParticles.Any(x => particles[1].State.SequenceEqual(x.State)));
@@ -184,10 +182,7 @@ class SimulationTest
 			count0 += navigator.VehicleParticles.Any(x => particles[0].State.SequenceEqual(x.State)) ? 1 : 0;
 			count3 += navigator.VehicleParticles.Any(x => particles[3].State.SequenceEqual(x.State)) ? 1 : 0;
 		}
-		
-		Console.WriteLine("count0: " + count0 + " / " + iterations + " -> " + ((float) count0 / iterations).ToString("F2") + "; expected = 0.55");
-		Console.WriteLine("count3: " + count3 + " / " + iterations + " -> " + ((float) count3 / iterations).ToString("F2") + "; expected = 0.05");
-		
+
 		// these can't be in every resample; sometime they need to be missed
 		Assert.Less(count0, iterations);
 		Assert.Less(count3, iterations);

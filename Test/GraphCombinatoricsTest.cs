@@ -16,7 +16,6 @@ using NUnit.Framework;
 using AE = monorfs.ArrayExtensions;
 using GC = monorfs.GraphCombinatorics;
 
-// "D:\applications\NUnit 2.6.3\bin\nunit.exe" "$(TargetPath)"
 namespace monorfs.Test
 {
 /// <summary>
