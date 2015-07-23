@@ -27,22 +27,74 @@ namespace monorfs
 public abstract class Vehicle : IDisposable
 {
 	/// <summary>
-	/// Motion model covariance matrix.
+	/// Internal motion model covariance matrix. Yaw-pitch-roll representation.
 	/// </summary>
-	public double[][] MotionCovariance = new double[7][] {new double[7] {5e-3, 0, 0, 0, 0, 0, 0},
-	                                                      new double[7] {0, 5e-3, 0, 0, 0, 0, 0},
-	                                                      new double[7] {0, 0, 5e-3, 0, 0, 0, 0},
-	                                                      new double[7] {0, 0, 0, 2e-4, 0, 0, 0},
-	                                                      new double[7] {0, 0, 0, 0, 2e-4, 0, 0},
-	                                                      new double[7] {0, 0, 0, 0, 0, 2e-4, 0},
-	                                                      new double[7] {0, 0, 0, 0, 0, 0, 2e-4}};
+	private double[][] motionCovariance = new double[6][] { new double[6] {5e-3, 0, 0, 0, 0, 0},
+	                                                        new double[6] {0, 5e-3, 0, 0, 0, 0},
+	                                                        new double[6] {0, 0, 5e-3, 0, 0, 0},
+	                                                        new double[6] {0, 0, 0, 2e-4, 0, 0},
+	                                                        new double[6] {0, 0, 0, 0, 2e-4, 0},
+	                                                        new double[6] {0, 0, 0, 0, 0, 2e-4} };
+	/// <summary>
+	/// Internal motion model covariance matrix. Quaternion representation.
+	/// </summary>
+	private double[][] motionCovarianceQ = new double[7][] { new double[7] {5e-3, 0, 0, 0, 0, 0, 0},
+	                                                         new double[7] {0, 5e-3, 0, 0, 0, 0, 0},
+	                                                         new double[7] {0, 0, 5e-3, 0, 0, 0, 0},
+	                                                         new double[7] {0, 0, 0, 1e-9, 0, 0, 0},
+	                                                         new double[7] {0, 0, 0, 0, 5e-5, 0, 0},
+	                                                         new double[7] {0, 0, 0, 0, 0, 5e-5, 0},
+	                                                         new double[7] {0, 0, 0, 0, 0, 0, 5e-5} };
+
+	/// <summary>
+	/// Motion model covariance matrix. Yaw-pitch-roll representation.
+	/// </summary>
+	public double[][] MotionCovariance
+	{
+		get {
+			return motionCovariance;
+		}
+
+		set {
+			motionCovariance    = value;
+
+			double[][] r        = Util.YPR2QJacobian(0, 0, 0);
+			double[][] jacobian = new double[7][] { new double[6] {1, 0, 0, 0,       0,      0},
+			                                        new double[6] {0, 1, 0, 0,       0,      0},
+			                                        new double[6] {0, 0, 1, 0,       0,      0},
+			                                        new double[6] {0, 0, 0, r[0][0], r[0][1], r[0][2]},
+			                                        new double[6] {0, 0, 0, r[1][0], r[1][1], r[1][2]},
+			                                        new double[6] {0, 0, 0, r[2][0], r[2][1], r[2][2]},
+			                                        new double[6] {0, 0, 0, r[3][0], r[3][1], r[3][2]} };
+
+			motionCovarianceQ = jacobian.Multiply(motionCovariance).MultiplyByTranspose(jacobian);
+
+			// regularization: if variance is zero in some component the matrix probably will be
+			// semi-definite instead of definite positive and some algorithms will not work properly;
+			// add a tiny amount of variance in such case
+			for (int i = 0; i < motionCovarianceQ.Length; i++) {
+				if (motionCovarianceQ[i][i] < 1e-9) {
+					motionCovarianceQ[i][i] = 1e-9;
+				}
+			}
+		}
+	}
+
+	/// <summary>
+	/// Motion model covariance matrix. Quaternion representation.
+	/// </summary>
+	public double[][] MotionCovarianceQ
+	{
+		get         { return motionCovarianceQ;  }
+		private set { motionCovarianceQ = value; }
+	}
 
 	/// <summary>
 	/// Measurement model covariance matrix.
 	/// </summary>
-	public double[][] MeasurementCovariance = new double[3][] {new double[3] {2e-1, 0, 0},
-	                                                           new double[3] {0, 2e-1, 0},
-	                                                           new double[3] {0, 0, 2e-4}};
+	public double[][] MeasurementCovariance = new double[3][] { new double[3] {2e-1, 0, 0},
+	                                                            new double[3] {0, 2e-1, 0},
+	                                                            new double[3] {0, 0, 2e-4} };
 	
 	/// <summary>
 	/// Internal vehicle pose state.
@@ -225,6 +277,10 @@ public abstract class Vehicle : IDisposable
 		this.SidebarWidth       = that.SidebarWidth;
 		this.SidebarHeight      = that.SidebarHeight;
 		this.MappedMeasurements = that.MappedMeasurements;
+
+		this.motionCovariance      = that.motionCovariance.MemberwiseClone();
+		this.MotionCovarianceQ     = that.MotionCovarianceQ.MemberwiseClone();
+		this.MeasurementCovariance = that.MeasurementCovariance.MemberwiseClone();
 
 		if (copytrajectory) {
 			this.Waypoints = new List<double[]>(that.Waypoints);

@@ -73,6 +73,54 @@ public static class Util
 	}
 
 	/// <summary>
+	/// Calculate the jacobian of the yaw-pitch-roll to quaternion function.
+	/// </summary>
+	/// <returns>Jacobian.</returns>
+	/// <param name="yaw">Yaw evaluation point.</param>
+	/// <param name="pitch">Pitch evaluation point.</param>
+	/// <param name="roll">Roll evaluation point.</param>
+	public static double[][] YPR2QJacobian(double yaw, double pitch, double roll)
+	{
+		double r2 = 0.5 * roll;
+		double p2 = 0.5 * pitch;
+		double y2 = 0.5 * yaw;
+
+		double sr = Math.Sin(r2);
+		double cr = Math.Cos(r2);
+		double sp = Math.Sin(p2);
+		double cp = Math.Cos(p2);
+		double sy = Math.Sin(y2);
+		double cy = Math.Cos(y2);
+
+		double wc =  0.5 * cy * cp * cr;
+		double ws =  0.5 * sy * sp * sr;
+
+		double xc =  0.5 * cy * sp * cr;
+		double xs =  0.5 * sy * cp * sr;
+
+		double yc =  0.5 * sy * cp * cr;
+		double ys = -0.5 * cy * sp * sr;
+
+		double zc =  0.5 * cy * cp * sr;
+		double zs = -0.5 * sy * sp * cr;
+
+		double w = wc + ws;
+		double x = xc + xs;
+		double y = yc + ys;
+		double z = zc + zs;
+
+		double a = wc - ws;
+		double b = xc - xs;
+		double c = yc - ys;
+		double d = zc - zs;
+
+		return new double[4][] { new double[3] {-y, -b, -z},
+		                         new double[3] { z,  a,  y},
+		                         new double[3] { w, -d, -x},
+		                         new double[3] {-x, -c,  w} };
+	}
+
+	/// <summary>
 	/// Get a dictionary from a tabular string descriptor.
 	/// All entries have 'string' type. The entry separator is a newline.
 	/// Keys must not have any whitespace on their line and values associated

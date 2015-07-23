@@ -96,13 +96,11 @@ public class SimulatedVehicle : Vehicle
 	public SimulatedVehicle(SimulatedVehicle that, bool copytrajectory = false)
 		: this((Vehicle) that, copytrajectory)
 	{
-		this.Landmarks             = that.Landmarks;
-		this.detectionProbability  = that.detectionProbability;
-		this.ClutterDensity        = that.ClutterDensity;
-		this.ClutterCount          = that.ClutterCount;
-		this.clutterGen            = new PoissonDistribution(that.clutterGen.Mean);
-		this.MotionCovariance      = that.MotionCovariance.MemberwiseClone();
-		this.MeasurementCovariance = that.MeasurementCovariance.MemberwiseClone();
+		this.Landmarks            = that.Landmarks;
+		this.detectionProbability = that.detectionProbability;
+		this.ClutterDensity       = that.ClutterDensity;
+		this.ClutterCount         = that.ClutterCount;
+		this.clutterGen           = new PoissonDistribution(that.clutterGen.Mean);
 	}
 
 	/// <summary>
@@ -126,12 +124,10 @@ public class SimulatedVehicle : Vehicle
 	public SimulatedVehicle(Vehicle that, double motioncovmultiplier, double measurecovmultiplier, double pdetection, double clutter, bool copytrajectory = false)
 	           : this(that, copytrajectory)
 	{
-		this.MotionCovariance      = motioncovmultiplier .Multiply(this.MotionCovariance);
-		this.MeasurementCovariance = measurecovmultiplier.Multiply(this.MeasurementCovariance);
-		this.detectionProbability  = pdetection;
-		this.ClutterDensity        = clutter;
-		this.ClutterCount          = this.ClutterDensity * this.FilmArea.Height * this.FilmArea.Width * this.RangeClip.Length;
-		this.clutterGen            = new PoissonDistribution(this.ClutterCount);
+		this.detectionProbability = pdetection;
+		this.ClutterDensity       = clutter;
+		this.ClutterCount         = this.ClutterDensity * this.FilmArea.Height * this.FilmArea.Width * this.RangeClip.Length;
+		this.clutterGen           = new PoissonDistribution(this.ClutterCount);
 	}
 
 	/// <summary>
@@ -170,7 +166,7 @@ public class SimulatedVehicle : Vehicle
 
 		// Do a better noise (radial), though it seems to work just fine
 		State       = State.Add(time.ElapsedGameTime.TotalSeconds.Multiply(
-		                             U.RandomGaussianVector(new double[7] {0, 0, 0, 0, 0, 0, 0}, MotionCovariance)));
+		                             U.RandomGaussianVector(new double[7] {0, 0, 0, 0, 0, 0, 0}, MotionCovarianceQ)));
 		Orientation = Quaternion.Normalize(Orientation);
 		Waypoints.Add(new double[1] {time.TotalGameTime.TotalSeconds}.Concatenate(State));
 	}
