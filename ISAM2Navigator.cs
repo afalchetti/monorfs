@@ -194,7 +194,7 @@ public class ISAM2Navigator : Navigator
 	public override void SlamUpdate(GameTime time, List<double[]> measurements)
 	{
 		double[] odometry            = Vehicle.StateDiff(estimate, prevestimate);
-		double[] marshalmeasurements = new double[7 * measurements.Count];
+		double[] marshalmeasurements = new double[3 * measurements.Count];
 
 		for (int i = 0, h = 0; i < measurements.Count; i++) {
 			marshalmeasurements[h++] = measurements[i][0];
@@ -212,8 +212,8 @@ public class ISAM2Navigator : Navigator
 		List<double[]> trajectory = GetTrajectory();
 		estimate.State            = trajectory[trajectory.Count - 1];
 
-		List<Gaussian> mapmodel = GetMapModel();
-		WayMaps.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, mapmodel));
+		BestMapModel = GetMapModel();
+		WayMaps.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, BestMapModel));
 
 		estimate.State.CopyTo(prevestimate.State, 0);
 		UpdateMapHistory(time);
@@ -233,7 +233,7 @@ public class ISAM2Navigator : Navigator
 			double bestmatch = double.MaxValue;
 
 			for (int k = 0; k < mapmodel.Count; k++) {
-				double distance2 = mapmodel[k].Mean.SquareEuclidean(measurements[i]);
+				double distance2 = mapmodel[k].Mean.SquareEuclidean(BestEstimate.MeasureToMap(measurements[i]));
 				if (distance2 < bestmatch) {
 						bestmatch = distance2;
 						labels[i] = k;
@@ -306,12 +306,13 @@ public class ISAM2Navigator : Navigator
 	private unsafe List<double[]> GetTrajectory()
 	{
 		int            length;
-		double[]       point      = new double[7];
 		List<double[]> trajectory = new List<double[]>();
 
 		double* ptrtrajectory = (double*) gettrajectory(handle, out length);
 
 		for (int i = 0, k = 0; i < length; i++, k += 7) {
+			double[] point = new double[7];
+
 			point[0] = ptrtrajectory[k + 0];
 			point[1] = ptrtrajectory[k + 1];
 			point[2] = ptrtrajectory[k + 2];
@@ -334,14 +335,15 @@ public class ISAM2Navigator : Navigator
 	{
 		int            length;
 		Gaussian       component;
-		double[]       mean       = new double[3];
-		double[][]     covariance = {new double[3], new double[3], new double[3]};
 		List<Gaussian> mapmodel   = new List<Gaussian>();
 
 		double* ptrmapmodel = (double*) getmapmodel(handle, out length);
 		double* ptrmapcov   = (double*) mapmarginals(handle, out length);
 
 		for (int i = 0, k = 0, h = 0; i < length; i++, k += 3, h += 9) {
+			double[]   mean       = new double[3];
+			double[][] covariance = {new double[3], new double[3], new double[3]};
+
 			mean[0]          = ptrmapmodel[k + 0];
 			mean[1]          = ptrmapmodel[k + 1];
 			mean[2]          = ptrmapmodel[k + 2];

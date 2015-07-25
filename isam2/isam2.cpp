@@ -36,7 +36,6 @@ public:
 	vector<double> mapmodel;
 	vector<double> tmarginals;
 	vector<double> mmarginals;
-	vector<int>    mlabels;
 	ISAM2          isam;
 	Values         estimate;
 	double         focal;
@@ -46,7 +45,7 @@ public:
 	ISAM2Navigator(double focal, Noise measurementnoise, Noise motionnoise)
 		: t(0), tlength(1), msize(0),
 		  trajectory(vector<double>{0.0, 0.0, 0.0}), mapmodel(vector<double>()),
-		  tmarginals(vector<double>(36)), mmarginals(vector<double>()), mlabels(vector<int>()),
+		  tmarginals(vector<double>(36)), mmarginals(vector<double>()),
 		  isam(), estimate(), focal(focal),
 		  measurementnoise(measurementnoise), motionnoise(motionnoise) {}
 };
@@ -223,11 +222,10 @@ void update(ISAM2Navigator* navigator, double* odometry, double* measurements, i
 	navigator->tlength = navigator->tlength + 1;
 	navigator->msize   = navigator->estimate.size() - navigator->tlength;
 
-	navigator->trajectory.resize(7 * navigator->tlength);  // mean + covariance
+	navigator->trajectory.resize(7 * navigator->tlength);
 	navigator->mapmodel  .resize(3 * navigator->msize);
 	navigator->tmarginals.resize((7 * 7) * navigator->tlength);
 	navigator->mmarginals.resize((3 * 3) * navigator->msize);
-	navigator->mlabels   .resize(3 * navigator->msize);
 
 	for (auto item = navigator->estimate.begin(); item != navigator->estimate.end(); ++item) {
 		Symbol key(item->key);
