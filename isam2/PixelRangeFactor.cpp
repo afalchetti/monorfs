@@ -28,10 +28,10 @@ PixelRangeFactor::PixelRangeFactor() {}
 // create PixelRangeFactor instance given appropiate keys for the
 // relevant pose and landmark, the actual pixel-range measurement
 // a noise model and a camera focal length parameter
-PixelRangeFactor::PixelRangeFactor(Key poseKey, Key pointKey,
+PixelRangeFactor::PixelRangeFactor(Key poseKey, Key landmarkKey,
 	                               const double px, const double py, const double range,
 	                               const SharedNoiseModel& model, const double focal)
-		: NoiseModelFactor2<Pose3, Point3>(model, poseKey, pointKey),
+		: NoiseModelFactor2<Pose3, Point3>(model, poseKey, landmarkKey),
 		  px(px), py(py), range(range), focal(focal) {}
 
 // get a string representation of the PixelRangeFactor
@@ -56,11 +56,11 @@ bool PixelRangeFactor::equals(const NonlinearFactor& thatfactor, double eps) con
 // 
 // where |a-b| is the euclidean distance between a and b and
 // (.)L is performed on the local axis
-Vector PixelRangeFactor::evaluateError(const Pose3& pose, const Point3& point,
+Vector PixelRangeFactor::evaluateError(const Pose3& pose, const Point3& landmark,
 	                                   boost::optional<Matrix&> H1, boost::optional<Matrix&> H2) const
 {
 	Matrix jlocalpose, jlocalpoint;
-	Point3 local = pose.transform_to(point, jlocalpose, jlocalpoint);
+	Point3 local = pose.transform_to(landmark, jlocalpose, jlocalpoint);
 
 	double erange = local.norm();
 	double epx    = focal * local.x() / local.z();

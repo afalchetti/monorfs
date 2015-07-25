@@ -327,55 +327,6 @@ public class PHDNavigator : Navigator
 	}
 
 	/// <summary>
-	/// Update both the estimated map and the localization with debugging flags.
-	/// This means doing a model prediction and a measurement update.
-	/// This method is the core of the whole program.
-	/// </summary>
-	/// <param name="time">Provides a snapshot of timing values.</param>
-	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
-	/// <param name="predict">Predict flag; if false, no prediction step is done.</param>
-	/// <param name="correct">Correct flag; if false, no correction step is done.</param>
-	/// <param name="prune">Prune flag; if false, no prune step is done.</param>
-	[Obsolete("Debug flags are not that interesting with the algorithm working correctly.")]
-	public void SlamUpdate(GameTime time, List<double[]> measurements,
-	                                bool predict, bool correct, bool prune)
-	{
-		// map update
-		Parallel.For (0, VehicleParticles.Length, i => {
-			List<Gaussian> predicted, corrected;
-
-			if (predict) { predicted = PredictConditional(measurements, VehicleParticles[i], MapModels[i], toexplore[i]); }
-			else         { predicted = MapModels[i]; }
-
-			if (correct) { corrected = CorrectConditional(measurements, VehicleParticles[i], predicted); }
-			else         { corrected = predicted; }
-
-			if (prune)   { corrected = PruneModel(corrected); }
-
-			if (!OnlyMapping) { VehicleWeights[i] *= WeightAlpha(measurements, predicted, corrected, VehicleParticles[i]); }
-
-			MapModels[i] = corrected;
-		});
-
-		// localization update
-		if (!OnlyMapping) {
-			double sum = VehicleWeights.Sum();
-
-			if (sum == 0) {
-				sum = 1;
-			}
-
-			VehicleWeights = VehicleWeights.Divide(sum);
-
-			if (ParticleDepleted()) {
-				ResampleParticles();
-			}
-		}
-
-		UpdateMapHistory(time);
-	}
-
-	/// <summary>
 	/// Update the weights of each vehicle using the sequential importance sampling technique.
 	/// It uses most-probable-components approximation to solve the problem in polynomial time.
 	/// </summary>

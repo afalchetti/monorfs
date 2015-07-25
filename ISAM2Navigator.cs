@@ -61,14 +61,8 @@ public class ISAM2Navigator : Navigator
 	/// </summary>
 	public override SimulatedVehicle BestEstimate
 	{
-		get
-		{
-			return estimate;
-		}
-		set
-		{
-			estimate = value;
-		}
+		get { return estimate;  }
+		set { estimate = value;	}
 	}
 
 	/// <summary>
@@ -76,14 +70,8 @@ public class ISAM2Navigator : Navigator
 	/// </summary>
 	public override List<Gaussian> BestMapModel
 	{
-		get
-		{
-			return mapmodel;
-		}
-		set
-		{
-			mapmodel = value;
-		}
+		get { return mapmodel;  }
+		set { mapmodel = value; }
 	}
 
 	/// <summary>
@@ -91,14 +79,8 @@ public class ISAM2Navigator : Navigator
 	/// </summary>
 	public SimulatedVehicle PreviousEstimate
 	{
-		get
-		{
-			return prevestimate;
-		}
-		set
-		{
-			prevestimate = value;
-		}
+		get { return prevestimate;  }
+		set { prevestimate = value; }
 	}
 
 	/// <summary>
@@ -193,7 +175,7 @@ public class ISAM2Navigator : Navigator
 	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
 	public override void SlamUpdate(GameTime time, List<double[]> measurements)
 	{
-		double[] odometry            = Vehicle.StateDiff(estimate, prevestimate);
+		double[] odometry            = Vehicle.StateDiff(BestEstimate, prevestimate);
 		double[] marshalmeasurements = new double[3 * measurements.Count];
 
 		for (int i = 0, h = 0; i < measurements.Count; i++) {
@@ -210,12 +192,12 @@ public class ISAM2Navigator : Navigator
 		//      of PHD SLAM and only getting the current one is more suitable for
 		//      real-time simulation
 		List<double[]> trajectory = GetTrajectory();
-		estimate.State            = trajectory[trajectory.Count - 1];
+		BestEstimate.State        = trajectory[trajectory.Count - 1];
 
 		BestMapModel = GetMapModel();
 		WayMaps.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, BestMapModel));
 
-		estimate.State.CopyTo(prevestimate.State, 0);
+		BestEstimate.State.CopyTo(prevestimate.State, 0);
 		UpdateMapHistory(time);
 	}
 

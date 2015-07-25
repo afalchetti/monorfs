@@ -161,7 +161,11 @@ public class KinectVehicle : Vehicle
 	/// <param name="inputfile">Recorded data file.
 	/// If null or empty, an unspecified active hardware sensor is used.</param>
 	public KinectVehicle(string inputfile = null)
-		: base()
+		: base(new double[3] {0, 0, 0}, 0, new double[3] {1, 0, 0},
+		       575.8156 / Delta,
+		       new Rectangle(-640 / Delta / 2, -480 / Delta / 2,
+		                      640 / Delta,      480 / Delta),
+		       new Range(0.1f, 2f))
 	{
 		try {
 			device = Device.Open((!string.IsNullOrEmpty(inputfile)) ? inputfile : Device.AnyDevice);
