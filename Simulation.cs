@@ -169,7 +169,8 @@ public class Simulation : Manipulator
 		Commands        = commands;
 		SidebarHistory  = new List<Texture2D>();
 		WayMeasurements = new TimedMeasurements();
-		WayMeasurements.Add(Tuple.Create(0.0, new List<double[]>()));
+		// note that WayMeasurements starts empty as measurements are between frames
+		// so it will have a length |frames| - 1
 	}
 
 	/// <summary>

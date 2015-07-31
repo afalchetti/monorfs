@@ -365,6 +365,10 @@ public class Viewer : Manipulator
 			history.Add(Tuple.Create(time, measurements));
 		}
 
+		// measurements have one less data than everything else as they come
+		// in between frames; to simplify edge cases, add an "empty" measurement at the end
+		history.Add(Tuple.Create(double.PositiveInfinity, new List<double[]>()));
+
 		return history;
 	}
 
