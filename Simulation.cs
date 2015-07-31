@@ -19,6 +19,7 @@ using Microsoft.Xna.Framework.Input;
 using Accord.Math;
 using System.Text;
 
+using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
 
 namespace monorfs
@@ -78,14 +79,7 @@ public class Simulation : Manipulator
 	{
 		get
 		{
-			return string.Join("\n", Explorer.Waypoints.ConvertAll(p => p[0].ToString("F6") + " " +
-			                                                            p[1].ToString("F6") + " " +
-			                                                            p[2].ToString("F6") + " " +
-			                                                            p[3].ToString("F6") + " " +
-			                                                            p[4].ToString("F6") + " " +
-			                                                            p[5].ToString("F6") + " " +
-			                                                            p[6].ToString("F6") + " " +
-			                                                            p[7].ToString("F6")));
+			return SerializeWayPoints(Explorer.WayPoints);
 		}
 	}
 	
@@ -97,10 +91,9 @@ public class Simulation : Manipulator
 	{
 		get
 		{
-			return string.Join("\n", Navigator.Waypoints.ConvertAll(p => p[0].ToString("F6") + " " +
-			                                                             p[1].ToString("F6") + " " +
-			                                                             p[2].ToString("F6") + " " +
-			                                                             p[3].ToString("F6")));
+			return string.Join("\n|\n", Navigator.WayTrajectories.ConvertAll(t => t.Item1.ToString("F6") + "\n" + 
+			                                                                      Simulation.SerializeWayPoints(t.Item2)));
+		
 		}
 	}
 
@@ -127,6 +120,25 @@ public class Simulation : Manipulator
 			return string.Join("\n|\n", Navigator.WayMaps.ConvertAll(m => m.Item1.ToString("F6") + "\n" + string.Join("\n",
 			                                                              m.Item2.ConvertAll(g => g.LinearSerialization))));
 		}
+	}
+
+	/// <summary>
+	/// Serializes a trajectory waypoints.
+	/// </summary>
+	/// <returns>Serialization string.</returns>
+	/// <param name="waypoints">Trajectory.</param>
+	public static string SerializeWayPoints(TimedState waypoints)
+	{
+		return string.Join("\n", waypoints.ConvertAll(s => {double time = s.Item1;
+		                                                    double[] p = s.Item2;
+		                                                    return time.ToString("F6") + " " +
+		                                                           p[0].ToString("F6") + " " +
+		                                                           p[1].ToString("F6") + " " +
+		                                                           p[2].ToString("F6") + " " +
+		                                                           p[3].ToString("F6") + " " +
+		                                                           p[4].ToString("F6") + " " +
+		                                                           p[5].ToString("F6") + " " +
+		                                                           p[6].ToString("F6");}));
 	}
 
 	/// <summary>

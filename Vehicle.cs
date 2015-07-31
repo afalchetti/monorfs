@@ -19,6 +19,8 @@ using AForge;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
 
+using TimedState = System.Collections.Generic.List<System.Tuple<double, double[]>>;
+
 namespace monorfs
 {
 /// <summary>
@@ -213,7 +215,7 @@ public abstract class Vehicle : IDisposable
 	/// The first argument per item is a timestamp, the
 	/// next three are 3D coordinates.
 	/// </summary>
-	public List<double[]> Waypoints { get; set; }
+	public TimedState WayPoints { get; set; }
 	
 	/// <summary>
 	/// Cached measurements from the update process for rendering purposes.
@@ -259,8 +261,8 @@ public abstract class Vehicle : IDisposable
 
 		MappedMeasurements = new List<double[]>();
 
-		Waypoints = new List<double[]>();
-		Waypoints.Add(new double[1] {0}.Concatenate(state));
+		WayPoints = new TimedState();
+		WayPoints.Add(Tuple.Create(0.0, state));
 	}
 
 	/// <summary>
@@ -282,11 +284,11 @@ public abstract class Vehicle : IDisposable
 		this.MeasurementCovariance = that.MeasurementCovariance.MemberwiseClone();
 
 		if (copytrajectory) {
-			this.Waypoints = new List<double[]>(that.Waypoints);
+			this.WayPoints = new TimedState(that.WayPoints);
 		}
 		else {
-			this.Waypoints = new List<double[]>();
-			this.Waypoints.Add(new double[1] {0}.Concatenate(that.state));
+			this.WayPoints = new TimedState();
+			this.WayPoints.Add(Tuple.Create(0.0, that.state));
 		}
 	}
 	
@@ -313,8 +315,8 @@ public abstract class Vehicle : IDisposable
 	/// </summary>
 	public void ResetHistory()
 	{
-		Waypoints.Clear();
-		Waypoints.Add(new double[1] {0}.Concatenate(state));
+		WayPoints.Clear();
+		WayPoints.Add(Tuple.Create(0.0, state));
 	}
 
 	/// <summary>
@@ -548,10 +550,11 @@ public abstract class Vehicle : IDisposable
 	/// <param name="color">Trajectory color.</param>
 	public void RenderTrajectory(double[][] camera, Color color)
 	{
-		double[][] vertices = new double[Waypoints.Count][];
+		double[][] vertices = new double[WayPoints.Count][];
 
-		for (int i = 0; i < Waypoints.Count; i++) {
-			vertices[i] = camera.Multiply(new double[3] {Waypoints[i][1], Waypoints[i][2], Waypoints[i][3]});
+		for (int i = 0; i < WayPoints.Count; i++) {
+			double[] w  = WayPoints[i].Item2;
+			vertices[i] = camera.Multiply(new double[3] {w[0], w[1], w[2]});
 		}
 
 		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, false);

@@ -21,6 +21,7 @@ using Accord.Math;
 using System.Text;
 
 using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
+using TimedTrajectory   = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<System.Tuple<double, double[]>>>>;
 using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
 
@@ -44,7 +45,7 @@ public class Viewer : Manipulator
 	/// Recorded estimated vehicle trajectory indexed by time.
 	/// The first entry of each tuple is a time point in seconds; the second is the state.
 	/// </summary>
-	public TimedState Estimate { get; private set; }
+	public TimedTrajectory Estimate { get; private set; }
 
 	/// <summary>
 	/// Recorded maximum-a-posteriori estimate for the map indexed by time.
@@ -59,6 +60,22 @@ public class Viewer : Manipulator
 	public TimedMeasurements Measurements { get; private set; }
 
 	/// <summary>
+	/// Obtain vehicle history that corresponds to the current indexed time.
+	/// </summary>
+	public TimedState VehicleWaypoints
+	{
+		get {
+			TimedState waypoints = new TimedState();
+
+			for (int k = 0; k <= i; k++) {
+				waypoints.Add(Trajectory[k]);
+			}
+
+			return waypoints;
+		}
+	}
+
+	/// <summary>
 	/// Sidebar video filename.
 	/// </summary>
 	private string sidebarfile;
@@ -68,49 +85,10 @@ public class Viewer : Manipulator
 	/// </summary>
 	public List<Texture2D> SidebarHistory { get; private set; }
 
+	/// <summary>
+	/// "overriden" SideBuffer image.
+	/// </summary>
 	private Texture2D SideBuffer2;
-
-	/// <summary>
-	/// Vehicle waypoints internal cache.
-	/// </summary>
-	private List<double[]> vehiclewaypoints;
-
-	/// <summary>
-	/// Obtain vehicle history that corresponds to the current indexed time.
-	/// </summary>
-	public List<double[]> VehicleWaypoints
-	{
-		get {
-			List<double[]> waypoints = new List<double[]>();
-
-			for (int k = 0; k < i; k++) {
-				waypoints.Add(vehiclewaypoints[k]);
-			}
-
-			return waypoints;
-		}
-	}
-
-	/// <summary>
-	/// Estimate waypoints internal cache.
-	/// </summary>
-	private List<double[]> estimatewaypoints;
-
-	/// <summary>
-	/// Obtain estimate history that corresponds to the current indexed time.
-	/// </summary>
-	public List<double[]> EstimateWaypoints
-	{
-		get {
-			List<double[]> waypoints = new List<double[]>();
-
-			for (int k = 0; k < i; k++) {
-				waypoints.Add(estimatewaypoints[k]);
-			}
-
-			return waypoints;
-		}
-	}
 
 	/// <summary>
 	/// Mapping between trajectory indices and equivalent map indices (which may have a slower framerate).
@@ -132,7 +110,7 @@ public class Viewer : Manipulator
 	/// <param name="fps">Frame rate.</param>
 	/// <param name="mapclip">Initial observable area in the form [left, right, bottom, top]</param>
 	/// <param name="sidebarfile">Sidebar video filename.</param>
-	public Viewer(SimulatedVehicle explorer, TimedState trajectory, TimedState estimate,
+	public Viewer(SimulatedVehicle explorer, TimedState trajectory, TimedTrajectory estimate,
 	              TimedMapModel map, TimedMeasurements measurements,
 	              double fps, float[] mapclip, string sidebarfile)
 		: base(explorer, new PHDNavigator(explorer, 1, false), false, mapclip, fps)
@@ -143,17 +121,6 @@ public class Viewer : Manipulator
 		Measurements = measurements;
 		i            = 0;
 
-		vehiclewaypoints  = new List<double[]>();
-		estimatewaypoints = new List<double[]>();
-		
-		foreach (var point in trajectory) {
-			vehiclewaypoints.Add(new double[1] {point.Item1}.Concatenate(point.Item2));
-		}
-
-		foreach (var point in estimate) {
-			estimatewaypoints.Add(new double[1] {point.Item1}.Concatenate(point.Item2));
-		}
-
 		while (Measurements.Count < map.Count) {
 			Measurements.Add(Tuple.Create(map[Measurements.Count].Item1, new List<double[]>()));
 		}
@@ -161,8 +128,8 @@ public class Viewer : Manipulator
 		mapindices = new int[trajectory.Count];
 
 		int h = 0;
-		for (int k = 0; k < trajectory.Count; k++) {
-			while (h < map.Count - 1 && map[h].Item1 < trajectory[k].Item1) {
+		for (int k = 0; k < estimate.Count; k++) {
+			while (h < map.Count - 1 && map[h].Item1 < estimate[k].Item1) {
 				h++;
 			}
 
@@ -189,13 +156,13 @@ public class Viewer : Manipulator
 	{
 		SimulatedVehicle  explorer;
 		TimedState        trajectory;
-		TimedState        estimate;
+		TimedTrajectory   estimate;
 		TimedMapModel     map;
 		TimedMeasurements measurements;
 		float[]           mapclip;
 
 		trajectory   = trajectoryFromDescriptor(File.ReadAllLines(vehiclefile),  7);
-		estimate     = trajectoryFromDescriptor(File.ReadAllLines(estimatefile), 3);
+		estimate     = trajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), 7);
 		map          = mapHistoryFromDescriptor(File.ReadAllText(mapfile));
 
 		if (!string.IsNullOrEmpty(measurefile)) {
@@ -248,6 +215,35 @@ public class Viewer : Manipulator
 	/// <param name="dim">Expected state dimension.</param>
 	/// <returns>The trajectory, list of vectors representing state as a function of discrete time
 	/// (time is delivered as the first entry of each tuple).</returns>
+	private static TimedTrajectory trajectoryHistoryFromDescriptor(string descriptor, int dim = 7)
+	{
+		string[]        frames  = descriptor.Split(new string[] {"\n|\n"}, StringSplitOptions.RemoveEmptyEntries);
+		TimedTrajectory history = new TimedTrajectory();
+
+		foreach (string frame in frames) {
+			string[] lines = frame.Split(new char[] {'\n'}, StringSplitOptions.RemoveEmptyEntries);
+			double time    = -1;
+
+			try {
+				time = double.Parse(lines[0]);
+			}
+			catch (FormatException) {
+				throw new FormatException("bad trajectory format: missing time");
+			}
+
+			history.Add(Tuple.Create(time, trajectoryFromDescriptor(lines.Submatrix(1, lines.Length - 1), dim)));
+		}
+
+		return history;
+	}
+
+	/// <summary>
+	/// Get a trajectory from a formatted string descriptor.
+	/// </summary>
+	/// <param name="lines">Array of formatted state vectors moving through time.</param>
+	/// <param name="dim">Expected state dimension.</param>
+	/// <returns>The trajectory, list of vectors representing state as a function of discrete time
+	/// (time is delivered as the first entry of each tuple).</returns>
 	private static TimedState trajectoryFromDescriptor(string[] lines, int dim = 7)
 	{
 		TimedState trajectory = new TimedState();
@@ -255,14 +251,11 @@ public class Viewer : Manipulator
 		foreach (string line in lines) {
 			double[] values = ParseDoubleList(line);
 
-			if (values.Length != dim + 1) {  // an extra dimension for time
+			if (values.Length != dim + 1) {  // state + time
 				throw new FormatException("wrong state dimension");
 			}
 
-			double   time  = values[0];
-			double[] state = values.Submatrix(1, values.Length - 1);
-
-			trajectory.Add(Tuple.Create(time, state));
+			trajectory.Add(Tuple.Create(values[0], values.Submatrix(1, values.Length - 1)));
 		}
 
 		return trajectory;
@@ -295,6 +288,28 @@ public class Viewer : Manipulator
 		}
 
 		return history;
+	}
+
+	/// <summary>
+	/// Get a map model from a formatted string descriptor.
+	/// </summary>
+	/// <param name="descriptor">Formatted map descriptor.</param>
+	/// <param name="dim">Expected world dimension.</param>
+	/// <returns>The map model as a vector of gaussian components.</returns>
+	private static List<Gaussian> mapFromDescriptor(string[] lines, int dim = 3)
+	{
+		List<Gaussian> map = new List<Gaussian>();
+
+		for (int i = 0; i < lines.Length; i++) {
+			Gaussian component = ParseGaussianDescriptor(lines[i]);
+			map.Add(component);
+
+			if (component.Mean.Length != dim) {
+				throw new FormatException("wrong gaussian dimension");
+			}
+		}
+
+		return map;
 	}
 
 	/// <summary>
@@ -393,28 +408,6 @@ public class Viewer : Manipulator
 	}
 
 	/// <summary>
-	/// Get a map model from a formatted string descriptor.
-	/// </summary>
-	/// <param name="descriptor">Formatted map descriptor.</param>
-	/// <param name="dim">Expected world dimension.</param>
-	/// <returns>The map model as a vector of gaussian components.</returns>
-	private static List<Gaussian> mapFromDescriptor(string[] lines, int dim = 3)
-	{
-		List<Gaussian> map = new List<Gaussian>();
-
-		for (int i = 0; i < lines.Length; i++) {
-			Gaussian component = ParseGaussianDescriptor(lines[i]);
-			map.Add(component);
-
-			if (component.Mean.Length != dim) {
-				throw new FormatException("wrong gaussian dimension");
-			}
-		}
-
-		return map;
-	}
-
-	/// <summary>
 	/// Allow the viewer to run logic such as updating the world,
 	/// and gathering input.
 	/// </summary>
@@ -434,18 +427,17 @@ public class Viewer : Manipulator
 		}
 
 		SideBuffer2            = SidebarHistory[i];
-		Explorer .State        = Trajectory[i].Item2;
-		Explorer .Waypoints    = VehicleWaypoints;
-		Navigator.Waypoints    = EstimateWaypoints;
+		Explorer .WayPoints    = VehicleWaypoints;
+		Explorer .State        = Explorer.WayPoints[Explorer.WayPoints.Count - 1].Item2;
 		Navigator.BestMapModel = Map[mapindices[i]].Item2;
-		Navigator.BestEstimate.Waypoints = EstimateWaypoints;
+		Navigator.BestEstimate.WayPoints = Estimate[i].Item2;
 
 		Explorer.MappedMeasurements.Clear();
 		foreach (double[] z in Measurements[mapindices[i]].Item2) {
 			Explorer.MappedMeasurements.Add(Explorer.MeasureToMap(z));
 		}
 
-		Message = string.Format("time = {0,12:N4}        frame = {1,5:N0}", Trajectory[i].Item1, i);
+		Message = string.Format("time = {0,12:N4}        frame = {1,5:N0}", Estimate[i].Item1, i);
 		
 		// frame-by-frame fine time lookup, reverse
 		if (keyboard.IsKeyDown(Keys.Q) && !prevkeyboard.IsKeyDown(Keys.Q)) {

@@ -163,7 +163,6 @@ public class ISAM2Navigator : Navigator
 	                            double dyaw, double dpitch, double droll)
 	{
 		BestEstimate.Update(time, dx, dy, dz, dyaw, dpitch, droll);
-		UpdateTrajectory(time);
 	}
 
 	/// <summary>
@@ -186,18 +185,27 @@ public class ISAM2Navigator : Navigator
 
 		Update(odometry, marshalmeasurements, findLabels(measurements), measurements.Count);
 
-		// NOTE the whole path could change retroactively but that requires more
-		//      comprehensive structural changes so, for now, only update the
-		//      "current position"; this is similar to the "best retroactive particle"
-		//      of PHD SLAM and only getting the current one is more suitable for
-		//      real-time simulation
+		// updates the estimated complete path to show the batch nature of the algorithm
 		List<double[]> trajectory = GetTrajectory();
 		BestEstimate.State        = trajectory[trajectory.Count - 1];
+		BestMapModel              = GetMapModel();
 
-		BestMapModel = GetMapModel();
-		WayMaps.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, BestMapModel));
+		// copy the new estimated trajectory (given by iSAM2) into the BestEstimate
+		// variable, using the previous timestamps, as they do not change
+		for (int i = 0; i < trajectory.Count - 1; i++) {
+			BestEstimate.WayPoints[i] = Tuple.Create(BestEstimate.WayPoints[i].Item1, trajectory[i]);
+		}
+
+		// the last one does not have a previous (valid) timestamp so it must be created
+		BestEstimate.WayPoints[trajectory.Count - 1] =
+			Tuple.Create(time.TotalGameTime.TotalSeconds, trajectory[trajectory.Count - 1]);
+
+		// BestEstimate may have been updated several times since the last call to
+		// this method, so it could contain a lot of unused data, remove it
+		BestEstimate.WayPoints = BestEstimate.WayPoints.GetRange(0, trajectory.Count);
 
 		BestEstimate.State.CopyTo(prevestimate.State, 0);
+		UpdateTrajectory(time);
 		UpdateMapHistory(time);
 	}
 

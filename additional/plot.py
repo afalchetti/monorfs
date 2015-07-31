@@ -32,18 +32,22 @@ def readscene(descriptor):
 	        "worldclip": {"left": world[0], "right": world[1], "top": world[2], "bottom": world[3]},
 	        "map": landmarks}
 
-def readtrajectories(descriptor):
+def readtrajectory(descriptor):
 	descriptor = normalizelinefeeds(descriptor)
 	points     = (tuple(float(n) for n in point.split()) for point in descriptor.split("\n"))
 	
 	return [{"time": p[0], "pos": np.array((p[1], p[2], p[3]))} for p in points]
+
+def readfinaltrajectory(descriptor):
+	# get last block and remove first line (timestamp)
+	return readtrajectory(descriptor.rsplit("\n|\n", 1)[1].split("\n", 1)[1])
 
 def readmaps(descriptor):
 	descriptor  = normalizelinefeeds(descriptor)
 	descriptors = (block.split("\n", 1) for block in descriptor.split("\n|\n"))
 	
 	return [tuple((float(head), [parsegaussian(line) for line in tail.split("\n") if line != ""])) for (head, tail) in descriptors]
-	
+
 def parsegaussian(descriptor):
 	descriptors = descriptor.split(";")
 	weight      = float(descriptor[0])
@@ -125,12 +129,13 @@ if __name__ == '__main__':
 	with open("map.world") as sfile:
 		scene = readscene(sfile.read())
 	
-	print "reading trajectories"
+	print "reading trajectory"
 	with open("trajectory.out") as tfile:
-		trajectory = readtrajectories(tfile.read())
-		
+		trajectory = readtrajectory(tfile.read())
+	
+	print "reading estimate"
 	with open("estimate.out") as efile:
-		estimate   = readtrajectories(efile.read())
+		estimate   = readfinaltrajectory(efile.read())
 	
 	print "reading maps"
 	with open("maps.out") as mfile:

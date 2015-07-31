@@ -241,7 +241,7 @@ public class KinectVehicle : Vehicle
 		Location    = new double[3] {X + dlocation.X, Y + dlocation.Y, Z + dlocation.Z};
 		Orientation = neworientation;
 		Orientation = Quaternion.Normalize(Orientation);
-		Waypoints.Add(new double[1] {time.TotalGameTime.TotalSeconds}.Concatenate(State));
+		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, State));
 	}
 	
 	/// <summary>

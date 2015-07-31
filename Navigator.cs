@@ -19,8 +19,9 @@ using Microsoft.Xna.Framework.Graphics;
 using NUnit.Framework;
 using System.Timers;
 
-using TimedState    = System.Collections.Generic.List<System.Tuple<double, double[]>>;
-using TimedMapModel = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
+using TimedState      = System.Collections.Generic.List<System.Tuple<double, double[]>>;
+using TimedTrajectory = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<System.Tuple<double, double[]>>>>;
+using TimedMapModel   = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
 
 namespace monorfs
 {
@@ -35,9 +36,17 @@ public abstract class Navigator : IDisposable
 	public Vehicle RefVehicle { get; private set; }
 
 	/// <summary>
-	/// Estimated trajectory.
+	/// Estimated trajectory history.
+	/// Accounts for the fact that estimates can retroactively change.
 	/// </summary>
-	public List<double[]> Waypoints { get; set; }
+	public TimedTrajectory WayTrajectories { get; set; }
+
+	/// <summary>
+	/// Most current estimated trajectory.
+	/// </summary>
+	public TimedState WayPoints {
+		get { return WayTrajectories[WayTrajectories.Count - 1].Item2; }
+	}
 
 	/// <summary>
 	/// Best map history.
@@ -68,14 +77,8 @@ public abstract class Navigator : IDisposable
 	/// Render output.
 	/// </summary>
 	public virtual GraphicsDevice Graphics {
-		get
-		{
-			return graphics;
-		}
-		set
-		{
-			graphics = value;
-		}
+		get { return graphics;  }
+		set { graphics = value; }
 	}
 
 	/// <summary>
@@ -96,8 +99,8 @@ public abstract class Navigator : IDisposable
 		// the real vehicle pose
 		RefVehicle = vehicle;
 
-		Waypoints = new List<double[]>();
-		Waypoints.Add(new double[4] {0, vehicle.X, vehicle.Y, vehicle.Z});
+		WayTrajectories = new TimedTrajectory();
+		WayTrajectories.Add(Tuple.Create(0.0, new TimedState {Tuple.Create(0.0, vehicle.State)}));
 
 		WayMaps = new TimedMapModel();
 		WayMaps.Add(Tuple.Create(0.0, new List<Gaussian>()));
@@ -155,14 +158,11 @@ public abstract class Navigator : IDisposable
 	/// </summary>
 	public virtual void ResetHistory()
 	{
-		Waypoints.Clear();
-		WayMaps  .Clear();
-		
-		Waypoints = new List<double[]>();
-		Waypoints.Add(new double[4] {0, BestEstimate.X, BestEstimate.Y, BestEstimate.Z});
+		WayTrajectories.Clear();
+		WayMaps        .Clear();
 
-		WayMaps = new TimedMapModel();
-		WayMaps.Add(Tuple.Create(0.0, new List<Gaussian>()));
+		WayTrajectories.Add(Tuple.Create(0.0, new TimedState {Tuple.Create(0.0, BestEstimate.State)}));
+		WayMaps        .Add(Tuple.Create(0.0, new List<Gaussian>()));
 	}
 
 	/// <summary>
@@ -193,8 +193,8 @@ public abstract class Navigator : IDisposable
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	protected void UpdateTrajectory(GameTime time)
 	{
-		Vehicle best = BestEstimate;
-		Waypoints.Add(new double[4] {time.TotalGameTime.TotalSeconds, best.X, best.Y, best.Z});
+		TimedState waypoints = new TimedState(BestEstimate.WayPoints);
+		WayTrajectories.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, waypoints));
 	}
 	
 	/// <summary>
@@ -237,11 +237,12 @@ public abstract class Navigator : IDisposable
 	/// <param name="camera">Camera rotation matrix.</param>
 	public void RenderTrajectory(double[][] camera)
 	{
-		double[][] vertices = new double[Waypoints.Count][];
+		double[][] vertices = new double[WayPoints.Count][];
 		Color color = Color.Blue;
 
-		for (int i = 0; i < Waypoints.Count; i++) {
-			vertices[i] = camera.Multiply(new double[3] {Waypoints[i][1], Waypoints[i][2], Waypoints[i][3]});
+		for (int i = 0; i < WayPoints.Count; i++) {
+			double[] w  = WayPoints[i].Item2;
+			vertices[i] = camera.Multiply(new double[3] {w[0], w[1], w[2]});
 		}
 
 		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, false);
