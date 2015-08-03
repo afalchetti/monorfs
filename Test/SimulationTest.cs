@@ -42,11 +42,12 @@ namespace monorfs.Test
 [TestFixture]
 class SimulationTest
 {
-	private Simulation               simulation;
-	private Vehicle                  explorer;
-	private PHDNavigator             navigator;
-	private GameTime                 lastnavigationupdate;
-	private CircularBuffer<double[]> commands;
+	private Simulation     simulation;
+	private Vehicle        explorer;
+	private PHDNavigator   navigator;
+	private GameTime       lastnavigationupdate;
+	private List<double[]> commands;
+	private int            commandindex;
 
 	private readonly Action nop = () => {};
 
@@ -94,11 +95,17 @@ class SimulationTest
 	/// </summary>
 	public void Update(GameTime time, bool forceslam, bool forcemapping, Action updatehook, Action measurehook, Action slamhook)
 	{
-		double[] autocmd = commands.Next();
+		double[] autocmd = commands[commandindex];
 		double   ds      = autocmd[0];
 		double   dyaw    = autocmd[1];
 		double   dpitch  = autocmd[2];
 		double   droll   = autocmd[3];
+
+		commandindex++;
+
+		if (commandindex >= commands.Count) {
+			commandindex = 0;
+		}
 
 		explorer .Update(time, 0, 0, ds, dyaw, dpitch, droll);
 		navigator.Update(time, 0, 0, ds, dyaw, dpitch, droll);

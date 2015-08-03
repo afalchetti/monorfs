@@ -55,12 +55,18 @@ public class Simulation : Manipulator
 	/// <summary>
 	/// Automatic simulation command input.
 	/// </summary>
-	public CircularBuffer<double[]> Commands { get; private set; }
+	public List<double[]> Commands { get; private set; }
 
 	/// <summary>
 	/// Frame number for the command list.
 	/// </summary>
 	private int commandindex;
+
+	/// <summary>
+	/// True if all command frames have been played;
+	/// this signals the system to shutdown.
+	/// </summary>
+	private bool commanddepleted;
 
 	/// <summary>
 	/// Measure cycle period. Every this amount of
@@ -175,7 +181,7 @@ public class Simulation : Manipulator
 	/// as it had taken exactly the nominal rate.</param>
 	/// <param name="mapclip">Initial observable area in the form [left, right, bottom, top]</param>
 	/// <param name="algorithm">SLAM navigation algorithm.</param>
-	public Simulation(Vehicle explorer, CircularBuffer<double[]> commands, int particlecount,
+	public Simulation(Vehicle explorer, List<double[]> commands, int particlecount,
 	                  bool onlymapping, bool realtime, float[] mapclip,
 	                  NavigationAlgorithm algorithm)
 		: base(explorer,
@@ -185,6 +191,9 @@ public class Simulation : Manipulator
 		        realtime, mapclip)
 	{
 		Commands        = commands;
+		commandindex    = 0;
+		commanddepleted = false;
+
 		SidebarHistory  = new List<Texture2D>();
 		WayMeasurements = new TimedMeasurements();
 		// note that WayMeasurements starts empty as measurements are between frames
@@ -212,9 +221,9 @@ public class Simulation : Manipulator
 	                                   bool onlymapping = false, bool simulate = true, bool realtime = false,
 	                                   NavigationAlgorithm algorithm = NavigationAlgorithm.PHD)
 	{
-		Vehicle                  explorer;
-		CircularBuffer<double[]> commands;
-		float[]                  mapclip;
+		Vehicle        explorer;
+		List<double[]> commands;
+		float[]        mapclip;
 
 		if (simulate) {
 			explorer = VehicleFromSimFile(File.ReadAllText(scenefile), out mapclip);
@@ -228,13 +237,12 @@ public class Simulation : Manipulator
 				commands =  commandsFromDescriptor(File.ReadAllLines(commandfile));
 			}
 			else {
-				commands = new CircularBuffer<double[]>(1);
-				commands.Add(new double[7] {0, 0, 0, 0, 0, 0, 0});
+				commands = new List<double[]>();
 			}
 		}
 		catch (FileNotFoundException) {
-			commands = new CircularBuffer<double[]>(1);
-			commands.Add(new double[7] {0, 0, 0, 0, 0, 0, 0});
+			Console.WriteLine("command file not found: " + commandfile);
+			commands = new List<double[]>();
 		}
 
 		return new Simulation(explorer, commands, particlecount, onlymapping, realtime, mapclip, algorithm);
@@ -245,13 +253,9 @@ public class Simulation : Manipulator
 	/// </summary>
 	/// <param name="commandstr">Command descriptor array.</param>
 	/// <returns>Command list.</returns>
-	private static CircularBuffer<double[]> commandsFromDescriptor(string[] commandstr)
+	private static List<double[]> commandsFromDescriptor(string[] commandstr)
 	{
-		if (commandstr.Length < 1) {
-			commandstr = new string[1] {"0 0 0 0 0 0 0"};
-		}
-
-		CircularBuffer<double[]> commands = new CircularBuffer<double[]>(commandstr.Length);
+		List<double[]> commands = new List<double[]>(commandstr.Length);
 
 		for (int i = 0; i < commandstr.Length; i++) {
 			commands.Add(ParseDoubleList(commandstr[i]));
@@ -267,7 +271,6 @@ public class Simulation : Manipulator
 	/// </summary>
 	protected override void Initialize()
 	{
-		commandindex = 0;
 		base.Initialize();
 	}
 
@@ -281,6 +284,10 @@ public class Simulation : Manipulator
 	/// <param name="multiplier">Movement scale multiplier.</param>
 	protected override void Update(GameTime time, KeyboardState keyboard, KeyboardState prevkeyboard, double multiplier)
 	{
+		if (commanddepleted) {
+			Exit();
+		}
+
 		double dlocx     = 0;
 		double dlocy     = 0;
 		double dlocz     = 0;
@@ -331,8 +338,8 @@ public class Simulation : Manipulator
 		}
 		
 		if (!Paused) {
-			if (commandindex < Commands.Size) {
-				double[] autocmd = Commands.Next();
+			if (commandindex < Commands.Count) {
+				double[] autocmd = Commands[commandindex];
 		
 				dlocx  += autocmd[0];
 				dlocy  += autocmd[1];
@@ -343,9 +350,11 @@ public class Simulation : Manipulator
 
 				commandindex++;
 			}
-			else if (Commands.Size != 1) {
-				Paused = true;
-				commandindex = 0;
+			else if (Commands.Count != 0) {
+				Paused          = true;
+				commanddepleted = true;
+				// the depletion will trigger an exit in the next update
+				// do not do it now, as the last frame still needs to be processed and rendered
 			}
 
 			Explorer.Update(time, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
