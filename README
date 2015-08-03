@@ -47,4 +47,4 @@ monorfs -s -f=map.world -c=movements.in -p=20 -y
 monorfs -s -f=map.world -c=movements.in -p=20 -y -a=isam2
 
 # Open a previous run with a Viewer
-monorfs -v -f=map.world -t=trajectory.out -e=estimate.out -m=maps.out -b=sidebar.avi -x=measurements.out
+monorfs -v -f=map.world

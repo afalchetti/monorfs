@@ -29,6 +29,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -162,16 +163,33 @@ public class Viewer : Manipulator
 	/// <summary>
 	/// Create a visualization object from a pair of formatted description files.
 	/// </summary>
-	/// <param name="vehiclefile">Vehicle trajectory descriptor file.</param>
-	/// <param name="estimatefile">Vehicle trajectory estimation descriptor file.</param>
-	/// <param name="mapfile">Map estimation descriptor file.</param>
-	/// <param name="sidebarfile">Sidebar history video file.</param>
-	/// <param name="measurefile">Vehicle sensed measurements file, may be null or empty.</param>
+	/// <param name="datafile">Compressed prerecorded data file.</param>
 	/// <param name="scenefile">Scene descriptor file, may be null or empty.</param>
+	/// <param name="tmpdir">Temporary data directory, to be removed after use.</param>
 	/// <returns>Prepared visualization object.</returns>
 	/// <remarks>All file must be previously sorted by time value. This property is assumed.</remarks>
-	public static Viewer FromFiles(string vehiclefile, string estimatefile, string mapfile, string sidebarfile = "", string measurefile = "", string scenefile = "")
+	public static Viewer FromFiles(string datafile, string scenefile, out string tmpdir)
 	{
+		tmpdir         = Util.TemporaryDir();
+		string datadir = Path.Combine(tmpdir, "data");
+
+		ZipFile.ExtractToDirectory(datafile, datadir);
+
+		string vehiclefile  = Path.Combine(datadir, "trajectory.out");
+		string estimatefile = Path.Combine(datadir, "estimate.out");
+		string mapfile      = Path.Combine(datadir, "maps.out");
+		string measurefile  = Path.Combine(datadir, "measurements.out");
+		string sidebarfile  = Path.Combine(datadir, "sidebar.avi");
+
+		if (!File.Exists(measurefile)) {
+			measurefile = "";
+		}
+
+		if (!File.Exists(sidebarfile)) {
+			sidebarfile = "";
+
+		}
+
 		SimulatedVehicle  explorer;
 		TimedState        trajectory;
 		TimedTrajectory   estimate;
@@ -179,9 +197,9 @@ public class Viewer : Manipulator
 		TimedMeasurements measurements;
 		float[]           mapclip;
 
-		trajectory   = trajectoryFromDescriptor(File.ReadAllLines(vehiclefile),  7);
+		trajectory   = trajectoryFromDescriptor       (File.ReadAllLines(vehiclefile),  7);
 		estimate     = trajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), 7);
-		map          = mapHistoryFromDescriptor(File.ReadAllText(mapfile));
+		map          = mapHistoryFromDescriptor       (File.ReadAllText(mapfile));
 
 		if (!string.IsNullOrEmpty(measurefile)) {
 			measurements = measurementsFromDescriptor(File.ReadAllText(measurefile));

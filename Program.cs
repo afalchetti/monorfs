@@ -29,6 +29,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Runtime.InteropServices;
 using Accord.Extensions.Imaging;
 using Microsoft.Xna.Framework;
@@ -42,55 +43,6 @@ namespace monorfs
 /// </summary>
 public class Program
 {
-	/// <summary>
-	/// Save a 2d image into a stream as a PNG file.
-	/// </summary>
-	/// <param name="image">Image to be saved.</param>
-	/// <param name="file">Output filename.</param>
-	public static void SaveAsPng(Texture2D image, string file)
-	{
-		GraphicsDevice  graphics = new GraphicsDevice(GraphicsAdapter.DefaultAdapter,
-		                                              GraphicsProfile.HiDef,
-		                                              new PresentationParameters());
-		RenderTarget2D halfsize = new RenderTarget2D(graphics, image.Width / 2, image.Height / 2,
-		                                              false, SurfaceFormat.Color, DepthFormat.None,
-		                                              0, RenderTargetUsage.DiscardContents);
-		SpriteBatch sb = new SpriteBatch(graphics);
-		
-		graphics.SetRenderTarget(halfsize);
-		graphics.Clear(Color.Black);
-
-		sb.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
-				 DepthStencilState.None, RasterizerState.CullNone);
-		sb.Draw(image, new Rectangle(0, 0, halfsize.Width, halfsize.Height), Color.White);
-		sb.End();
-
-		byte[] data = new byte[4 * halfsize.Width * halfsize.Height];
-		halfsize.GetData(data);
-
-		// the internal format is ABGR but this isn't supported by S.Drawing.Bitmap
-		// so this makes it ARGB. Note that the bytes are reversed (little endianness)
-		for (int i = 0; i < data.Length; i += 4) {
-			byte temp   = data[i + 0];
-			data[i + 0] = data[i + 2];
-			data[i + 2] = temp;
-			data[i + 3] = 255;
-		}
-		
-		using (var stream = new MemoryStream(data)) {
-		using (var bitmap = new System.Drawing.Bitmap(halfsize.Width, halfsize.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb)) {
-			var bitmapdata = bitmap.LockBits(new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height),
-			                                 System.Drawing.Imaging.ImageLockMode.WriteOnly, bitmap.PixelFormat);
-
-			Marshal.Copy(data, 0, bitmapdata.Scan0, data.Length);
-
-			bitmap.UnlockBits(bitmapdata);
-
-			bitmap.Save(file, System.Drawing.Imaging.ImageFormat.Png);
-		}
-		}
-	}
-
 	/// <summary>
 	/// Save a stream of image frames as an AVI video file.
 	/// </summary>
@@ -149,11 +101,7 @@ public class Program
 	//[STAThread]
 	public static void Main(string[] args)
 	{
-		string vehiclefile   = "";
-		string estimatefile  = "";
-		string mapfile       = "";
-		string sidebarfile   = "";
-		string measurefile   = "";
+		string recfile       = "data.zip";
 		string scenefile     = "";
 		string commandfile   = "";
 		int    particlecount = 1;
@@ -166,19 +114,15 @@ public class Program
 		NavigationAlgorithm algorithm = NavigationAlgorithm.PHD;
 
 		OptionSet options = new OptionSet() {
-			{ "f|file=",       "Scene description file. Simulated, recorded or device id.",    f       => scenefile     = f },
+			{ "f|scene=",      "Scene description file. Simulated, recorded or device id.",    f       => scenefile     = f },
+			{ "r|recfile=",    "Recording file. Saves State and events for reviewing.",        r       => recfile       = r },
 			{ "c|command=",    "Auto-command file (simulates user input).",                    c       => commandfile   = c },
+			{ "a|algorithm=",  "SLAM solver algorithm (phd or isam2)",                         a       => algorithm     = (a != "isam2") ? NavigationAlgorithm.PHD : NavigationAlgorithm.ISAM2 },
 			{ "p|particles=",  "Number of particles used for the RB-PHD",                      (int p) => particlecount = p },
 			{ "y|onlymap",     "Only do mapping, assuming known localization.",                y       => onlymapping   = y != null },
 			{ "s|simulate",    "Generate an artificial simulation instead of using a sensor.", s       => simulate      = s != null },
-			{ "r|realtime",    "Process the system in realtime, instead of a fixed step.",     r       => realtime      = r != null },
+			{ "R|realtime",    "Process the system in realtime, instead of a fixed step.",     R       => realtime      = R != null },
 			{ "v|view",        "View a precorded session.",                                    v       => viewer        = v != null },
-			{ "t|trajectory=", "Prerecorded trajectory file.",                                 t       => vehiclefile   = t },
-			{ "e|estimate=",   "Prerecorded estimation file.",                                 e       => estimatefile  = e },
-			{ "m|map=",        "Prerecorded map history file.",                                m       => mapfile       = m },
-			{ "b|sidebar=",    "Prerecorded sidebar video file.",                              b       => sidebarfile   = b },
-			{ "x|measure=",    "Prerecorded measurement history file.",                        m       => measurefile   = m },
-			{ "a|algorithm=",  "SLAM solver algorithm (phd or isam2)",                         a       => algorithm     = (a != "isam2") ? NavigationAlgorithm.PHD : NavigationAlgorithm.ISAM2 },
 			{ "h|help",        "Show this message and exit",                                   h       => showhelp      = h != null }
 		};
 
@@ -203,25 +147,44 @@ public class Program
 		}
 
 		if (viewer) {
-			using (Viewer sim = Viewer.FromFiles(vehiclefile, estimatefile, mapfile, sidebarfile, measurefile, scenefile)) {
+			string tmpdir;
+
+			using (Viewer sim = Viewer.FromFiles(recfile, scenefile, out tmpdir)) {
 				sim.Run();
+				Directory.Delete(tmpdir, true);
 			}
 		}
 		else {
 			using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, onlymapping, simulate, realtime, algorithm)) {
 				sim.Run();
 
-				Console.WriteLine("writing output");
-				File.WriteAllText("trajectory.out",   sim.SerializedTrajectory);
-				File.WriteAllText("estimate.out",     sim.SerializedEstimate);
-				File.WriteAllText("maps.out",         sim.SerializedMaps);
-				File.WriteAllText("measurements.out", sim.SerializedMeasurements);
-				
-				Console.WriteLine("Writing snapshot");
-				SaveAsPng(sim.SceneBuffer, "final.png");
+				string tmp    = Util.TemporaryDir();
+				string output = Path.Combine(tmp, "out");
+				Directory.CreateDirectory(output);
 
-				Console.WriteLine("Writing sidebar video");
-				SaveAsAvi(sim.SidebarHistory, "sidebar.avi");
+				Console.WriteLine("writing output");
+
+				Console.WriteLine("  -- writing trajectory history");
+				File.WriteAllText(Path.Combine(output, "trajectory.out"),   sim.SerializedTrajectory);
+				Console.WriteLine("  -- writing estimate history");
+				File.WriteAllText(Path.Combine(output, "estimate.out"),     sim.SerializedEstimate);
+				Console.WriteLine("  -- writing map model history");
+				File.WriteAllText(Path.Combine(output, "maps.out"),         sim.SerializedMaps);
+				Console.WriteLine("  -- writing measurements history");
+				File.WriteAllText(Path.Combine(output, "measurements.out"), sim.SerializedMeasurements);
+				Console.WriteLine("  -- writing sidebar video");
+				SaveAsAvi(sim.SidebarHistory, Path.Combine(output, "sidebar.avi"));
+
+				Console.WriteLine("  -- compressing");
+
+				if (File.Exists(recfile)) {
+					File.Delete(recfile);
+				}
+
+				ZipFile.CreateFromDirectory(output, recfile);
+
+				Console.WriteLine("  -- cleaning up");
+				Directory.Delete(tmp, true);
 			}
 		}
 

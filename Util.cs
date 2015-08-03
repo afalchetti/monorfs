@@ -139,6 +139,38 @@ public static class Util
 	}
 
 	/// <summary>
+	/// Realize a random vector from a gaussian distribution around a specified mean
+	/// vector with a given covvariance.
+	/// </summary>
+	/// <param name="mean">Distribution mean vector.</param>
+	/// <param name="covariance">Distribution covariance matrix.</param>
+	/// <returns>Random vector.</returns>
+	public static double[] RandomGaussianVector(double[] mean, double[][] covariance)
+	{
+		// first find the square root of the covariance matrix
+		// C such as C * C^T = covariance
+		var       cholesky = new CholeskyDecomposition(covariance.ToMatrix());
+		double[]  sqrtdiag = cholesky.Diagonal;
+		double[,] covroot;
+
+		for (int i = 0; i < sqrtdiag.Length; i++) {
+			sqrtdiag[i] = Math.Sqrt(sqrtdiag[i]);
+		}
+
+		covroot = cholesky.LeftTriangularFactor.MultiplyByDiagonal(sqrtdiag);
+
+		// and then use the random variable Y = mean + C * Z
+		// with Z an independent canonical gaussian random vector ~N(0, 1)
+		// to obtain the multinormal correlated  random vector
+		double[]  canonical = new double[mean.Length];
+		for (int i = 0; i < canonical.Length; i++) {
+			canonical[i] = gaussian.Next();
+		}
+
+		return mean.Add(covroot.Multiply(canonical));
+	}
+
+	/// <summary>
 	/// Get a dictionary from a tabular string descriptor.
 	/// All entries have 'string' type. The entry separator is a newline.
 	/// Keys must not have any whitespace on their line and values associated
@@ -181,35 +213,28 @@ public static class Util
 	}
 
 	/// <summary>
-	/// Realize a random vector from a gaussian distribution around a specified mean
-	/// vector with a given covvariance.
+	/// Create a temporary directory.
+	/// Unless maliciously attacked or extremely bad luck
+	/// (extreme data race + 57bits randomness), the directory
+	/// will be unique - sadly, no mkdtemp in Windows|.Net.
 	/// </summary>
-	/// <param name="mean">Distribution mean vector.</param>
-	/// <param name="covariance">Distribution covariance matrix.</param>
-	/// <returns>Random vector.</returns>
-	public static double[] RandomGaussianVector(double[] mean, double[][] covariance)
+	/// <returns>Directory path.</returns>
+	public static string TemporaryDir()
 	{
-		// first find the square root of the covariance matrix
-		// C such as C * C^T = covariance
-		var       cholesky = new CholeskyDecomposition(covariance.ToMatrix());
-		double[]  sqrtdiag = cholesky.Diagonal;
-		double[,] covroot;
+		string dir = "";
 
-		for (int i = 0; i < sqrtdiag.Length; i++) {
-			sqrtdiag[i] = Math.Sqrt(sqrtdiag[i]);
-		}
-		
-		covroot = cholesky.LeftTriangularFactor.MultiplyByDiagonal(sqrtdiag);
+		// after 5 tries, just use the folder, even if it already exists
+		for (int i = 0; i < 5; i++) {
+			dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
 
-		// and then use the random variable Y = mean + C * Z
-		// with Z an independent canonical gaussian random vector ~N(0, 1)
-		// to obtain the multinormal correlated  random vector
-		double[]  canonical = new double[mean.Length];
-		for (int i = 0; i < canonical.Length; i++) {
-			canonical[i] = gaussian.Next();
+			if (!Directory.Exists(dir)) {
+				break;
+			}
 		}
 
-		return mean.Add(covroot.Multiply(canonical));
+		Directory.CreateDirectory(dir);
+
+		return dir;
 	}
 }
 }
