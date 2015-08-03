@@ -34,7 +34,13 @@ public class ISAM2Navigator : Navigator
 	/// <summary>
 	/// Maximum distance at which a match is considered valid; otherwise a new landmark is generated.
 	/// </summary>
-	public const double MatchThreshold = 0.3;
+	public const double MatchThreshold = 4.8;
+
+	/// <summary>
+	/// Number of consecutive frames a landmark must be seen before
+	/// it is considered real and not clutter.
+	/// </summary>
+	public const int NewLandmarkThreshold = 5;
 
 	/// <summary>
 	/// The handle.
@@ -73,6 +79,16 @@ public class ISAM2Navigator : Navigator
 		get { return mapmodel;  }
 		set { mapmodel = value; }
 	}
+
+	/// <summary>
+	/// Not-associated measurements map model.
+	/// If enough similar measurements are found
+	/// continuosly in time, the landmark is
+	/// moved into the map model.
+	/// </summary>
+	/// <remarks>In this list, the weights are used to indicate
+	/// in how many consecutive frames has the candidate been seen.</remarks>
+	public List<Gaussian> CandidateMapModel { get; private set; }
 
 	/// <summary>
 	/// Previous SLAM step vehicle pose estimate.
@@ -120,9 +136,10 @@ public class ISAM2Navigator : Navigator
 			motionnoise[i] = vehicle.MotionCovariance[i][i];
 		}
 
-		estimate     = new SimulatedVehicle();
-		prevestimate = new SimulatedVehicle();
-		mapmodel     = new List<Gaussian>();
+		estimate          = new SimulatedVehicle();
+		prevestimate      = new SimulatedVehicle();
+		mapmodel          = new List<Gaussian>();
+		CandidateMapModel = new List<Gaussian>();
 
 		vehicle.State.CopyTo(estimate    .State, 0);
 		vehicle.State.CopyTo(prevestimate.State, 0);
@@ -174,7 +191,18 @@ public class ISAM2Navigator : Navigator
 	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
 	public override void SlamUpdate(GameTime time, List<double[]> measurements)
 	{
-		double[] odometry            = Vehicle.StateDiff(BestEstimate, prevestimate);
+		double[]  odometry = Vehicle.StateDiff(BestEstimate, prevestimate);
+		List<int> labels   = findLabels(measurements);
+
+		for (int i = labels.Count - 1; i >= 0; i--) {
+			// candidates are removed from the measurement list
+			// until they've been seen enough times
+			if (labels[i] < 0) {
+				labels.RemoveAt(i);
+				measurements.RemoveAt(i);
+			}
+		}
+
 		double[] marshalmeasurements = new double[3 * measurements.Count];
 
 		for (int i = 0, h = 0; i < measurements.Count; i++) {
@@ -183,7 +211,7 @@ public class ISAM2Navigator : Navigator
 			marshalmeasurements[h++] = measurements[i][2];
 		}
 
-		Update(odometry, marshalmeasurements, findLabels(measurements), measurements.Count);
+		Update(odometry, marshalmeasurements, labels.ToArray(), measurements.Count);
 
 		// updates the estimated complete path to show the batch nature of the algorithm
 		List<double[]> trajectory = GetTrajectory();
@@ -211,27 +239,99 @@ public class ISAM2Navigator : Navigator
 
 	/// <summary>
 	/// Find the data association labels from the new valid measurements and
-	/// the internal previous map model using nearest-neighbour association.
+	/// the internal previous map model using Mahalanobis association.
 	/// </summary>
 	/// <param name="measurements">New measurements.</param>
 	/// <returns>Association labels.</returns>
-	public int[] findLabels(List<double[]> measurements)
+	public List<int> findLabels(List<double[]> measurements)
 	{
-		int[] labels = new int[measurements.Count];
+		List<int> labels = new List<int>(measurements.Count);
+
+		double[][] R             = BestEstimate.MeasurementCovariance;
+		double[][] I             = 0.001.Multiply(Accord.Math.Matrix.Identity(3).ToArray());
+		Gaussian[] q             = new Gaussian[mapmodel.Count];
+		Gaussian[] qcandidate    = new Gaussian[CandidateMapModel.Count];
+		bool[]     keepcandidate = new bool    [CandidateMapModel.Count];
+
+		for (int i = 0; i < q.Length; i++) {
+			Gaussian component = mapmodel[i];
+			double[][] H = BestEstimate.MeasurementJacobian(component.Mean);
+			q[i] = new Gaussian(BestEstimate.MeasurePerfect(component.Mean),
+			                                                H.Multiply(component.Covariance.MultiplyByTranspose(H)).Add(R),
+			                                                component.Weight);
+		}
+
+		for (int i = 0; i < qcandidate.Length; i++) {
+			Gaussian component = CandidateMapModel[i];
+
+			// assume the covariance is zero, since there's nothing better to assume here
+			// note that this is more stringent on the unproven data, as they are given
+			// less leeway for noise than the already associated landmark
+			qcandidate[i] = new Gaussian(BestEstimate.MeasurePerfect(component.Mean), R, component.Weight);
+		}
 
 		for (int i =  0; i < measurements.Count; i++) {
 			double bestmatch = double.MaxValue;
+			int    label     = int.MinValue;
 
-			for (int k = 0; k < mapmodel.Count; k++) {
-				double distance2 = mapmodel[k].Mean.SquareEuclidean(BestEstimate.MeasureToMap(measurements[i]));
+			for (int k = 0; k < q.Length; k++) {
+				double distance2 = q[k].MahalanobisSquared(measurements[i]);
 				if (distance2 < bestmatch) {
-						bestmatch = distance2;
-						labels[i] = k;
+					bestmatch = distance2;
+					label     = k;
 				}
 			}
 
+			for (int k = 0; k < qcandidate.Length; k++) {
+				double distance2 = qcandidate[k].MahalanobisSquared(measurements[i]);
+				if (distance2 < bestmatch) {
+					bestmatch = distance2;
+					label     = -k - 1;
+					// negative labels are for candidates,
+					// note that zero is already occupied by the associated landmarks
+				}
+			}
+
+			// if far from everything, generate a new candidate at the measured point
+			// note that the covariance is assumed zero, though that would throw an exception,
+			// as it doesn't have an inverse, so the identity is used instead (dummy value)
 			if (bestmatch > MatchThreshold * MatchThreshold) {
-				labels[i] = NextLabel;
+				CandidateMapModel.Add(new Gaussian(BestEstimate.MeasureToMap(measurements[i]), I, 1));
+				label = int.MinValue;
+			}
+			else if (label < 0) {
+				int k = -label - 1;
+
+				// improve the estimated landmark by averaging with the new measurement
+				double w = CandidateMapModel[k].Weight;
+				CandidateMapModel[k] =
+					new Gaussian((CandidateMapModel[k].Mean.Multiply(w).Add(
+					                 BestEstimate.MeasureToMap(measurements[i]))).Divide(w + 1),
+					             I,
+					             w + 1);
+				// note the comparison between double and int
+				// since the weight is only used with integer values (and addition by one)
+				// there should never be any truncation error, at least while
+				// the number has less than 23/52 bits (for float/double);
+				// this amounts to 8388608 and 4.5e15 so it should be always ok.
+				// In fact, the gtsam key system fails before that
+				// (it uses three bytes for numbering, one for character)
+				if (CandidateMapModel[k].Weight >= NewLandmarkThreshold) {
+					label = NextLabel;
+				}
+				else {
+					keepcandidate[k] = true;
+					// only keep candidates that haven't been added, but are still visible
+				}
+			}
+
+			labels.Add(label);
+		}
+
+		// anything that wasn't seen goes away, it was clutter
+		for (int i = keepcandidate.Length - 1; i >= 0; i--) {
+			if (!keepcandidate[i]) {
+				CandidateMapModel.RemoveAt(i);
 			}
 		}
 
@@ -338,15 +438,15 @@ public class ISAM2Navigator : Navigator
 			mean[1]          = ptrmapmodel[k + 1];
 			mean[2]          = ptrmapmodel[k + 2];
 
-			covariance[0][0] = ptrmapcov[k + 0];
-			covariance[0][1] = ptrmapcov[k + 1];
-			covariance[0][2] = ptrmapcov[k + 2];
-			covariance[1][0] = ptrmapcov[k + 3];
-			covariance[1][1] = ptrmapcov[k + 4];
-			covariance[1][2] = ptrmapcov[k + 5];
-			covariance[2][0] = ptrmapcov[k + 6];
-			covariance[2][1] = ptrmapcov[k + 7];
-			covariance[2][2] = ptrmapcov[k + 8];
+			covariance[0][0] = ptrmapcov[h + 0];
+			covariance[0][1] = ptrmapcov[h + 1];
+			covariance[0][2] = ptrmapcov[h + 2];
+			covariance[1][0] = ptrmapcov[h + 3];
+			covariance[1][1] = ptrmapcov[h + 4];
+			covariance[1][2] = ptrmapcov[h + 5];
+			covariance[2][0] = ptrmapcov[h + 6];
+			covariance[2][1] = ptrmapcov[h + 7];
+			covariance[2][2] = ptrmapcov[h + 8];
 
 			component = new Gaussian(mean, covariance, 1.0);
 			mapmodel.Add(component);

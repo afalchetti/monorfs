@@ -94,9 +94,9 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// Measurement model covariance matrix.
 	/// </summary>
-	public double[][] MeasurementCovariance = new double[3][] { new double[3] {2e-1, 0, 0},
-	                                                            new double[3] {0, 2e-1, 0},
-	                                                            new double[3] {0, 0, 2e-4} };
+	public double[][] MeasurementCovariance = new double[3][] { new double[3] {2e-0, 0, 0},
+	                                                            new double[3] {0, 2e-0, 0},
+	                                                            new double[3] {0, 0, 1e-3} };
 	
 	/// <summary>
 	/// Internal vehicle pose state.

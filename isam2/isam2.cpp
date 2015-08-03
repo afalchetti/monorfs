@@ -88,7 +88,7 @@ void marshalpoint(double* list, const Point3& state, const int n)
 void marshalmarginal(double* list, const Matrix& covariance, const int n)
 {
 	int side   = covariance.rows();
-	int offset = n * side;
+	int offset = n * side * side;
 
 	for (int i = 0; i < side; ++i) {
 	for (int k = 0; k < side; ++k) {
