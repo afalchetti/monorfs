@@ -39,6 +39,7 @@ using System.Text;
 
 using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
+using System.Diagnostics;
 
 namespace monorfs
 {
@@ -264,15 +265,6 @@ public class Simulation : Manipulator
 
 		return commands;
 	}
-	
-
-	/// <summary>
-	/// Allow the simulation to perform any initialization it needs to do before it starts running.
-	/// </summary>
-	protected override void Initialize()
-	{
-		base.Initialize();
-	}
 
 	/// <summary>
 	/// Allow the simulation to run logic such as updating the world
@@ -410,6 +402,35 @@ public class Simulation : Manipulator
 
 			SidebarHistory.Add(frame);
 		}
+	}
+
+	/// <summary>
+	/// Run the simulation without generating any GUI;
+	/// bypasses MonoGame.
+	/// </summary>
+	public void RunHeadless()
+	{
+		GameTime      time       = new GameTime();
+		TimeSpan      dt         = MeasureElapsed;
+		KeyboardState keyboard   = new KeyboardState();
+		Stopwatch     timer      = new Stopwatch();
+
+		Console.WriteLine("running headless");
+
+		if (Commands.Count == 0) {  // no infinite simulations, make it one command = one frame
+			Commands.Add(new double[6]);
+		}
+
+		timer.Start();
+
+		while (!commanddepleted) {
+			Update(time, keyboard, keyboard, 1.0);
+			time = new GameTime(time.TotalGameTime.Add(dt), dt);
+		}
+
+		timer.Stop();
+
+		Console.WriteLine("finished running (" + timer.Elapsed.TotalSeconds.ToString("F4") + " s)");
 	}
 }
 }

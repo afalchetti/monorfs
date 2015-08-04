@@ -109,6 +109,7 @@ public class Program
 		bool   simulate      = false;
 		bool   realtime      = false;
 		bool   viewer        = false;
+		bool   headless      = false;
 		bool   showhelp      = false;
 
 		NavigationAlgorithm algorithm = NavigationAlgorithm.PHD;
@@ -123,6 +124,7 @@ public class Program
 			{ "s|simulate",    "Generate an artificial simulation instead of using a sensor.", s       => simulate      = s != null },
 			{ "R|realtime",    "Process the system in realtime, instead of a fixed step.",     R       => realtime      = R != null },
 			{ "v|view",        "View a precorded session.",                                    v       => viewer        = v != null },
+			{ "x|headless",    "Run headless, i.e. with no GUI",                               x       => headless      = x != null },
 			{ "h|help",        "Show this message and exit",                                   h       => showhelp      = h != null }
 		};
 
@@ -156,7 +158,12 @@ public class Program
 		}
 		else {
 			using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, onlymapping, simulate, realtime, algorithm)) {
-				sim.Run();
+				if (headless) {
+					sim.RunHeadless();
+				}
+				else {
+					sim.Run();
+				}
 
 				string tmp    = Util.TemporaryDir();
 				string output = Path.Combine(tmp, "out");
