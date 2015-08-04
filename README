@@ -44,7 +44,7 @@ monorfs -f=room.oni -c=movroom.in -p=40 -y
 monorfs -s -f=map.world -c=movements.in -p=20 -y
 
 # Similar to above but use isam2 SLAM algorithm
-monorfs -s -f=map.world -c=movements.in -p=20 -y -a=isam2
+monorfs -s -f=map.world -c=movements.in -a=isam2
 
 # Open a previous run with a Viewer
 monorfs -v -f=map.world

@@ -193,8 +193,9 @@ Point3 landmarkestimate(double px, double py, double range, Pose3 pose, double f
 // 'measurements' format must be a 3*n double array with the
 // x-y-z coordinates for each one of them;
 // each measurement must be associated to a labeled (int) landmark;
-void update(ISAM2Navigator* navigator, double* odometry, double* measurements, int* labels, int nmeasurements)
+int update(ISAM2Navigator* navigator, double* odometry, double* measurements, int* labels, int nmeasurements)
 {
+	try {
 	NonlinearFactorGraph graph;
 	Values               newestimates;
 
@@ -261,6 +262,26 @@ void update(ISAM2Navigator* navigator, double* odometry, double* measurements, i
 	}
 
 	++navigator->t;
+	}
+	catch (const IndeterminantLinearSystemException& e) {
+		Symbol key = e.nearbyVariable();
+		cerr << "gtsam > IndeterminateLinearSystemException near ";
+		cerr << "'" << key.chr() << key.index() << "'" << endl;
+		return 1;
+	}
+	catch (const ValuesKeyAlreadyExists& e) {
+		Symbol key = e.key();
+		cerr << "gtsam > ValuesKeyAlreadyExists: ";
+		cerr << "'" << key.chr() << key.index() << "'" << endl;
+		return 2;
+	}
+	catch (const std::exception& e) {
+		cerr << "gtsam > exception" << endl;
+		cerr << e.what() << endl;
+		return -1;
+	}
+
+	return 0;
 }
 
 // get the trajectory estimate held in the navigator

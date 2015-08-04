@@ -103,7 +103,7 @@ Vector PixelRangeFactor::evaluateError(const Pose3& pose, const Point3& landmark
 		*H2 = jprojection * jlocalpoint;
 	}
 
-	return Vector3(epx - px, epy- py, erange - range);
+	return Vector3(epx - px, epy - py, erange - range);
 }
 
 // get the internal measurement data as the tuple (px, py, range)

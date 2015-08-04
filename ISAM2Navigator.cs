@@ -229,7 +229,7 @@ public class ISAM2Navigator : Navigator
 			marshalmeasurements[h++] = measurements[i][2];
 		}
 
-		Update(odometry, marshalmeasurements, labels.ToArray(), measurements.Count);
+		int status = Update(odometry, marshalmeasurements, labels.ToArray(), measurements.Count);
 
 		// updates the estimated complete path to show the batch nature of the algorithm
 		List<double[]> trajectory = GetTrajectory();
@@ -253,6 +253,13 @@ public class ISAM2Navigator : Navigator
 		BestEstimate.State.CopyTo(prevestimate.State, 0);
 		UpdateTrajectory(time);
 		UpdateMapHistory(time);
+
+		if (status != 0) {
+			string message = (status == 1) ? "IndeterminateLinearSystemException" :
+			                 (status == 2) ? "ValuesKeyAlreadyExists":
+			                                 "gtsam exception";
+			throw new InvalidOperationException(message);
+		}
 	}
 
 	/// <summary>
@@ -396,15 +403,19 @@ public class ISAM2Navigator : Navigator
 	/// <param name="measurements">Vectorized measurement list as [x1, y1, z1, x2, y2, z2, ...].</param>
 	/// <param name="labels">Data association labels, one per measurement.</param>
 	/// <param name="nmeasurements">Number of measurements.</param>
-	private unsafe void Update(double[] odometry, double[] measurements, int[] labels, int nmeasurements)
+	/// <returns>Error code: 0 = ok, 1 = divergence, 2 = duplicate var, -1 = general error.</returns>
+	private unsafe int Update(double[] odometry, double[] measurements, int[] labels, int nmeasurements)
 	{
+		int retvalue = -1;
 		fixed(double* ptrOdometry     = odometry) {
 		fixed(double* ptrMeasurements = measurements) {
 		fixed(int*    ptrLabels       = labels) {
-			update(handle, (IntPtr) ptrOdometry, (IntPtr) ptrMeasurements, (IntPtr) ptrLabels, nmeasurements);
+			retvalue = update(handle, (IntPtr) ptrOdometry, (IntPtr) ptrMeasurements, (IntPtr) ptrLabels, nmeasurements);
 		}
 		}
 		}
+
+		return retvalue;
 	}
 
 	/// <summary>
@@ -480,7 +491,7 @@ public class ISAM2Navigator : Navigator
 	private extern static void deletenavigator(HandleRef navigator);
 
 	[DllImport("libisam2.so")]
-	private extern static void update(HandleRef navigator, IntPtr odometry, IntPtr measurements, IntPtr labels, int nmeasurements);
+	private extern static int update(HandleRef navigator, IntPtr odometry, IntPtr measurements, IntPtr labels, int nmeasurements);
 
 	[DllImport("libisam2.so")]
 	private extern static IntPtr gettrajectory(HandleRef navigator, out int length);

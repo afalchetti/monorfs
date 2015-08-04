@@ -362,8 +362,13 @@ public class Simulation : Manipulator
 			if (time.TotalGameTime - lastnavigationupdate.TotalGameTime >= MeasureElapsed) {
 				List<double[]> measurements = Explorer.Measure();
 				WayMeasurements.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, measurements));
-			
-				Navigator.SlamUpdate(time, measurements);
+				
+				try {
+					Navigator.SlamUpdate(time, measurements);
+				}
+				catch (InvalidOperationException e) {  // gtsam failure
+					commanddepleted = true;  // force exit in next call
+				}
 
 				lastnavigationupdate = new GameTime(time.TotalGameTime, time.ElapsedGameTime);
 			}
