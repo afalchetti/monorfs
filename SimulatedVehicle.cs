@@ -80,7 +80,8 @@ public class SimulatedVehicle : Vehicle
 	/// <summary>
 	/// Poisson distributed random generator with parameter lambda = ClutterCount.
 	/// </summary>
-	private PoissonDistribution clutterGen;
+	/// <remarks>The type is general distribution to allow for zero clutter (dirac distribution)</remarks>
+	private UnivariateDiscreteDistribution clutterGen;
 
 	/// <summary>
 	/// Construct a new Vehicle from a "zero initial state", i.e. location = {0, 0, 0},
@@ -99,11 +100,18 @@ public class SimulatedVehicle : Vehicle
 	public SimulatedVehicle(double[] location, double theta, double[] axis, List<double[]> landmarks)
 		: base(location, theta, axis)
 	{
-		ClutterCount       = ClutterDensity * FilmArea.Height * FilmArea.Width * RangeClip.Length;
-		clutterGen         = new PoissonDistribution(ClutterCount);
-		Landmarks          = landmarks;
-		SidebarWidth       = 1;
-		SidebarHeight      = 1;
+		ClutterCount = ClutterDensity * FilmArea.Height * FilmArea.Width * RangeClip.Length;
+
+		if (ClutterCount > 0) {
+			clutterGen = new PoissonDistribution(ClutterCount);
+		}
+		else {
+			clutterGen = new DegenerateDistribution(0);
+		}
+
+		Landmarks     = landmarks;
+		SidebarWidth  = 1;
+		SidebarHeight = 1;
 	}
 
 	/// <summary>
@@ -118,7 +126,7 @@ public class SimulatedVehicle : Vehicle
 		this.detectionProbability = that.detectionProbability;
 		this.ClutterDensity       = that.ClutterDensity;
 		this.ClutterCount         = that.ClutterCount;
-		this.clutterGen           = new PoissonDistribution(that.clutterGen.Mean);
+		this.clutterGen           = that.clutterGen;
 	}
 
 	/// <summary>
@@ -145,7 +153,13 @@ public class SimulatedVehicle : Vehicle
 		this.detectionProbability = pdetection;
 		this.ClutterDensity       = clutter;
 		this.ClutterCount         = this.ClutterDensity * this.FilmArea.Height * this.FilmArea.Width * this.RangeClip.Length;
-		this.clutterGen           = new PoissonDistribution(this.ClutterCount);
+
+		if (this.ClutterCount > 0) {
+			this.clutterGen = new PoissonDistribution(this.ClutterCount);
+		}
+		else {
+			this.clutterGen = new DegenerateDistribution(0);
+		}
 	}
 
 	/// <summary>
