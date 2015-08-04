@@ -172,8 +172,11 @@ public class Program
 				File.WriteAllText(Path.Combine(output, "maps.out"),         sim.SerializedMaps);
 				Console.WriteLine("  -- writing measurements history");
 				File.WriteAllText(Path.Combine(output, "measurements.out"), sim.SerializedMeasurements);
-				Console.WriteLine("  -- writing sidebar video");
-				SaveAsAvi(sim.SidebarHistory, Path.Combine(output, "sidebar.avi"));
+
+				if (sim.Explorer.HasSidebar) {
+					Console.WriteLine("  -- writing sidebar video");
+					SaveAsAvi(sim.SidebarHistory, Path.Combine(output, "sidebar.avi"));
+				}
 
 				Console.WriteLine("  -- compressing");
 

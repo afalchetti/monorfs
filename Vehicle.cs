@@ -241,6 +241,11 @@ public abstract class Vehicle : IDisposable
 	public List<double[]> MappedMeasurements { get; set; }
 
 	/// <summary>
+	/// Whether the vehicle uses the sidebar or not.
+	/// </summary>
+	public bool HasSidebar { get; protected set; }
+
+	/// <summary>
 	/// Construct a vehicle with default constants.
 	/// </summary>
 	public Vehicle() : this(new double[3] {0, 0, 0}, 0, new double[3] {1, 0, 0}) {}
@@ -281,6 +286,8 @@ public abstract class Vehicle : IDisposable
 
 		WayPoints = new TimedState();
 		WayPoints.Add(Tuple.Create(0.0, state));
+
+		HasSidebar = false;
 	}
 
 	/// <summary>
@@ -607,7 +614,7 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// Render the sidebar info screen (extra interesting data).
 	/// </summary>
-	public abstract void RenderSide();
+	public virtual void RenderSide() {}
 
 	/// <summary>
 	/// Dispose of any resources.

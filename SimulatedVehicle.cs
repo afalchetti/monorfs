@@ -440,13 +440,5 @@ public class SimulatedVehicle : Vehicle
 		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
 		Graphics.DrawUser2DPolygon(outvertices, 0.02f, outercolor, true);
 	}
-
-	/// <summary>
-	/// Render the sidebar info screen.
-	/// It shows the world from the point of view of the vehicle.
-	/// </summary>
-	public override void RenderSide()
-	{
-	}
 }
 }

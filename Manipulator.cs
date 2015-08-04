@@ -154,6 +154,9 @@ public abstract class Manipulator : Game
 	/// </summary>
 	private SpriteFont font;
 
+	/// <summary>
+	/// Text message position.
+	/// </summary>
 	private Vector2 messagepos;
 
 	/// <summary>
@@ -178,7 +181,7 @@ public abstract class Manipulator : Game
 
 		FrameElapsed = new TimeSpan((long) (10000000/fps));
 		Message      = "";
-		messagepos   = new Vector2(20, graphicsManager.PreferredBackBufferHeight - 30);
+		messagepos   = new Vector2(350, graphicsManager.PreferredBackBufferHeight - 30);
 
 		IsFixedTimeStep   = false;
 		TargetElapsedTime = FrameElapsed;
@@ -230,14 +233,14 @@ public abstract class Manipulator : Game
 		effect.LightingEnabled    = false;
 		effect.VertexColorEnabled = true;
 
-		const double screencut = 0.7;
+		double screencut = (Explorer.HasSidebar) ? 0.7 : 1.0;
 
 		scenedest = clipCenter((int)(graphicsManager.PreferredBackBufferWidth * screencut),
-		                       graphicsManager.PreferredBackBufferHeight,
+		                       graphicsManager.PreferredBackBufferHeight - 40,
 		                       (MapClip[1] - MapClip[0]) / (MapClip[3] - MapClip[2]));
 
 		sidedest = clipCenter((int)(graphicsManager.PreferredBackBufferWidth * (1 - screencut)),
-		                      graphicsManager.PreferredBackBufferHeight,
+		                      graphicsManager.PreferredBackBufferHeight - 40,
 		                      (float) Explorer.SidebarWidth / Explorer.SidebarHeight);
 
 		sidedest.X += (int)(graphicsManager.PreferredBackBufferWidth * screencut);
@@ -370,8 +373,6 @@ public abstract class Manipulator : Game
 		Flip.DrawString(font, Message, messagepos, Color.White);
 		
 		Flip.End();
-
-		//Console.WriteLine((1.0/time.ElapsedGameTime.TotalSeconds).ToString("F2"));
 
 		base.Draw(time);
 	}

@@ -212,6 +212,7 @@ public class KinectVehicle : Vehicle
 				                                  Resolution      = new System.Drawing.Size(640, 480) };
 			}
 
+			HasSidebar    = true;
 			SidebarWidth  = (int) (depth.VideoMode.Resolution.Width  / Delta);
 			SidebarHeight = (int) (depth.VideoMode.Resolution.Height / Delta) * 2;
 

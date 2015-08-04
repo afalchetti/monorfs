@@ -259,7 +259,7 @@ public class Simulation : Manipulator
 
 		for (int i = 0; i < commandstr.Length; i++) {
 			commands.Add(ParseDoubleList(commandstr[i]));
-			// the item structure is {dlocx, dlocy, dlocz, dyaw, dpitch, droll, dcamera}
+			// the item structure is {dlocx, dlocy, dlocz, dyaw, dpitch, droll}
 		}
 
 		return commands;
@@ -401,16 +401,15 @@ public class Simulation : Manipulator
 	{
 		base.Draw(time);
 
-		// FIXME make sure this works with the pause behaviour and doesn't unsync when using it
+		if (!Paused && Explorer.HasSidebar) {
+			Texture2D frame = new Texture2D(Graphics, SideBuffer.Width, SideBuffer.Height);
+			Color[]   data  = new Color[SideBuffer.Width * SideBuffer.Height];
 
-		Texture2D frame = new Texture2D(Graphics, SideBuffer.Width, SideBuffer.Height);
-		Color[]   data  = new Color[SideBuffer.Width * SideBuffer.Height];
+			SideBuffer.GetData(data);
+			frame     .SetData(data);
 
-		SideBuffer.GetData(data);
-		frame     .SetData(data);
-		
-
-		SidebarHistory.Add(frame);
+			SidebarHistory.Add(frame);
+		}
 	}
 }
 }
