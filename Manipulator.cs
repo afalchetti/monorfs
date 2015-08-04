@@ -280,7 +280,9 @@ public abstract class Manipulator : Game
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	protected override void Update(GameTime time)
 	{
-		simtime = Realtime ? time : new GameTime(simtime.TotalGameTime.Add(FrameElapsed), FrameElapsed);
+		if (Realtime) {
+			simtime = time;
+		}
 
 		KeyboardState keyboard = Keyboard.GetState();
 
@@ -294,7 +296,10 @@ public abstract class Manipulator : Game
 		multiplier *= (fast) ? 2.0 : 1.0;
 		multiplier /= (slow) ? 4.0 : 1.0;
 		
-		if (keyboard.IsKeyDown(Keys.Delete)) { Exit(); }
+		if (keyboard.IsKeyDown(Keys.Delete)) {
+			Exit();
+			return;
+		}
 
 		if (keyboard.IsKeyDown(Keys.Up)) {
 			dcamangle += 0.06 * multiplier;
@@ -322,6 +327,9 @@ public abstract class Manipulator : Game
 
 		Update(simtime, keyboard, prevkeyboard, multiplier);
 
+		if (!Realtime) {
+			simtime = new GameTime(simtime.TotalGameTime.Add(FrameElapsed), FrameElapsed);
+		}
 		prevkeyboard = keyboard;
 		base.Update(time);
 	}

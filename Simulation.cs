@@ -78,7 +78,7 @@ public class Simulation : Manipulator
 	/// <summary>
 	/// Last time the navigator update method was called.
 	/// </summary>
-	private GameTime lastnavigationupdate = new GameTime();
+	private GameTime lastnavigationupdate = new GameTime(new TimeSpan(-1, 0, 0), TimeSpan.Zero);
 
 	/// <summary>
 	/// Defines if the particles look at the odometry input as relevant information
@@ -278,6 +278,7 @@ public class Simulation : Manipulator
 	{
 		if (commanddepleted) {
 			Exit();
+			return;
 		}
 
 		double dlocx     = 0;
