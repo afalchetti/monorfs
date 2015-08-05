@@ -774,6 +774,20 @@ public class MatrixKey
 		K = k;
 	}
 
+	/// <param name="a">First key.</param>
+	/// <param name="b">Second key.</param>
+	public static bool operator==(MatrixKey a, MatrixKey b)
+	{
+		return a.Equals(b);
+	}
+
+	/// <param name="a">First key.</param>
+	/// <param name="b">Second key.</param>
+	public static bool operator!=(MatrixKey a, MatrixKey b)
+	{
+		return !(a == b);
+	}
+
 	/// <summary>
 	/// Compares with another matrix key by value.
 	/// Two keys are equal iff both the column and row indices are equal.
