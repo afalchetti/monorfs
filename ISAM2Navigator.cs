@@ -52,13 +52,42 @@ public class ISAM2Navigator : Navigator
 	/// <summary>
 	/// Maximum distance at which a match is considered valid; otherwise a new landmark is generated.
 	/// </summary>
-	public const double MatchThreshold = 4.8;
+	public const double MatchThreshold = 3.0;
 
 	/// <summary>
 	/// Number of consecutive frames a landmark must be seen before
 	/// it is considered real and not clutter.
 	/// </summary>
-	public const int NewLandmarkThreshold = 5;
+	public const int NewLandmarkThreshold = 3;
+
+	/// <summary>
+	/// Algorithm to decide data association.
+	/// </summary>
+	/// <remarks>
+	/// Note that "perfect mode" isn't good for real applications.
+	/// It's there to compare performance and gain insights as to how
+	/// sensible is the algorithm to associations errors.
+	/// </remarks>
+	public const DataAssociationAlgorithm DAAlgorithm = DataAssociationAlgorithm.Perfect;
+
+	/// <summary>
+	/// Obtains the data association from the tracked vehicle.
+	/// </summary>
+	/// <remarks>
+	/// This delegate exposes a minimum amount of information
+	/// about the tracked vehicle.
+	/// Giving a full reference of the vehicle as a member field
+	/// would be calling for generating interdependencies
+	/// and could become problematic as an unintended source of
+	/// direct information. It is better to separate both
+	/// structures as much as possible.
+	/// </remarks>
+	private Func<List<int>> GetDataAssociation;
+
+	/// <summary>
+	/// Whether the tracked vehicle knows its data association.
+	/// </summary>
+	public bool HasDataAssociation { get; private set; }
 
 	/// <summary>
 	/// The handle.
@@ -161,6 +190,12 @@ public class ISAM2Navigator : Navigator
 
 		vehicle.State.CopyTo(estimate    .State, 0);
 		vehicle.State.CopyTo(prevestimate.State, 0);
+
+		HasDataAssociation = vehicle.HasDataAssociation;
+
+		if (HasDataAssociation) {
+			GetDataAssociation = () => vehicle.DataAssociation;
+		}
 
 		handle    = NewNavigator(vehicle.State, measurementnoise, motionnoise, focal);
 		nextlabel = 0;
@@ -270,45 +305,78 @@ public class ISAM2Navigator : Navigator
 	/// <returns>Association labels.</returns>
 	public List<int> findLabels(List<double[]> measurements)
 	{
-		List<int> labels = new List<int>(measurements.Count);
+		if (DAAlgorithm == DataAssociationAlgorithm.Perfect) {
+			if (!HasDataAssociation) {
+				throw new InvalidOperationException("Tried to use perfect data association when none exists.");
+			}
 
-		double[][] R             = BestEstimate.MeasurementCovariance;
-		double[][] I             = 0.001.Multiply(Accord.Math.Matrix.Identity(3).ToArray());
-		Gaussian[] q             = new Gaussian[mapmodel.Count];
-		Gaussian[] qcandidate    = new Gaussian[CandidateMapModel.Count];
-		bool[]     keepcandidate = new bool    [CandidateMapModel.Count];
-
-		for (int i = 0; i < q.Length; i++) {
-			Gaussian component = mapmodel[i];
-			double[][] H = BestEstimate.MeasurementJacobian(component.Mean);
-			q[i] = new Gaussian(BestEstimate.MeasurePerfect(component.Mean),
-			                                                H.Multiply(component.Covariance.MultiplyByTranspose(H)).Add(R),
-			                                                component.Weight);
+			return GetDataAssociation();
 		}
 
-		for (int i = 0; i < qcandidate.Length; i++) {
-			Gaussian component = CandidateMapModel[i];
+		List<int> labels = new List<int>(measurements.Count);
 
-			// assume the covariance is zero, since there's nothing better to assume here
-			// note that this is more stringent on the unproven data, as they are given
-			// less leeway for noise than the already associated landmark
-			qcandidate[i] = new Gaussian(BestEstimate.MeasurePerfect(component.Mean), R, component.Weight);
+		double[][] I             = 0.001.Multiply(Accord.Math.Matrix.Identity(3).ToArray());
+		bool[]     keepcandidate = new bool    [CandidateMapModel.Count];
+		double[][] R;
+		Gaussian[] q;
+		Gaussian[] qcandidate;
+
+		int candidatecount = CandidateMapModel.Count;
+		// candidate count at the beggining of the process
+		// this is so the measurements aren't compared with other measurements
+		// (if one gets promoted to candidate, the next one could think it's similar to it
+		// but that isn't sensible: one landmark -> hopefully one measurement)
+
+		if (DAAlgorithm == DataAssociationAlgorithm.Mahalanobis) {
+			R          = BestEstimate.MeasurementCovariance;
+			q          = new Gaussian[mapmodel.Count];
+			qcandidate = new Gaussian[CandidateMapModel.Count];
+
+			for (int i = 0; i < q.Length; i++) {
+				Gaussian component = mapmodel[i];
+				double[][] H = BestEstimate.MeasurementJacobian(component.Mean);
+				q[i] = new Gaussian(BestEstimate.MeasurePerfect(component.Mean),
+					H.Multiply(component.Covariance.MultiplyByTranspose(H)).Add(R),
+					component.Weight);
+			}
+
+			for (int i = 0; i < qcandidate.Length; i++) {
+				Gaussian component = CandidateMapModel[i];
+
+				// assume the covariance is zero, since there's nothing better to assume here
+				// note that this is more stringent on the unproven data, as they are given
+				// less leeway for noise than the already associated landmark
+				qcandidate[i] = new Gaussian(BestEstimate.MeasurePerfect(component.Mean), R, component.Weight);
+			}
 		}
 
 		for (int i =  0; i < measurements.Count; i++) {
 			double bestmatch = double.MaxValue;
 			int    label     = int.MinValue;
+			double distance2;
 
-			for (int k = 0; k < q.Length; k++) {
-				double distance2 = q[k].MahalanobisSquared(measurements[i]);
+			for (int k = 0; k < mapmodel.Count; k++) {
+				if (DAAlgorithm == DataAssociationAlgorithm.Mahalanobis) {
+					distance2 = q[k].MahalanobisSquared(measurements[i]);
+				}
+				else {
+					distance2 = mapmodel[k].Mean.SquareEuclidean(BestEstimate.MeasureToMap(measurements[i]));
+				}
+
 				if (distance2 < bestmatch) {
 					bestmatch = distance2;
 					label     = k;
 				}
 			}
 
-			for (int k = 0; k < qcandidate.Length; k++) {
-				double distance2 = qcandidate[k].MahalanobisSquared(measurements[i]);
+			for (int k = 0; k < candidatecount; k++) {
+				if (DAAlgorithm == DataAssociationAlgorithm.Mahalanobis) {
+					distance2 = qcandidate[k].MahalanobisSquared(measurements[i]);
+				}
+				else {
+					distance2 = CandidateMapModel[k].Mean.SquareEuclidean(BestEstimate.MeasureToMap(measurements[i]));
+				}
+
 				if (distance2 < bestmatch) {
 					bestmatch = distance2;
 					label     = -k - 1;
@@ -323,6 +391,11 @@ public class ISAM2Navigator : Navigator
 			if (bestmatch > MatchThreshold * MatchThreshold) {
 				CandidateMapModel.Add(new Gaussian(BestEstimate.MeasureToMap(measurements[i]), I, 1));
 				label = int.MinValue;
+
+				if (NewLandmarkThreshold <= 1) {
+					CandidateMapModel.RemoveAt(CandidateMapModel.Count - 1);
+					label = NextLabel;
+				}
 			}
 			else if (label < 0) {
 				int k = -label - 1;
@@ -504,5 +577,15 @@ public class ISAM2Navigator : Navigator
 
 	[DllImport("libisam2.so")]
 	private extern static IntPtr mapmarginals(HandleRef navigator, out int length);
+}
+
+/// <summary>
+/// Data association algorithm.
+/// </summary>
+public enum DataAssociationAlgorithm
+{
+	Perfect,
+	NearestNeighbours,
+	Mahalanobis
 }
 }

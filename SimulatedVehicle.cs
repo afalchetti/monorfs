@@ -112,6 +112,9 @@ public class SimulatedVehicle : Vehicle
 		Landmarks     = landmarks;
 		SidebarWidth  = 1;
 		SidebarHeight = 1;
+
+		HasDataAssociation = true;
+		DataAssociation    = new List<int>();
 	}
 
 	/// <summary>
@@ -269,12 +272,14 @@ public class SimulatedVehicle : Vehicle
 	public override List<double[]> Measure()
 	{
 		List<double[]> measurements = new List<double[]>();
+		DataAssociation = new List<int>();
 
 		// add every measurement with probability = DetectionProbbility
 		for (int i = 0; i < Landmarks.Count; i++) {
 			if (Visible(Landmarks[i])) {
 				if (U.uniform.Next() < detectionProbability) {
-					measurements.Add(MeasureDetected(Landmarks[i]));
+					measurements   .Add(MeasureDetected(Landmarks[i]));
+					DataAssociation.Add(i);
 				}
 			}
 		}
@@ -297,6 +302,7 @@ public class SimulatedVehicle : Vehicle
 			double py    = U.uniform.Next() * FilmArea.Height + FilmArea.Top;
 			double range = U.uniform.Next() * RangeClip.Length + RangeClip.Min;
 			measurements.Add(new double[3] {px, py, range});
+			DataAssociation.Add(int.MinValue);
 		}
 
 		MappedMeasurements.Clear();

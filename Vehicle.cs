@@ -238,7 +238,17 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// Cached measurements from the update process for rendering purposes.
 	/// </summary>
-	public List<double[]> MappedMeasurements { get; set; }
+	public List<double[]> MappedMeasurements { get; protected set; }
+
+	/// <summary>
+	/// Data association for the last measurement.
+	/// </summary>
+	public List<int> DataAssociation { get; protected set; }
+
+	/// <summary>
+	/// Whether the vehicle knows the data association in advance or not.
+	/// </summary>
+	public bool HasDataAssociation { get; protected set; }
 
 	/// <summary>
 	/// Whether the vehicle uses the sidebar or not.
