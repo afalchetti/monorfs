@@ -122,6 +122,7 @@ public class Viewer : Manipulator
 	/// <summary>
 	/// Construct a visualization from its components.
 	/// </summary>
+	/// <param name="title">Window title.</param>
 	/// <param name="explorer">Main vehicle in the visualization.</param>
 	/// <param name="trajectory">Recorded vehicle trajectory.</param>
 	/// <param name="estimate">Recorded estimated vehicle trajectory.</param>
@@ -129,10 +130,10 @@ public class Viewer : Manipulator
 	/// <param name="fps">Frame rate.</param>
 	/// <param name="mapclip">Initial observable area in the form [left, right, bottom, top]</param>
 	/// <param name="sidebarfile">Sidebar video filename.</param>
-	public Viewer(SimulatedVehicle explorer, TimedState trajectory, TimedTrajectory estimate,
+	public Viewer(string title, SimulatedVehicle explorer, TimedState trajectory, TimedTrajectory estimate,
 	              TimedMapModel map, TimedMeasurements measurements,
 	              double fps, float[] mapclip, string sidebarfile)
-		: base(explorer, new PHDNavigator(explorer, 1, false), false, mapclip, fps)
+		: base(title, explorer, new PHDNavigator(explorer, 1, false), false, mapclip, fps)
 	{
 		Trajectory   = trajectory;
 		Estimate     = estimate;
@@ -216,7 +217,7 @@ public class Viewer : Manipulator
 			mapclip = new float[4] {-6, 6, -3, 3};
 		}
 
-		return new Viewer(explorer, trajectory, estimate, map, measurements, 30, mapclip, sidebarfile);
+		return new Viewer("monorfs - viewing " + datafile, explorer, trajectory, estimate, map, measurements, 30, mapclip, sidebarfile);
 	}
 
 	/// <summary>

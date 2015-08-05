@@ -162,8 +162,16 @@ public abstract class Manipulator : Game
 	/// <summary>
 	/// Construct a Manipulator from its components.
 	/// </summary>
-	public Manipulator(Vehicle explorer, Navigator navigator, bool realtime, float[] mapclip, double fps = 30)
+	/// <param name="title">Window title.</param>
+	/// <param name="explorer">Explorer vehicle.</param>
+	/// <param name="navigator">SLAM solver.</param>
+	/// <param name="realtime">Realtime data processing.</param>
+	/// <param name="mapclip">Map visible bounds.</param>
+	/// <param name="fps">Frame per seconds.</param>
+	public Manipulator(string title, Vehicle explorer, Navigator navigator, bool realtime, float[] mapclip, double fps = 30)
 	{
+		Window.Title = title;
+
 		Explorer      = explorer;
 		Navigator     = navigator;
 		Realtime      = realtime;

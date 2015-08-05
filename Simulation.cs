@@ -169,6 +169,7 @@ public class Simulation : Manipulator
 	/// <summary>
 	/// Construct a simulation from its components.
 	/// </summary>
+	/// <param name="title">Window title.</param>
 	/// <param name="explorer">Main vehicle in the simulation. This is the only entity the user directly controls.</param>
 	/// <param name="commands">List of stored commands for the vehicle as odometry readings.</param>
 	/// <param name="particlecount">Number of particles for the RB-PHD algorithm.
@@ -182,10 +183,10 @@ public class Simulation : Manipulator
 	/// as it had taken exactly the nominal rate.</param>
 	/// <param name="mapclip">Initial observable area in the form [left, right, bottom, top]</param>
 	/// <param name="algorithm">SLAM navigation algorithm.</param>
-	public Simulation(Vehicle explorer, List<double[]> commands, int particlecount,
+	public Simulation(string title, Vehicle explorer, List<double[]> commands, int particlecount,
 	                  bool onlymapping, bool realtime, float[] mapclip,
 	                  NavigationAlgorithm algorithm)
-		: base(explorer,
+		: base(title, explorer,
 		       (algorithm == NavigationAlgorithm.PHD) ?
 		           (Navigator) new PHDNavigator(explorer, particlecount, onlymapping) :
 		           (Navigator) new ISAM2Navigator(explorer, onlymapping),
@@ -246,7 +247,9 @@ public class Simulation : Manipulator
 			commands = new List<double[]>();
 		}
 
-		return new Simulation(explorer, commands, particlecount, onlymapping, realtime, mapclip, algorithm);
+		string title = "monorfs - simulating " + scenefile + " [" + algorithm + "]";
+
+		return new Simulation(title, explorer, commands, particlecount, onlymapping, realtime, mapclip, algorithm);
 	}
 
 	/// <summary>
