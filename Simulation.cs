@@ -369,7 +369,7 @@ public class Simulation : Manipulator
 				try {
 					Navigator.SlamUpdate(time, measurements);
 				}
-				catch (InvalidOperationException e) {  // gtsam failure
+				catch (InvalidOperationException) {  // gtsam failure
 					commanddepleted = true;  // force exit in next call
 				}
 

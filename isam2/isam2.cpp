@@ -198,6 +198,7 @@ int update(ISAM2Navigator* navigator, double* odometry, double* measurements, in
 	try {
 	NonlinearFactorGraph graph;
 	Values               newestimates;
+	int                  maxlabel = -1;
 
 	// add new estimate for new pose (estimate using last pose)
 	Pose3 pestimate = navigator->estimate.at<Pose3>(Symbol('x', navigator->t - 1));
@@ -219,6 +220,8 @@ int update(ISAM2Navigator* navigator, double* odometry, double* measurements, in
 			newestimates.insert(Symbol('l', l),
 			                    landmarkestimate(px, py, range, pestimate, navigator->focal));
 		}
+
+		maxlabel = max(maxlabel, l);
 	}
 
 	if (odometry != nullptr) {
@@ -239,10 +242,10 @@ int update(ISAM2Navigator* navigator, double* odometry, double* measurements, in
 
 	// update the public estimates (interop)
 	navigator->tlength = navigator->tlength + 1;
-	navigator->msize   = navigator->estimate.size() - navigator->tlength;
+	navigator->msize   = max(navigator->msize, maxlabel + 1);
 
 	navigator->trajectory.resize(7 * navigator->tlength);
-	navigator->mapmodel  .resize(3 * navigator->msize);
+	navigator->mapmodel  .resize(3 * navigator->msize, HUGE_VAL);
 	navigator->tmarginals.resize((7 * 7) * navigator->tlength);
 	navigator->mmarginals.resize((3 * 3) * navigator->msize);
 
