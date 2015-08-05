@@ -285,7 +285,7 @@ public abstract class Vehicle : IDisposable
 		MappedMeasurements = new List<double[]>();
 
 		WayPoints = new TimedState();
-		WayPoints.Add(Tuple.Create(0.0, state));
+		WayPoints.Add(Tuple.Create(0.0, Util.SClone(state)));
 
 		HasSidebar = false;
 	}
@@ -313,7 +313,7 @@ public abstract class Vehicle : IDisposable
 		}
 		else {
 			this.WayPoints = new TimedState();
-			this.WayPoints.Add(Tuple.Create(0.0, that.state));
+			this.WayPoints.Add(Tuple.Create(0.0, Util.SClone(that.state)));
 		}
 	}
 	
@@ -341,7 +341,7 @@ public abstract class Vehicle : IDisposable
 	public void ResetHistory()
 	{
 		WayPoints.Clear();
-		WayPoints.Add(Tuple.Create(0.0, state));
+		WayPoints.Add(Tuple.Create(0.0, Util.SClone(state)));
 	}
 
 	/// <summary>

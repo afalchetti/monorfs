@@ -200,7 +200,8 @@ public class SimulatedVehicle : Vehicle
 		State       = State.Add(time.ElapsedGameTime.TotalSeconds.Multiply(
 		                             U.RandomGaussianVector(new double[7] {0, 0, 0, 0, 0, 0, 0}, MotionCovarianceQ)));
 		Orientation = Quaternion.Normalize(Orientation);
-		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, State));
+
+		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(State)));
 	}
 	
 	/// <summary>

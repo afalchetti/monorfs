@@ -171,6 +171,17 @@ public static class Util
 	}
 
 	/// <summary>
+	/// Typesafe shallow clone of an array.
+	/// </summary>
+	/// <returns>Shallow clone.</returns>
+	/// <param name="array">Array.</param>
+	/// <typeparam name="T">Elements' type.</typeparam>
+	public static T[] SClone<T>(T[] array)
+	{
+		return (T[]) array.Clone();
+	}
+
+	/// <summary>
 	/// Get a dictionary from a tabular string descriptor.
 	/// All entries have 'string' type. The entry separator is a newline.
 	/// Keys must not have any whitespace on their line and values associated

@@ -361,6 +361,10 @@ public class Viewer : Manipulator
 		string[]          frames  = descriptor.Split('\n');
 		TimedMeasurements history = new TimedMeasurements();
 
+		// measurements have one less data than everything else as they come
+		// in between frames; to simplify edge cases, add an "empty" measurement at the beggining
+		history.Add(Tuple.Create(0.0, new List<double[]>()));
+
 		foreach (string frame in frames) {
 			string[] parts = frame.Split(':');
 			double time    = -1;
@@ -401,10 +405,6 @@ public class Viewer : Manipulator
 
 			history.Add(Tuple.Create(time, measurements));
 		}
-
-		// measurements have one less data than everything else as they come
-		// in between frames; to simplify edge cases, add an "empty" measurement at the end
-		history.Add(Tuple.Create(double.PositiveInfinity, new List<double[]>()));
 
 		return history;
 	}

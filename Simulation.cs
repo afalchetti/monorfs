@@ -433,8 +433,8 @@ public class Simulation : Manipulator
 		timer.Start();
 
 		while (!commanddepleted) {
-			Update(time, keyboard, keyboard, 1.0);
 			time = new GameTime(time.TotalGameTime.Add(dt), dt);
+			Update(time, keyboard, keyboard, 1.0);
 		}
 
 		timer.Stop();
