@@ -171,6 +171,13 @@ public class Program
 
 				Console.WriteLine("writing output");
 
+				// with artificial data, the scene file has useful information
+				// with real sensors it isn't that useful and it's way too heavy
+				if (simulate) {
+					Console.WriteLine("  -- copying scene file");
+					File.Copy(scenefile, Path.Combine(output, "scene.world"));
+				}
+
 				Console.WriteLine("  -- writing trajectory history");
 				File.WriteAllText(Path.Combine(output, "trajectory.out"),   sim.SerializedTrajectory);
 				Console.WriteLine("  -- writing estimate history");

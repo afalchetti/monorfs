@@ -46,5 +46,8 @@ monorfs -s -f=map.world -c=movements.in -p=20 -y
 # Similar to above but use isam2 SLAM algorithm
 monorfs -s -f=map.world -c=movements.in -a=isam2
 
+# The same as the above, but in headless mode
+monorfs -s -f=map.world -c=movements.in -a=isam2 -x
+
 # Open a previous run with a Viewer
 monorfs -v -f=map.world

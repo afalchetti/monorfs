@@ -106,7 +106,7 @@ def parsedict(descriptor):
 def normalizelinefeeds(text):
 	return text.replace("\r\n", "\n").replace("\r", "\n")
 
-def plottrajectories(real, estimate):
+def poseerror(real, estimate):
 	treal   = [p["time"] for p in real]
 	posreal = [p["pos"]  for p in real]
 	
@@ -120,9 +120,9 @@ def plottrajectories(real, estimate):
 	
 	error = [np.linalg.norm(interreal[i] - interestimate[i]) for i in xrange(len(time))]
 	
-	mp.plot(time, error)
+	return (time, error)
 
-def plotmaps(real, estimate):
+def maperror(real, estimate):
 	time     = [estmap[0] for estmap in estimate]
 	real     = [np.array(p) for p in real]
 	estimate = [[gaussian["mean"] for gaussian in estmap[1] if gaussian["weight"] > 0.8] for estmap in estimate]
@@ -131,7 +131,7 @@ def plotmaps(real, estimate):
 	
 	error = multiprocessing.Pool(4).map(errorentry, [(real, estimate[i], c, p) for i in xrange(len(estimate))])
 	
-	mp.plot(time, error)
+	return (time, error)
 
 def errorentry(entry):
 	return mapdistance(*entry)
@@ -151,6 +151,32 @@ def mapdistance(a, b, c, p):
 def landmarkdistance(x, y, c):
 	return min(c, np.linalg.norm(x - y))
 
+def addgraphs(a, b):
+	(ta, fa) = a
+	(tb, fb) = b
+
+	fbproj = np.interp(ta, tb, fb)
+	fadd   = [fa[i] + fb[i] for i in xrange(len(ta))]
+
+	return (ta, fadd)
+
+def plot(poseerror, maperror, posefile, mapfile):	
+	pplot = mp.figure(1)
+	mp.plot(*poseerror)
+	mp.xlabel("Time [s]")
+	mp.ylabel("Pose error [m]")
+	mp.autoscale(tight=True)
+	pplot.subplots_adjust(bottom=0.15)
+	mp.savefig(posefile)
+
+	mplot = mp.figure(2)
+	mp.plot(*maperror)
+	mp.xlabel("Time [s]")
+	mp.ylabel("OSPA Map error")
+	mp.autoscale(tight=True)
+	mplot.subplots_adjust(bottom=0.15)
+	mp.savefig(mapfile)
+
 def processdir(directory):
 	print "  -- reading scene"
 	with open(os.path.join(directory, "scene.world")) as sfile:
@@ -168,25 +194,13 @@ def processdir(directory):
 	with open(os.path.join(directory, "maps.out")) as mfile:
 		maps = readmaps(mfile.read())
 	
-	print "  -- plotting trajectories"
-	trajplot = mp.figure(1)
-	plottrajectories(trajectory, estimate)
+	print "  -- calculating pose error"
+	perror = poseerror(trajectory, estimate)
 	
-	mp.xlabel("Time [s]")
-	mp.ylabel("Pose error [m]")
-	mp.autoscale(tight=True)
-	trajplot.subplots_adjust(bottom=0.15)
-	mp.savefig("pose-error.pdf")
-	
-	print "  -- plotting maps"
-	mapplot  = mp.figure(2)
-	plotmaps(scene["map"], maps)
-	
-	mp.xlabel("Time [s]")
-	mp.ylabel("OSPA Map error")
-	mp.autoscale(tight=True)
-	mapplot.subplots_adjust(bottom=0.15)
-	mp.savefig("map-error.pdf")
+	print "  -- calculating map error"
+	merror = maperror(scene["map"], maps)
+
+	return (perror, merror)
 
 def processfile(datafile):
 	tmp     = tempfile.mkdtemp()
@@ -198,16 +212,31 @@ def processfile(datafile):
 		datazip.extractall(datadir)
 
 	print "processing", datafile
-	processdir(datadir)
+	(perror, merror) = processdir(datadir)
 
 	shutil.rmtree(tmp)
 
+	return (perror, merror)
+
 def main():
 	if len(sys.argv) < 2:
-		print "usage: python plot.py datafile.zip"
+		print "usage: python plot.py pose.pdf map.pdf data1.zip [data2.zip [data3.zip ...]]"
 		return
+
+	n = len(sys.argv) - 3
 	
-	processfile(sys.argv[1])
+	(totalp, totalm) = processfile(sys.argv[3])
+	
+	for i in xrange(4, len(sys.argv)):
+		(perror, merror) = processfile(sys.argv[i])
+		totalp = addgraphs(totalp, perror)
+		totalm = addgraphs(totalm, merror)
+
+	totalp = (np.array(totalp[0]), np.array(totalp[1]) / n)
+	totalm = (np.array(totalm[0]), np.array(totalm[1]) / n)
+
+	print "plotting"
+	plot(totalp, totalm, sys.argv[1], sys.argv[2])
 
 if __name__ == '__main__':
 	main()
