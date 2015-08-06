@@ -33,6 +33,7 @@ from matplotlib import rcParams
 import numpy as np
 import munkres
 import multiprocessing
+import os, sys, shutil, tempfile, zipfile
 
 rcParams['axes.labelsize']  = 9
 rcParams['xtick.labelsize'] = 9
@@ -128,13 +129,12 @@ def plotmaps(real, estimate):
 	c        = 1
 	p        = 2
 	
-	error = multiprocessing.Pool(4).map(errorentry, [(str(i) + " / " + str(len(estimate)), (real, estimate[i], c, p)) for i in xrange(len(estimate))])
+	error = multiprocessing.Pool(4).map(errorentry, [(real, estimate[i], c, p) for i in xrange(len(estimate))])
 	
 	mp.plot(time, error)
 
 def errorentry(entry):
-	print entry[0]
-	return mapdistance(*entry[1])
+	return mapdistance(*entry)
 
 def mapdistance(a, b, c, p):
 	
@@ -151,24 +151,24 @@ def mapdistance(a, b, c, p):
 def landmarkdistance(x, y, c):
 	return min(c, np.linalg.norm(x - y))
 
-if __name__ == '__main__':
-	print "reading scene"
-	with open("map.world") as sfile:
+def processdir(directory):
+	print "  -- reading scene"
+	with open(os.path.join(directory, "scene.world")) as sfile:
 		scene = readscene(sfile.read())
 	
-	print "reading trajectory"
-	with open("trajectory.out") as tfile:
+	print "  -- reading trajectory"
+	with open(os.path.join(directory, "trajectory.out")) as tfile:
 		trajectory = readtrajectory(tfile.read())
 	
-	print "reading estimate"
-	with open("estimate.out") as efile:
+	print "  -- reading estimate"
+	with open(os.path.join(directory, "estimate.out")) as efile:
 		estimate   = readfinaltrajectory(efile.read())
 	
-	print "reading maps"
-	with open("maps.out") as mfile:
+	print "  -- reading maps"
+	with open(os.path.join(directory, "maps.out")) as mfile:
 		maps = readmaps(mfile.read())
 	
-	print "plotting trajectories"
+	print "  -- plotting trajectories"
 	trajplot = mp.figure(1)
 	plottrajectories(trajectory, estimate)
 	
@@ -178,7 +178,7 @@ if __name__ == '__main__':
 	trajplot.subplots_adjust(bottom=0.15)
 	mp.savefig("pose-error.pdf")
 	
-	print "plotting maps"
+	print "  -- plotting maps"
 	mapplot  = mp.figure(2)
 	plotmaps(scene["map"], maps)
 	
@@ -187,3 +187,27 @@ if __name__ == '__main__':
 	mp.autoscale(tight=True)
 	mapplot.subplots_adjust(bottom=0.15)
 	mp.savefig("map-error.pdf")
+
+def processfile(datafile):
+	tmp     = tempfile.mkdtemp()
+	datadir = os.path.join(tmp, "data")
+
+	os.mkdir(datadir)
+
+	with zipfile.ZipFile(datafile, "r") as datazip:
+		datazip.extractall(datadir)
+
+	print "processing", datafile
+	processdir(datadir)
+
+	shutil.rmtree(tmp)
+
+def main():
+	if len(sys.argv) < 2:
+		print "usage: python plot.py datafile.zip"
+		return
+	
+	processfile(sys.argv[1])
+
+if __name__ == '__main__':
+	main()
