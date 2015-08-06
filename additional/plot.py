@@ -129,7 +129,7 @@ def maperror(real, estimate):
 	c        = 1
 	p        = 2
 	
-	error = multiprocessing.Pool(4).map(errorentry, [(real, estimate[i], c, p) for i in xrange(len(estimate))])
+	error = map(errorentry, [(real, estimate[i], c, p) for i in xrange(len(estimate))])
 	
 	return (time, error)
 
@@ -177,32 +177,44 @@ def plot(poseerror, maperror, posefile, mapfile):
 	mplot.subplots_adjust(bottom=0.15)
 	mp.savefig(mapfile)
 
-def processdir(directory):
-	print "  -- reading scene"
+def processdir(directory, verbose = False):
+	if verbose:
+		print "  -- reading scene"
+		
 	with open(os.path.join(directory, "scene.world")) as sfile:
 		scene = readscene(sfile.read())
 	
-	print "  -- reading trajectory"
+	if verbose:
+		print "  -- reading trajectory"
+		
 	with open(os.path.join(directory, "trajectory.out")) as tfile:
 		trajectory = readtrajectory(tfile.read())
 	
-	print "  -- reading estimate"
+	if verbose:
+		print "  -- reading estimate"
+		
 	with open(os.path.join(directory, "estimate.out")) as efile:
 		estimate   = readfinaltrajectory(efile.read())
 	
-	print "  -- reading maps"
+	if verbose:
+		print "  -- reading maps"
+		
 	with open(os.path.join(directory, "maps.out")) as mfile:
 		maps = readmaps(mfile.read())
 	
-	print "  -- calculating pose error"
+	if verbose:
+		print "  -- calculating pose error"
+		
 	perror = poseerror(trajectory, estimate)
 	
-	print "  -- calculating map error"
+	if verbose:
+		print "  -- calculating map error"
+		
 	merror = maperror(scene["map"], maps)
 
 	return (perror, merror)
 
-def processfile(datafile):
+def processfile(datafile, verbose = False):
 	tmp     = tempfile.mkdtemp()
 	datadir = os.path.join(tmp, "data")
 
@@ -212,7 +224,7 @@ def processfile(datafile):
 		datazip.extractall(datadir)
 
 	print "processing", datafile
-	(perror, merror) = processdir(datadir)
+	(perror, merror) = processdir(datadir, verbose)
 
 	shutil.rmtree(tmp)
 
@@ -225,10 +237,15 @@ def main():
 
 	n = len(sys.argv) - 3
 	
-	(totalp, totalm) = processfile(sys.argv[3])
+	pool = multiprocessing.Pool()
+	errors = pool.map(processfile, sys.argv[3:])
+	pool.close()
+	pool.join()
 	
-	for i in xrange(4, len(sys.argv)):
-		(perror, merror) = processfile(sys.argv[i])
+	(totalp, totalm) = errors[0]
+	
+	for i in xrange(1, len(errors)):
+		perror, merror = errors[i]
 		totalp = addgraphs(totalp, perror)
 		totalm = addgraphs(totalm, merror)
 
