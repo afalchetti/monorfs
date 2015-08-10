@@ -50,40 +50,38 @@ public class PHDNavigator : Navigator
 	/// <summary>
 	/// Landmark density expected on unexplored areas.
 	/// </summary>
-	public const double BirthWeight = 0.05;
+	public static double BirthWeight { get { return Config.BirthWeight; } }
 
 	/// <summary>
 	/// Landmark density spread expected on unexplored areas
 	/// </summary>
-	public static readonly double[][] BirthCovariance = new double[3][] {new double[3] {1e-3, 0, 0},
-	                                                                     new double[3] {0, 1e-3, 0},
-	                                                                     new double[3] {0, 0, 1e-3}};
+	public static double[][] BirthCovariance { get { return Config.BirthCovariance; } }
 
 	/// <summary>
 	/// Minimum weight that is kept after a model prune.
 	/// </summary>
-	public const double MinWeight = 1e-2;
+	public static double MinWeight { get { return Config.MinWeight; } }
 
 	/// <summary>
 	/// Minimum particles effective fraction that need to exist to give reasonable exploration.
 	/// </summary>
-	public const double MinEffectiveParticle = 0.3;
+	public static double MinEffectiveParticle { get { return Config.MinEffectiveParticle; } }
 
 	/// <summary>
 	/// Maximum number of gaussians kept after a model prune.
 	/// </summary>
-	public const int MaxQuantity = 100;
+	public static int MaxQuantity { get { return Config.MaxQuantity; } }
 
 	/// <summary>
 	/// Threshold used to decide when to merge close gaussian components.
 	/// </summary>
-	public const double MergeThreshold = 3e0;
+	public static double MergeThreshold { get { return Config.MergeThreshold; } }
 
 	/// <summary>
 	/// Threshold use to decide if a new measurement is in unexplored territory.
 	/// If it is, it should be explored (birth of a new gaussian).
 	/// </summary>
-	public const double ExplorationThreshold = 1e-5;
+	public static double ExplorationThreshold { get { return Config.ExplorationThreshold; } }
 
 	/// <summary>
 	/// Number of particles for the Montecarlo filter.
@@ -150,7 +148,7 @@ public class PHDNavigator : Navigator
 	/// If true every particle history is rendered onscreen;
 	/// otherwise, only the best particle is.
 	/// </summary>
-	public const bool RenderAllParticles = true;
+	public static bool RenderAllParticles { get { return Config.RenderAllParticles; } }
 
 	/// <summary>
 	/// Render output.

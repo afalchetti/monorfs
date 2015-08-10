@@ -52,12 +52,12 @@ public class SimulatedVehicle : Vehicle
 	/// <summary>
 	/// Internal probability of detection.
 	/// </summary>
-	private readonly double detectionProbability = 0.9;
+	private readonly double detectionProbability = Config.DetectionProbability;
 
 	/// <summary>
 	/// Amount of expected clutter (spuriousness) on the measurement process.
 	/// </summary>
-	public readonly double ClutterDensity = 3e-7;
+	public readonly double ClutterDensity = Config.ClutterDensity;
 
 	/// <summary>
 	/// Probability of detection.
@@ -75,7 +75,7 @@ public class SimulatedVehicle : Vehicle
 	/// If the robot is well located on the ground this makes sense, but if it is a handheld
 	/// device, it is not so easy to maintain it steady.
 	/// </summary>
-	public const bool PerfectStill = false;
+	public static bool PerfectStill { get { return Config.PerfectStill; } }
 
 	/// <summary>
 	/// Landmark 3d locations against which the measurements are performed.

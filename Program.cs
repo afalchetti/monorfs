@@ -104,6 +104,7 @@ public class Program
 		string recfile       = "data.zip";
 		string scenefile     = "";
 		string commandfile   = "";
+		string configfile    = "";
 		int    particlecount = 1;
 		bool   onlymapping   = false;
 		bool   simulate      = false;
@@ -118,6 +119,7 @@ public class Program
 			{ "f|scene=",      "Scene description file. Simulated, recorded or device id.",    f       => scenefile     = f },
 			{ "r|recfile=",    "Recording file. Saves State and events for reviewing.",        r       => recfile       = r },
 			{ "c|command=",    "Auto-command file (simulates user input).",                    c       => commandfile   = c },
+			{ "g|config=",     "Configuration file. Contains global constants",                g       => configfile    = g },
 			{ "a|algorithm=",  "SLAM solver algorithm (phd or isam2)",                         a       => algorithm     = (a != "isam2") ? NavigationAlgorithm.PHD : NavigationAlgorithm.ISAM2 },
 			{ "p|particles=",  "Number of particles used for the RB-PHD",                      (int p) => particlecount = p },
 			{ "y|onlymap",     "Only do mapping, assuming known localization.",                y       => onlymapping   = y != null },
@@ -146,6 +148,10 @@ public class Program
 		if (!KinectVehicle.Initialize()) {
 			KinectVehicle.Shutdown();
 			Environment.Exit(2);
+		}
+
+		if (!string.IsNullOrEmpty(configfile)) {
+			Config.FromFile(configfile);
 		}
 
 		if (viewer) {

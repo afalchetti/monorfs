@@ -49,22 +49,11 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// Internal motion model covariance matrix. Yaw-pitch-roll representation.
 	/// </summary>
-	private double[][] motionCovariance = new double[6][] { new double[6] {5e-3, 0, 0, 0, 0, 0},
-	                                                        new double[6] {0, 5e-3, 0, 0, 0, 0},
-	                                                        new double[6] {0, 0, 5e-3, 0, 0, 0},
-	                                                        new double[6] {0, 0, 0, 2e-4, 0, 0},
-	                                                        new double[6] {0, 0, 0, 0, 2e-4, 0},
-	                                                        new double[6] {0, 0, 0, 0, 0, 2e-4} };
+	private double[][] motionCovariance = Config.MotionCovariance;
 	/// <summary>
 	/// Internal motion model covariance matrix. Quaternion representation.
 	/// </summary>
-	private double[][] motionCovarianceQ = new double[7][] { new double[7] {5e-3, 0, 0, 0, 0, 0, 0},
-	                                                         new double[7] {0, 5e-3, 0, 0, 0, 0, 0},
-	                                                         new double[7] {0, 0, 5e-3, 0, 0, 0, 0},
-	                                                         new double[7] {0, 0, 0, 1e-9, 0, 0, 0},
-	                                                         new double[7] {0, 0, 0, 0, 5e-5, 0, 0},
-	                                                         new double[7] {0, 0, 0, 0, 0, 5e-5, 0},
-	                                                         new double[7] {0, 0, 0, 0, 0, 0, 5e-5} };
+	private double[][] motionCovarianceQ = Config.MotionCovarianceQ;
 
 	/// <summary>
 	/// Motion model covariance matrix. Yaw-pitch-roll representation.
@@ -112,9 +101,7 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// Measurement model covariance matrix.
 	/// </summary>
-	public double[][] MeasurementCovariance = new double[3][] { new double[3] {2e-0, 0, 0},
-	                                                            new double[3] {0, 2e-0, 0},
-	                                                            new double[3] {0, 0, 1e-3} };
+	public double[][] MeasurementCovariance = Config.MeasurementCovariance;
 	
 	/// <summary>
 	/// Internal vehicle pose state.

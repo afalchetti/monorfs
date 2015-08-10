@@ -138,6 +138,7 @@
     <Compile Include="PHDNavigator.cs" />
     <Compile Include="ISAM2Navigator.cs" />
     <Compile Include="Test\UtilTest.cs" />
+    <Compile Include="Config.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

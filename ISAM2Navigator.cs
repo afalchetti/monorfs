@@ -52,13 +52,13 @@ public class ISAM2Navigator : Navigator
 	/// <summary>
 	/// Maximum distance at which a match is considered valid; otherwise a new landmark is generated.
 	/// </summary>
-	public const double MatchThreshold = 3.0;
+	public static double MatchThreshold { get { return Config.MatchThreshold; } }
 
 	/// <summary>
 	/// Number of consecutive frames a landmark must be seen before
 	/// it is considered real and not clutter.
 	/// </summary>
-	public const int NewLandmarkThreshold = 3;
+	public static int NewLandmarkThreshold { get { return Config.NewLandmarkThreshold; } }
 
 	/// <summary>
 	/// Algorithm to decide data association.
@@ -68,7 +68,7 @@ public class ISAM2Navigator : Navigator
 	/// It's there to compare performance and gain insights as to how
 	/// sensible is the algorithm to associations errors.
 	/// </remarks>
-	public const DataAssociationAlgorithm DAAlgorithm = DataAssociationAlgorithm.Mahalanobis;
+	public static DataAssociationAlgorithm DAAlgorithm { get { return Config.DAAlgorithm; } }
 
 	/// <summary>
 	/// Obtains the data association from the tracked vehicle.

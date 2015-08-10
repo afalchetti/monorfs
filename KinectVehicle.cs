@@ -84,7 +84,7 @@ public class KinectVehicle : Vehicle
 	/// For efficiency purposes, not the whole image is used.
 	/// It is subsampled first using this delta factor.
 	/// </summary>
-	public const int Delta = 8;
+	public static int Delta { get { return Config.KinectDelta; } }
 
 	/// <summary>
 	/// Device resolution on the X-axis, properly scaled.

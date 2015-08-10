@@ -73,7 +73,7 @@ public class Simulation : Manipulator
 	/// Measure cycle period. Every this amount of
 	/// time the SLAM solver is invoked.
 	/// </summary>
-	public readonly TimeSpan MeasureElapsed = new TimeSpan(10000000/30);
+	public static TimeSpan MeasureElapsed { get { return Config.MeasureElapsed; } }
 	
 	/// <summary>
 	/// Last time the navigator update method was called.
@@ -85,7 +85,7 @@ public class Simulation : Manipulator
 	/// for the pose update. This may be set to false if there is no odometry
 	/// or for performance comparisons of the system with and without it.
 	/// </summary>
-	public const bool UseOdometry = true;
+	public static bool UseOdometry { get { return Config.UseOdometry; } }
 
 	/// <summary>
 	/// Every sidebar frame seen so far.
