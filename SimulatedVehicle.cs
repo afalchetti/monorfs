@@ -50,7 +50,7 @@ namespace monorfs
 public class SimulatedVehicle : Vehicle
 {
 	/// <summary>
-	/// Probability of detection.
+	/// Internal probability of detection.
 	/// </summary>
 	private readonly double detectionProbability = 0.9;
 
@@ -58,6 +58,11 @@ public class SimulatedVehicle : Vehicle
 	/// Amount of expected clutter (spuriousness) on the measurement process.
 	/// </summary>
 	public readonly double ClutterDensity = 3e-7;
+
+	/// <summary>
+	/// Probability of detection.
+	/// </summary>
+	public double PD { get { return detectionProbability; } }
 
 	/// <summary>
 	/// Clutter density integral over the whole measurement space, i.e.

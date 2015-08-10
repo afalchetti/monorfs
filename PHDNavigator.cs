@@ -361,7 +361,7 @@ public class PHDNavigator : Navigator
 		// use the most probable components approximation otherwise
 		SparseMatrix logprobs = new SparseMatrix(visible.Count + measurements.Count, visible.Count + measurements.Count, double.NegativeInfinity);
 
-		double     logPD      = (visible.Count > 0) ? Math.Log(pose.DetectionProbability(visible[0].Mean)) : 0;
+		double     logPD      = Math.Log(pose.PD);
 		double     logclutter = Math.Log(pose.ClutterDensity);
 		Gaussian[] zprobs     = new Gaussian[visible.Count];
 

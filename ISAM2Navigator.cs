@@ -68,7 +68,7 @@ public class ISAM2Navigator : Navigator
 	/// It's there to compare performance and gain insights as to how
 	/// sensible is the algorithm to associations errors.
 	/// </remarks>
-	public const DataAssociationAlgorithm DAAlgorithm = DataAssociationAlgorithm.Perfect;
+	public const DataAssociationAlgorithm DAAlgorithm = DataAssociationAlgorithm.Mahalanobis;
 
 	/// <summary>
 	/// Obtains the data association from the tracked vehicle.
@@ -176,11 +176,11 @@ public class ISAM2Navigator : Navigator
 		//      although it is possible to define a complete matrix,
 		//      it doesn't seem to be worth it when comparing performance
 		for (int i = 0; i < nmeasurement; ++i) {
-			measurementnoise[i] = vehicle.MeasurementCovariance[i][i];
+			measurementnoise[i] = Math.Sqrt(vehicle.MeasurementCovariance[i][i]);
 		}
 
 		for (int i = 0; i < nmotion; ++i) {
-			motionnoise[i] = vehicle.MotionCovariance[i][i];
+			motionnoise[i] = Math.Sqrt(vehicle.MotionCovariance[i][i]);
 		}
 
 		estimate          = new SimulatedVehicle();
@@ -245,7 +245,7 @@ public class ISAM2Navigator : Navigator
 	public override void SlamUpdate(GameTime time, List<double[]> measurements)
 	{
 		double[]  odometry = Vehicle.StateDiff(BestEstimate, prevestimate);
-		List<int> labels   = findLabels(measurements);
+		List<int> labels   = FindLabels(measurements);
 
 		for (int i = labels.Count - 1; i >= 0; i--) {
 			// candidates are removed from the measurement list
@@ -303,7 +303,7 @@ public class ISAM2Navigator : Navigator
 	/// </summary>
 	/// <param name="measurements">New measurements.</param>
 	/// <returns>Association labels.</returns>
-	public List<int> findLabels(List<double[]> measurements)
+	public List<int> FindLabels(List<double[]> measurements)
 	{
 		if (DAAlgorithm == DataAssociationAlgorithm.Perfect) {
 			if (!HasDataAssociation) {
@@ -313,13 +313,31 @@ public class ISAM2Navigator : Navigator
 			return GetDataAssociation();
 		}
 
-		List<int> labels = new List<int>(measurements.Count);
-
 		double[][] I             = 0.001.Multiply(Accord.Math.Matrix.Identity(3).ToArray());
-		bool[]     keepcandidate = new bool    [CandidateMapModel.Count];
+		bool[]     keepcandidate = new bool[CandidateMapModel.Count];
 		double[][] R;
 		Gaussian[] q;
 		Gaussian[] qcandidate;
+
+		SimulatedVehicle pose             = BestEstimate;
+		List<Gaussian>   visible          = new List<Gaussian>();
+		List<int>        visibleLandmarks = new List<int>();
+
+		for (int i = 0; i < mapmodel.Count; i++) {
+			if (pose.Visible(mapmodel[i].Mean)) {
+				visible         .Add(mapmodel[i]);
+				visibleLandmarks.Add(i);
+			}
+		}
+
+		double logPD      = Math.Log(pose.PD);
+		double logclutter = Math.Log(pose.ClutterDensity);
+
+		int n = visible.Count + CandidateMapModel.Count;
+		int m = visible.Count + CandidateMapModel.Count + measurements.Count;
+
+		// distances(i, k) = distance between landmark i and measurements k
+		SparseMatrix distances  = new SparseMatrix(n, n, double.NegativeInfinity);
 
 		int candidatecount = CandidateMapModel.Count;
 		// candidate count at the beggining of the process
@@ -327,86 +345,105 @@ public class ISAM2Navigator : Navigator
 		// (if one gets promoted to candidate, the next one could think it's similar to it
 		// but that isn't sensible: one landmark -> hopefully one measurement)
 
-		if (DAAlgorithm == DataAssociationAlgorithm.Mahalanobis) {
-			R          = BestEstimate.MeasurementCovariance;
-			q          = new Gaussian[mapmodel.Count];
-			qcandidate = new Gaussian[CandidateMapModel.Count];
+		R          = pose.MeasurementCovariance;
+		q          = new Gaussian[visible.Count];
+		qcandidate = new Gaussian[CandidateMapModel.Count];
 
-			for (int i = 0; i < q.Length; i++) {
-				Gaussian component = mapmodel[i];
-				double[][] H = BestEstimate.MeasurementJacobian(component.Mean);
-				q[i] = new Gaussian(BestEstimate.MeasurePerfect(component.Mean),
-					H.Multiply(component.Covariance.MultiplyByTranspose(H)).Add(R),
-					component.Weight);
+		for (int i = 0; i < q.Length; i++) {
+			Gaussian component = visible[i];
+
+			if (DAAlgorithm == DataAssociationAlgorithm.Mahalanobis) {
+				double[][] H = pose.MeasurementJacobian(component.Mean);
+				q[i] = new Gaussian(pose.MeasurePerfect(component.Mean),
+				                    H.Multiply(component.Covariance.MultiplyByTranspose(H)).Add(R),
+				                    1.0);
 			}
-
-			for (int i = 0; i < qcandidate.Length; i++) {
-				Gaussian component = CandidateMapModel[i];
-
-				// assume the covariance is zero, since there's nothing better to assume here
-				// note that this is more stringent on the unproven data, as they are given
-				// less leeway for noise than the already associated landmark
-				qcandidate[i] = new Gaussian(BestEstimate.MeasurePerfect(component.Mean), R, component.Weight);
+			else {
+				q[i] = new Gaussian(component.Mean, I, 1.0);
 			}
 		}
 
-		for (int i =  0; i < measurements.Count; i++) {
-			double bestmatch = double.MaxValue;
-			int    label     = int.MinValue;
-			double distance2;
+		for (int i = 0; i < qcandidate.Length; i++) {
+			Gaussian component = CandidateMapModel[i];
 
-			for (int k = 0; k < mapmodel.Count; k++) {
+			if (DAAlgorithm == DataAssociationAlgorithm.Mahalanobis) {
+				// assume the covariance is zero, since there's nothing better to assume here
+				// note that this is more stringent on the unproven data, as they are given
+				// less leeway for noise than the already associated landmark
+				qcandidate[i] = new Gaussian(pose.MeasurePerfect(component.Mean), R, component.Weight);
+			}
+			else {
+				qcandidate[i] = new Gaussian(component.Mean, I, 1.0);
+			}
+		}
+
+		Gaussian[] vlandmarks = q.Concatenate(qcandidate);
+
+		for (int i = 0; i < n;  i++) {
+			for (int k = 0; k < measurements.Count; k++) {
+				double distance2;
+
 				if (DAAlgorithm == DataAssociationAlgorithm.Mahalanobis) {
-					distance2 = q[k].MahalanobisSquared(measurements[i]);
+					distance2 = vlandmarks[i].MahalanobisSquared(measurements[k]);
 				}
 				else {
-					distance2 = mapmodel[k].Mean.SquareEuclidean(BestEstimate.MeasureToMap(measurements[i]));
+					distance2 = vlandmarks[i].Mean.SquareEuclidean(pose.MeasureToMap(measurements[k]));
 				}
 
-				if (distance2 < bestmatch) {
-					bestmatch = distance2;
-					label     = k;
+				if (distance2 < MatchThreshold * MatchThreshold) {
+					distances[i, k] = logPD + Math.Log(vlandmarks[i].Multiplier) - 0.5 * distance2;
 				}
 			}
+		}
 
-			for (int k = 0; k < candidatecount; k++) {
-				if (DAAlgorithm == DataAssociationAlgorithm.Mahalanobis) {
-					distance2 = qcandidate[k].MahalanobisSquared(measurements[i]);
-				}
-				else {
-					distance2 = CandidateMapModel[k].Mean.SquareEuclidean(BestEstimate.MeasureToMap(measurements[i]));
-				}
+		for (int i = 0; i < vlandmarks.Length; i++) {
+			distances[i, measurements.Count + i] = logPD;
+		}
 
-				if (distance2 < bestmatch) {
-					bestmatch = distance2;
-					label     = -k - 1;
-					// negative labels are for candidates,
-					// note that zero is already occupied by the associated landmarks
-				}
+		for (int i = 0; i < measurements.Count; i++) {
+			distances[vlandmarks.Length + i, i] = logclutter;
+		}
+
+		// fill the (Misdetection x Clutter) quadrant of the matrix with zeros (don't contribute)
+		for (int i = vlandmarks.Length;  i < m; i++) {
+		for (int k = measurements.Count; k < m; k++) {
+			distances[i, k] = 0;
+		}
+		}
+
+		int[] assignments = GraphCombinatorics.LinearAssignment(distances);
+
+		// the assignment vector after removing all the clutter variables
+		List<int> labels = new List<int>();
+
+		for (int i = 0; i < measurements.Count; i++) {
+			labels.Add(int.MinValue);
+		}
+
+		// proved landmark
+		for (int i = 0; i < visible.Count; i++) {
+			if (assignments[i] < measurements.Count) {
+				labels[assignments[i]] = visibleLandmarks[i];
 			}
+		}
 
-			// if far from everything, generate a new candidate at the measured point
-			// note that the covariance is assumed zero, though that would throw an exception,
-			// as it doesn't have an inverse, so the identity is used instead (dummy value)
-			if (bestmatch > MatchThreshold * MatchThreshold) {
-				CandidateMapModel.Add(new Gaussian(BestEstimate.MeasureToMap(measurements[i]), I, 1));
-				label = int.MinValue;
+		// candidate landmark
+		for (int i = visible.Count; i < vlandmarks.Length; i++) {
+			if (assignments[i] < measurements.Count) {
+				int k = i - visible.Count;
 
-				if (NewLandmarkThreshold <= 1) {
-					CandidateMapModel.RemoveAt(CandidateMapModel.Count - 1);
-					label = NextLabel;
-				}
-			}
-			else if (label < 0) {
-				int k = -label - 1;
+				labels[assignments[i]] = -k - 1;
+				// negative labels are for candidates,
+				// note that zero is already occupied by the associated landmarks
 
 				// improve the estimated landmark by averaging with the new measurement
 				double w = CandidateMapModel[k].Weight;
 				CandidateMapModel[k] =
 					new Gaussian((CandidateMapModel[k].Mean.Multiply(w).Add(
-					                 BestEstimate.MeasureToMap(measurements[i]))).Divide(w + 1),
+					                 BestEstimate.MeasureToMap(measurements[assignments[i]]))).Divide(w + 1),
 					             I,
 					             w + 1);
+				
 				// note the comparison between double and int
 				// since the weight is only used with integer values (and addition by one)
 				// there should never be any truncation error, at least while
@@ -415,15 +452,29 @@ public class ISAM2Navigator : Navigator
 				// In fact, the gtsam key system fails before that
 				// (it uses three bytes for numbering, one for character)
 				if (CandidateMapModel[k].Weight >= NewLandmarkThreshold) {
-					label = NextLabel;
+					labels[assignments[i]] = NextLabel;
 				}
 				else {
 					keepcandidate[k] = true;
 					// only keep candidates that haven't been added, but are still visible
 				}
 			}
+		}
 
-			labels.Add(label);
+		// else: unmatched measurements, add to candidates
+		for (int i = 0; i < measurements.Count; i++) {
+			if (labels[i] == int.MinValue) {
+				// if far from everything, generate a new candidate at the measured point
+				// note that the covariance is assumed zero, though that would throw an exception,
+				// as it doesn't have an inverse, so the identity is used instead (dummy value)
+				CandidateMapModel.Add(new Gaussian(BestEstimate.MeasureToMap(measurements[i]), I, 1));
+
+				if (NewLandmarkThreshold <= 1) {
+					CandidateMapModel.RemoveAt(CandidateMapModel.Count - 1);
+					labels[i] = NextLabel;
+				}
+				
+			}
 		}
 
 		// anything that wasn't seen goes away, it was clutter

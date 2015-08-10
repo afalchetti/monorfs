@@ -126,9 +126,9 @@ public abstract class Navigator : IDisposable
 		const int segments = 32;
 		pinterval = new double[segments][];
 
-		// pinterval will be the 5-sigma ellipse
+		// pinterval will be the 1-sigma ellipse
 		for (int i = 0; i < segments; i++) {
-			this.pinterval[i] = new double[2] {5 * Math.Cos(2 * Math.PI * i / segments), 5*Math.Sin(2 * Math.PI * i / segments)};
+			this.pinterval[i] = new double[2] {1 * Math.Cos(2 * Math.PI * i / segments), 1 * Math.Sin(2 * Math.PI * i / segments)};
 		}
 	}
 
