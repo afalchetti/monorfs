@@ -31,11 +31,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 
-using Accord;
+using AForge;
 using Accord.Math;
 using AForge.Math.Random;
 using Accord.Math.Decompositions;
-using AForge;
 
 namespace monorfs
 {
@@ -47,20 +46,20 @@ public static class Util
 	/// <summary>
 	/// Gaussian random generator.
 	/// </summary>
-	public static GaussianGenerator gaussian;
+	public static GaussianGenerator Gaussian;
 
 	/// <summary>
 	/// Global uniform random generator.
 	/// </summary>
-	public static UniformGenerator uniform;
+	public static UniformGenerator Uniform;
 
 	/// <summary>
 	/// Static generator initialization.
 	/// </summary>
 	static Util()
 	{
-		gaussian = new GaussianGenerator(0, 1);
-		uniform  = new UniformGenerator(new Range(0, 1));
+		Gaussian = new GaussianGenerator(0, 1);
+		Uniform  = new UniformGenerator(new Range(0, 1));
 	}
 
 	/// <summary>
@@ -164,7 +163,7 @@ public static class Util
 		// to obtain the multinormal correlated  random vector
 		double[]  canonical = new double[mean.Length];
 		for (int i = 0; i < canonical.Length; i++) {
-			canonical[i] = gaussian.Next();
+			canonical[i] = Gaussian.Next();
 		}
 
 		return mean.Add(covroot.Multiply(canonical));

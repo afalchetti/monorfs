@@ -28,17 +28,16 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
+
 using AForge;
 using AForge.Imaging;
-using Accord;
 using Accord.Math;
 using Accord.Imaging;
 
 using Microsoft.Xna.Framework;
-using OpenNIWrapper;
-using System.Drawing.Imaging;
-using System.Runtime.InteropServices;
 using Microsoft.Xna.Framework.Graphics;
+using OpenNIWrapper;
 
 namespace monorfs
 {
@@ -613,6 +612,8 @@ public class KinectVehicle : Vehicle
 	/// a bidimensional matrix.
 	/// </summary>
 	/// <param name="matrix">Original matrix.</param>
+	/// <param name="width">Image width.</param>
+	/// <param name="height">Image height.</param>
 	/// <returns>Color unmanaged image.</returns>
 	private static UnmanagedImage ColorMatrixToImage(Color[] matrix, int width, int height)
 	{

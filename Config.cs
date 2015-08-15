@@ -27,18 +27,9 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text.RegularExpressions;
-
-using Accord;
-using Accord.Math;
-using AForge.Math.Random;
-using Accord.Math.Decompositions;
-using AForge;
-using System.Threading;
 using System.Reflection;
-using System.Text;
+
+using Accord.Math;
 
 namespace monorfs
 {

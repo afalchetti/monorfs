@@ -29,17 +29,14 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Diagnostics;
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 
-using Accord.Math;
-using System.Text;
-
 using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
-using System.Diagnostics;
 
 namespace monorfs
 {
@@ -176,8 +173,6 @@ public class Simulation : Manipulator
 	/// If only mapping is done, it is irrelevant.</param>
 	/// <param name="onlymapping">If true, no localization is executed and the robot's position
 	/// is assumed perfectly known.</param>
-	/// <param name="simulate">True means a full simulation is performed;
-	/// false uses real sensor data (realtime or from a file).</param>
 	/// <param name="realtime">If true, the system works at the highest speed it can;
 	/// otherwise, the framerate is fixed and even if processing takes longer than the timestep, the simulation works
 	/// as it had taken exactly the nominal rate.</param>

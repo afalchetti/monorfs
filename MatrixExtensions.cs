@@ -27,10 +27,9 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
-using System.Collections.Generic;
 
-using Accord;
 using Accord.Math;
+
 using Microsoft.Xna.Framework;
 
 namespace monorfs
@@ -265,7 +264,7 @@ public static class MatrixExtensions
 	/// Calculate the determinant of a jagged matrix.
 	/// </summary>
 	/// <remarks>Jagged version of the Accord.Net function.</remarks>
-	/// <param name="a">Original matrix.</param>
+	/// <param name="matrix">Original matrix.</param>
 	/// <returns>Matrix determinant.</returns>
 	public static double Determinant(this double[][] matrix)
 	{
@@ -276,7 +275,7 @@ public static class MatrixExtensions
 	/// Calculate the inverse of a jagged matrix.
 	/// </summary>
 	/// <remarks>Jagged version of the Accord.Net function.</remarks>
-	/// <param name="a">Original matrix.</param>
+	/// <param name="matrix">Original matrix.</param>
 	/// <returns>Matrix inverse.</returns>
 	public static double[][] Inverse(this double[][] matrix)
 	{

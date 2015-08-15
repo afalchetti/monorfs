@@ -24,10 +24,10 @@
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Externalconsole>true</Externalconsole>
-    <Commandlineparameters>-s -f=map.world -c=movements.in -p=20 -y -a=isam2</Commandlineparameters>
+    <Commandlineparameters>-s -f=map.world -c=movroom.in -a=isam2</Commandlineparameters>
     <CustomCommands>
       <CustomCommands>
-        <Command type="AfterBuild" command="cp -ru ${ProjectDir}/additional/* ${TargetDir}" workingdir="${ProjectDir}" externalConsole="True" />
+        <Command type="AfterBuild" command="cp -ru ${ProjectDir}/additional/* ${ProjectDir}/isam2/bin/Debug/libisam2.so ${TargetDir}" workingdir="${ProjectDir}" externalConsole="True" />
       </CustomCommands>
     </CustomCommands>
   </PropertyGroup>
@@ -40,10 +40,10 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ConsolePause>false</ConsolePause>
     <Externalconsole>true</Externalconsole>
-    <Commandlineparameters>-s -f=map.world -c=movements.in -p=20 -y -a=isam2</Commandlineparameters>
+    <Commandlineparameters>-s -f=map.world -c=movroom.in -p=20 -a=isam2</Commandlineparameters>
     <CustomCommands>
       <CustomCommands>
-        <Command type="AfterBuild" command="cp -ru ${ProjectDir}/additional/* ${TargetDir}" workingdir="${ProjectDir}" externalConsole="True" />
+        <Command type="AfterBuild" command="cp -ru ${ProjectDir}/additional/* ${ProjectDir}/isam2/bin/Release/libisam2.so ${TargetDir}" workingdir="${ProjectDir}" externalConsole="True" />
       </CustomCommands>
     </CustomCommands>
   </PropertyGroup>

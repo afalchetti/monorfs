@@ -29,11 +29,9 @@
 using System;
 using System.Collections.Generic;
 
-using Accord;
 using Accord.Math;
-using Accord.Statistics.Distributions.Univariate;
-using AForge.Math.Random;
 using AForge;
+
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
 
@@ -245,7 +243,7 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// Construct a vehicle with default constants.
 	/// </summary>
-	public Vehicle() : this(new double[3] {0, 0, 0}, 0, new double[3] {1, 0, 0}) {}
+	protected Vehicle() : this(new double[3] {0, 0, 0}, 0, new double[3] {1, 0, 0}) {}
 
 	/// <summary>
 	/// Construct a new Vehicle object from its initial state.
@@ -253,7 +251,7 @@ public abstract class Vehicle : IDisposable
 	/// <param name="location">Spatial coordinates.</param>
 	/// <param name="theta">Orientation angle.</param>
 	/// <param name="axis">Orientation rotation axis.</param>
-	public Vehicle(double[] location, double theta, double[] axis)
+	protected Vehicle(double[] location, double theta, double[] axis)
 		: this(location, theta, axis, 575.8156,
 	           new Rectangle(-640 / 2, -480 / 2, 640, 480),
 			   new Range(0.1f, 10f)) {}
@@ -267,7 +265,7 @@ public abstract class Vehicle : IDisposable
 	/// <param name="focal">Focal lenghth.</param>
 	/// <param name="film">Film area.</param>
 	/// <param name="clip">Range clipping area.</param>
-	public Vehicle(double[] location, double theta, double[] axis, double focal, Rectangle film, Range clip)
+	protected Vehicle(double[] location, double theta, double[] axis, double focal, Rectangle film, Range clip)
 	{
 		double w = Math.Cos(theta / 2);
 		double d = Math.Sin(theta / 2);
@@ -292,7 +290,7 @@ public abstract class Vehicle : IDisposable
 	/// </summary>
 	/// <param name="that">Copied general vehicle.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
-	public Vehicle(Vehicle that, bool copytrajectory = false)
+	protected Vehicle(Vehicle that, bool copytrajectory = false)
 		: this(that.Location, 0, new double[3] {0, 0, 0})
 	{
 		this.Orientation        = that.Orientation;

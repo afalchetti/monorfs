@@ -307,7 +307,7 @@ public class SparseMatrix : IEnumerable<SparseItem>
 	/// Add every entry of a given column to the matrix.
 	/// Any previous colliding entry will be overwritten.
 	/// </summary>
-	/// <param name="i">Column index where the entries will be added.</param>
+	/// <param name="k">Column index where the entries will be added.</param>
 	/// <param name="column">New values.</param>
 	public void AddColumn(int k, Dictionary<int, double> column)
 	{
@@ -587,12 +587,13 @@ public class SparseMatrix : IEnumerable<SparseItem>
 	/// <param name="that">Compared matrix.</param>
 	/// <returns>True if both matrix are structurally identical.
 	/// This implies having the same values and the same defined structure.
-	/// If one matrix defines an entry as zero and the other doesn't
-	/// they are mathematically equal, but they are structurally different,
-	/// i.e. they can answer the question "mat.Defines(i, k)" differently.</returns>
+	/// If one matrix defines an entry as DefaultValue and the other one
+	/// doesn't define it at all, they are mathematically equal, but they are
+	/// structurally different, i.e. they can answer the
+	/// question "mat.Defines(i, k)" differently.</returns>
 	public bool Equals(SparseMatrix that)
 	{
-		if (Count != that.Count || DefaultValue != that.DefaultValue || Width != that.Width || Height != that.Height) {
+		if (this.Count != that.Count || this.DefaultValue != that.DefaultValue || this.Width != that.Width || this.Height != that.Height) {
 			return false;
 		}
 

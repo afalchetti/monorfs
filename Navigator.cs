@@ -28,14 +28,12 @@
 
 using System;
 using System.Collections.Generic;
-using System.Text;
+
 using Accord.Math;
 using Accord.Math.Decompositions;
-using AForge;
+
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using NUnit.Framework;
-using System.Timers;
 
 using TimedState      = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedTrajectory = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<System.Tuple<double, double[]>>>>;
@@ -109,7 +107,7 @@ public abstract class Navigator : IDisposable
 	/// </summary>
 	/// <param name="vehicle">Vehicle to track.</param>
 	/// <param name="onlymapping">If true, don't do SLAM, but mapping (i.e. the localization is assumed known).</param>
-	public Navigator(Vehicle vehicle, bool onlymapping = false)
+	protected Navigator(Vehicle vehicle, bool onlymapping = false)
 	{
 		OnlyMapping = onlymapping;
 
@@ -128,7 +126,7 @@ public abstract class Navigator : IDisposable
 
 		// pinterval will be the 1-sigma ellipse
 		for (int i = 0; i < segments; i++) {
-			this.pinterval[i] = new double[2] {1 * Math.Cos(2 * Math.PI * i / segments), 1 * Math.Sin(2 * Math.PI * i / segments)};
+			pinterval[i] = new double[2] {1 * Math.Cos(2 * Math.PI * i / segments), 1 * Math.Sin(2 * Math.PI * i / segments)};
 		}
 	}
 

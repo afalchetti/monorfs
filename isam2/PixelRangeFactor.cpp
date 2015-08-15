@@ -92,7 +92,7 @@ Vector PixelRangeFactor::evaluateError(const Pose3& pose, const Point3& landmark
 		double mag = sqrt(local.x() * local.x() + local.y() * local.y() + local.z() * local.z());
 		jprojection << focal / local.z(), 0,                     -focal * local.x() / (local.z() * local.z()),
 		               0,                     focal / local.z(), -focal * local.y() / (local.z() * local.z()),
-		               local.x() / mag,       local.y() / mag,    local.z() /mag;
+		               local.x() / mag,       local.y() / mag,    local.z() / mag;
 	}
 
 	if (H1) {

@@ -31,13 +31,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 
+using Accord.Extensions.Imaging;
+using Accord.Math;
+
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-
-using Accord.Extensions.Imaging;
-using Accord.Math;
-using System.Text;
 
 using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedTrajectory   = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<System.Tuple<double, double[]>>>>;
@@ -127,6 +126,7 @@ public class Viewer : Manipulator
 	/// <param name="trajectory">Recorded vehicle trajectory.</param>
 	/// <param name="estimate">Recorded estimated vehicle trajectory.</param>
 	/// <param name="map">Recorded maximum-a-posteriori estimate for the map.</param>
+	/// <param name="measurements">Recorded vehicle measurements.</param>
 	/// <param name="fps">Frame rate.</param>
 	/// <param name="mapclip">Initial observable area in the form [left, right, bottom, top]</param>
 	/// <param name="sidebarfile">Sidebar video filename.</param>
@@ -248,7 +248,7 @@ public class Viewer : Manipulator
 	/// <summary>
 	/// Get a trajectory from a formatted string descriptor.
 	/// </summary>
-	/// <param name="lines">Array of formatted state vectors moving through time.</param>
+	/// <param name="descriptor">Formatted trajectory vectors moving through time.</param>
 	/// <param name="dim">Expected state dimension.</param>
 	/// <returns>The trajectory, list of vectors representing state as a function of discrete time
 	/// (time is delivered as the first entry of each tuple).</returns>
@@ -330,7 +330,7 @@ public class Viewer : Manipulator
 	/// <summary>
 	/// Get a map model from a formatted string descriptor.
 	/// </summary>
-	/// <param name="descriptor">Formatted map descriptor.</param>
+	/// <param name="lines">Formatted map descriptor as an array of lines.</param>
 	/// <param name="dim">Expected world dimension.</param>
 	/// <returns>The map model as a vector of gaussian components.</returns>
 	private static List<Gaussian> mapFromDescriptor(string[] lines, int dim = 3)
@@ -353,7 +353,7 @@ public class Viewer : Manipulator
 	/// Get a measurement history from a formatted string descriptor.
 	/// </summary>
 	/// <param name="descriptor">Formatted measurement history descriptor through time.</param>
-	/// <param name="dim">Expected world dimension.</param>
+	/// <param name="dim">Expected measurement dimension.</param>
 	/// <returns>The measurement history, list of vectors representing point measurements as a function of discrete time
 	/// (time is delivered as the first entry of each tuple).</returns>
 	private static TimedMeasurements measurementsFromDescriptor(string descriptor, int dim = 3)
@@ -390,6 +390,10 @@ public class Viewer : Manipulator
 
 				string[] strcomps   = point.Split(' ');
 				double[] components = new double[strcomps.Length];
+
+				if (components.Length != dim) {
+					throw new FormatException("wrong measurement dimension");
+				}
 
 				for (int i = 0; i < strcomps.Length; i++) {
 					try {

@@ -28,19 +28,14 @@
 
 using System;
 using System.Collections.Generic;
-using System.Text;
-using Accord.Math;
-using Accord.Math.Decompositions;
-using AForge;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-using NUnit.Framework;
-using System.Timers;
 using System.Runtime.InteropServices;
+
+using Accord.Math;
+
+using Microsoft.Xna.Framework;
 
 using TimedState    = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedMapModel = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
-using AForge.Math.Geometry;
 
 namespace monorfs
 {
@@ -112,20 +107,12 @@ public class ISAM2Navigator : Navigator
 	/// <summary>
 	/// Most accurate estimate of the current vehicle pose.
 	/// </summary>
-	public override SimulatedVehicle BestEstimate
-	{
-		get { return estimate;  }
-		set { estimate = value;	}
-	}
+	public override SimulatedVehicle BestEstimate { get; set; }
 
 	/// <summary>
 	/// Most accurate estimate model of the map.
 	/// </summary>
-	public override List<Gaussian> BestMapModel
-	{
-		get { return mapmodel;  }
-		set { mapmodel = value; }
-	}
+	public override List<Gaussian> BestMapModel { get; set; }
 
 	/// <summary>
 	/// Not-associated measurements map model.
@@ -140,11 +127,7 @@ public class ISAM2Navigator : Navigator
 	/// <summary>
 	/// Previous SLAM step vehicle pose estimate.
 	/// </summary>
-	public SimulatedVehicle PreviousEstimate
-	{
-		get { return prevestimate;  }
-		set { prevestimate = value; }
-	}
+	public SimulatedVehicle PreviousEstimate { get; set; }
 
 	/// <summary>
 	/// Next unused label id.
@@ -183,13 +166,13 @@ public class ISAM2Navigator : Navigator
 			motionnoise[i] = Math.Sqrt(vehicle.MotionCovariance[i][i]);
 		}
 
-		estimate          = new SimulatedVehicle();
-		prevestimate      = new SimulatedVehicle();
-		mapmodel          = new List<Gaussian>();
+		BestEstimate          = new SimulatedVehicle();
+		PreviousEstimate      = new SimulatedVehicle();
+		BestMapModel          = new List<Gaussian>();
 		CandidateMapModel = new List<Gaussian>();
 
-		vehicle.State.CopyTo(estimate    .State, 0);
-		vehicle.State.CopyTo(prevestimate.State, 0);
+		vehicle.State.CopyTo(BestEstimate    .State, 0);
+		vehicle.State.CopyTo(PreviousEstimate.State, 0);
 
 		HasDataAssociation = vehicle.HasDataAssociation;
 
@@ -244,7 +227,7 @@ public class ISAM2Navigator : Navigator
 	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
 	public override void SlamUpdate(GameTime time, List<double[]> measurements)
 	{
-		double[]  odometry = Vehicle.StateDiff(BestEstimate, prevestimate);
+		double[]  odometry = Vehicle.StateDiff(BestEstimate, PreviousEstimate);
 		List<int> labels   = FindLabels(measurements);
 
 		for (int i = labels.Count - 1; i >= 0; i--) {
@@ -285,7 +268,7 @@ public class ISAM2Navigator : Navigator
 		// this method, so it could contain a lot of unused data, remove it
 		BestEstimate.WayPoints = BestEstimate.WayPoints.GetRange(0, trajectory.Count);
 
-		BestEstimate.State.CopyTo(prevestimate.State, 0);
+		BestEstimate.State.CopyTo(PreviousEstimate.State, 0);
 		UpdateTrajectory(time);
 		UpdateMapHistory(time);
 
@@ -323,9 +306,9 @@ public class ISAM2Navigator : Navigator
 		List<Gaussian>   visible          = new List<Gaussian>();
 		List<int>        visibleLandmarks = new List<int>();
 
-		for (int i = 0; i < mapmodel.Count; i++) {
-			if (pose.Visible(mapmodel[i].Mean)) {
-				visible         .Add(mapmodel[i]);
+		for (int i = 0; i < BestMapModel.Count; i++) {
+			if (pose.Visible(BestMapModel[i].Mean)) {
+				visible         .Add(BestMapModel[i]);
 				visibleLandmarks.Add(i);
 			}
 		}
@@ -384,7 +367,7 @@ public class ISAM2Navigator : Navigator
 				double distance2;
 
 				if (DAAlgorithm == DataAssociationAlgorithm.Mahalanobis) {
-					distance2 = vlandmarks[i].MahalanobisSquared(measurements[k]);
+					distance2 = vlandmarks[i].SquareMahalanobis(measurements[k]);
 				}
 				else {
 					distance2 = vlandmarks[i].Mean.SquareEuclidean(pose.MeasureToMap(measurements[k]));

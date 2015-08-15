@@ -28,14 +28,12 @@
 
 using System;
 using System.Collections.Generic;
-using System.Text;
+
 using Accord.Math;
-using Accord.Math.Decompositions;
 using AForge;
+
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using NUnit.Framework;
-using System.Timers;
 
 using TimedState    = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedMapModel = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
@@ -452,7 +450,7 @@ public class PHDNavigator : Navigator
 	/// </summary>
 	public void ResampleParticles()
 	{
-		double             random    = (double) Util.uniform.Next() / VehicleWeights.Length;
+		double             random    = (double) Util.Uniform.Next() / VehicleWeights.Length;
 		double[]           weights   = new double[VehicleWeights.Length];
 		SimulatedVehicle[] particles = new SimulatedVehicle[VehicleParticles.Length];
 		List<Gaussian>[]   models    = new List<Gaussian>[MapModels.Length];
@@ -506,6 +504,7 @@ public class PHDNavigator : Navigator
 	/// <param name="measurements">Sensor measurements in range-bearing  form.</param>
 	/// <param name="pose">Vehicle pose that conditions the mapping.</param>
 	/// <param name="model">Associated map model.</param>
+	/// <param name="unexplored">Input/Output, unexplored candidates from previous timestep..</param> 
 	/// <returns>Predicted map model.</returns>
 	/// <remarks>Though in theory the predict doesn't depend on the measurements,
 	/// the birth region (i.e. the unexplored areas) is large to represent on gaussians.
@@ -656,9 +655,10 @@ public class PHDNavigator : Navigator
 	/// that tries to approximate as much as possible the behaviour
 	/// of the original mixture.
 	/// </summary>
-	/// <param name="components">List of gaussian components.</param>
+	/// <param name="maincomponent">First gaussian component.</param>
+	/// <param name="components">List of the other gaussian components.</param>
 	/// <returns>Merged gaussian.</returns>
-	private Gaussian Merge(Gaussian maincomponent, List<Gaussian> components)
+	private static Gaussian Merge(Gaussian maincomponent, List<Gaussian> components)
 	{
 		double     weight     = maincomponent.Weight;
 		double[]   mean       = maincomponent.Weight.Multiply(maincomponent.Mean);

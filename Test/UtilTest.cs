@@ -27,14 +27,9 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
+
 using Microsoft.Xna.Framework;
 using NUnit.Framework;
-
-using Accord;
-using Accord.Math;
 
 namespace monorfs.Test
 {

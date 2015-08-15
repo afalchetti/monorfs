@@ -28,14 +28,12 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
+
+using Accord.Math;
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-
-using Accord.Math;
-using System.Text;
 
 namespace monorfs
 {
@@ -168,7 +166,7 @@ public abstract class Manipulator : Game
 	/// <param name="realtime">Realtime data processing.</param>
 	/// <param name="mapclip">Map visible bounds.</param>
 	/// <param name="fps">Frame per seconds.</param>
-	public Manipulator(string title, Vehicle explorer, Navigator navigator, bool realtime, float[] mapclip, double fps = 30)
+	protected Manipulator(string title, Vehicle explorer, Navigator navigator, bool realtime, float[] mapclip, double fps = 30)
 	{
 		Window.Title = title;
 
@@ -398,7 +396,7 @@ public abstract class Manipulator : Game
 	{
 		Dictionary<string, List<string>> dict = Util.ParseDictionary(scene);
 
-		mapclip = Accord.Math.Matrix.ToSingle(ParseDoubleList(dict["world"][0]));
+		mapclip = ParseDoubleList(dict["world"][0]).ToSingle();
 
 		if (mapclip.Length != 4) {
 			throw new FormatException("The map clipping area must be specified by four elements: left, right, bottom, top");
@@ -433,7 +431,7 @@ public abstract class Manipulator : Game
 	/// <summary>
 	/// Create a vehicle from a real sensor device.
 	/// </summary>
-	/// <param name="scene">Device (or recorded file) path.</param>
+	/// <param name="sensor">Device (or recorded file) path.</param>
 	/// <param name="mapclip">Secondary output; initial observable area.</param>
 	/// <returns>Vehicle linked to sensor.</returns>
 	protected static KinectVehicle VehicleFromSensor(string sensor, out float[] mapclip)
@@ -449,7 +447,7 @@ public abstract class Manipulator : Game
 	/// <returns>The double array.</returns>
 	protected static double[] ParseDoubleList(string descriptor) {
 		string[] values = descriptor.Split(' ');
-		double[] point = new double[values.Length];
+		double[] point  = new double[values.Length];
 		
 		try {
 			for (int i = 0; i < point.Length; i++) {

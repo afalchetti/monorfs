@@ -29,6 +29,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+
 using AE = monorfs.ArrayExtensions;
 
 namespace monorfs
@@ -36,7 +37,7 @@ namespace monorfs
 /// <summary>
 /// Graph combinatorics algorithms.
 /// </summary>
-class GraphCombinatorics
+public static class GraphCombinatorics
 {
 	/// <summary>
 	/// Solve the linear assignment problem. Choose the best matching between workers and works
@@ -60,11 +61,8 @@ class GraphCombinatorics
 	/// <returns>Dense assignment list.</returns>
 	private static int[] Hungarian(SparseMatrix matrix)
 	{
-		//Console.WriteLine(matrix.ToStringFull());
-		//Console.WriteLine("");
-
 		// initial feasible labeling
-		var      rowmax = matrix.FoldRows((cum, mi) => Math.Max(cum, mi), 0);
+		var      rowmax = matrix.FoldRows(Math.Max, 0);
 		double[] labelx = new double[matrix.Height];
 		double[] labely = new double[matrix.Width];
 
@@ -88,26 +86,7 @@ class GraphCombinatorics
 		AE.Fill(matchx, -1);
 		AE.Fill(matchy, -1);
 
-		//Action tellme = () =>
-		//{
-		//	Console.WriteLine("labelx: [" + string.Join(", ", Array.ConvertAll(labelx, x => x.ToString("F2"))) + "]");
-		//	Console.WriteLine("labely: [" + string.Join(", ", Array.ConvertAll(labely, x => x.ToString("F2"))) + "]");
-			
-		//	Console.WriteLine("matchx: [" + string.Join(", ", Array.ConvertAll(matchx, x => x.ToString())) + "]");
-		//	Console.WriteLine("matchy: [" + string.Join(", ", Array.ConvertAll(matchy, x => x.ToString())) + "]");
-
-		//	Console.WriteLine("visitx: [" + string.Join(", ", Array.ConvertAll(visitx, x => x ? "1" : "0")) + "]");
-		//	Console.WriteLine("visity: [" + string.Join(", ", Array.ConvertAll(visity, x => x ? "1" : "0")) + "]");
-			
-		//	Console.WriteLine("slack:  [" + string.Join(", ", Array.ConvertAll(slack,  x => x.ToString())) + "]");
-		//	Console.WriteLine("parent: [" + string.Join(", ", Array.ConvertAll(parent, x => x.ToString())) + "]");
-			
-		//	Console.WriteLine("root:   " + root);
-		//	Console.WriteLine("");
-		//};
-
 		// find an unmatched worker to start building a tree
-		//int h = 0;
 		while ((root = Array.IndexOf(matchx, -1)) != -1) {
 			// annotate all its slacks
 			AE.Fill(parent, root);
@@ -117,17 +96,11 @@ class GraphCombinatorics
 			Array.Clear(visity, 0, visity.Length);
 			visitx[root] = true;
 
-			//Console.WriteLine("Iteration " + h++ + "\n-----------------");
-			//tellme();
-
 			bool found = false;
-			//int m = 0;
 			while (!found) {
 				// find the minimal slack where "y is in T"
 				iminslack = int.MaxValue;
 				delta     = double.PositiveInfinity;
-
-				//Console.WriteLine("    Sub-iteration " + m++ + "\n    ---------------------");
 
 				for (int i = 0; i < slack.Length; i++) {
 					if (visity[i] == false && slack[i] < delta) {
@@ -136,12 +109,9 @@ class GraphCombinatorics
 					}
 				}
 
-				if (delta == double.PositiveInfinity) {
+				if (double.IsPositiveInfinity(delta)) {
 					return null;  // there is no solution
 				}
-				
-				//Console.WriteLine("    iminslack: " + iminslack);
-				//Console.WriteLine("    delta:     " + delta);
 
 				// change the labels to tighten the slacks
 				// {
@@ -163,20 +133,10 @@ class GraphCombinatorics
 
 				visity[iminslack] = true;
 
-				//Console.WriteLine("\n    Tightened______");
-				//Console.WriteLine("    labelx: [" + string.Join(", ", Array.ConvertAll(labelx, x => x.ToString("F2"))) + "]");
-				//Console.WriteLine("    labely: [" + string.Join(", ", Array.ConvertAll(labely, x => x.ToString("F2"))) + "]");
-				//Console.WriteLine("    slack:  [" + string.Join(", ", Array.ConvertAll(slack,  x => x.ToString()))     + "]");
-				//Console.WriteLine("    ");
-				//Console.WriteLine("    visity: [" + string.Join(", ", Array.ConvertAll(visity, x => x ? "1" : "0")) + "]");
-				//Console.WriteLine("    ");
-
 				// for matched minimal slack, expand tree
 				if (matchy[iminslack] != -1) {
 					int match = matchy[iminslack];
 					visitx[match]  = true;
-
-					//Console.WriteLine("    matched leaf:");
 
 					for (int i = 0; i < labely.Length; i++) {
 						if (!visity[i]) {
@@ -187,41 +147,26 @@ class GraphCombinatorics
 							}
 						}
 					}
-					
-					//Console.WriteLine("    visitx: [" + string.Join(", ", Array.ConvertAll(visitx, x => x ? "1" : "0")) + "]");
-					//Console.WriteLine("    slack:  [" + string.Join(", ", Array.ConvertAll(slack,  x => x.ToString())) + "]");
-					//Console.WriteLine("    parent: [" + string.Join(", ", Array.ConvertAll(parent, x => x.ToString())) + "]");
 				}
 				// for unmatched minimal slack, the tree has an augmenting branch,
 				// follow it and invert every edge
 				else {
 					found = true;
-
-					//Console.WriteLine("    free leaf");
 				}
-
-				//Console.WriteLine("    ");
 			}
 
 			// invert augmenting branch
 			// {
-			//Console.WriteLine("following branch...");
 			int px, py, ty;
 			for (py = iminslack, px = parent[py]; px != root; py = ty, px = parent[py]) {
 				ty = matchx[px];
 				matchx[px] = py;
 				matchy[py] = px;
-
-				//Console.WriteLine(px + "->" + py);
-
 			}
 
 			matchx[px] = py;
 			matchy[py] = px;
-			//Console.WriteLine(px + "->" + py);
 			// }
-			
-			//Console.WriteLine("");
 		}
 
 		return matchx;
@@ -421,18 +366,11 @@ class GraphCombinatorics
 			colstack.Add(element.K);
 
 			while (rowstack.Count > 0 || colstack.Count > 0) {
-				//Console.WriteLine("|------");
-				//Console.WriteLine("rowstack: [" + string.Join(", ", rowstack.ConvertAll(i => i.ToString())) + "]");
-				//Console.WriteLine("colstack: [" + string.Join(", ", rowstack.ConvertAll(i => i.ToString())) + "]");
-				//Console.WriteLine("");
-
 				while  (rowstack.Count > 0) {
 					int nextrow = rowstack[rowstack.Count - 1];
 					rowstack.RemoveAt(rowstack.Count - 1);
 
-					//Console.WriteLine("nextrow: " + nextrow);
-
-					if (rowvisited[nextrow] == true) {
+					if (rowvisited[nextrow]) {
 						continue;
 					}
 
@@ -442,15 +380,10 @@ class GraphCombinatorics
 
 					component.AddRow(nextrow, row);
 					complete.RemoveRow(nextrow);
-					
-					//Console.WriteLine("row =\n" + "[" + string.Join(", ", row.Select(i => i.Key + ": " + i.Value)) + "]");
-					//Console.WriteLine("component =\n" + component.ToStringFull());
-					//Console.WriteLine("complete =\n" + complete.ToStringFull());
 
 					foreach (var k in row.Keys) {
-						if (colvisited[k] == false && colstack.IndexOf(k) == -1) {
+						if (!colvisited[k] && colstack.IndexOf(k) == -1) {
 							colstack.Add(k);
-							//Console.WriteLine("colstack add: " + k);
 						}
 					}
 				}
@@ -459,9 +392,7 @@ class GraphCombinatorics
 					int nextcol = colstack[colstack.Count - 1];
 					colstack.RemoveAt(colstack.Count - 1);
 
-					//Console.WriteLine("nextcol: " + nextcol);
-
-					if (colvisited[nextcol] == true) {
+					if (colvisited[nextcol]) {
 						continue;
 					}
 
@@ -471,15 +402,10 @@ class GraphCombinatorics
 
 					component.AddColumn(nextcol, col);
 					complete.RemoveColumn(nextcol);
-					
-					//Console.WriteLine("col =\n" + "[" + string.Join(", ", col.Select(i => i.Key + ": " + i.Value)) + "]");
-					//Console.WriteLine("component =\n" + component.ToStringFull());
-					//Console.WriteLine("complete =\n" + complete.ToStringFull());
 
 					foreach (var i in col.Keys) {
-						if (rowvisited[i] == false && rowstack.IndexOf(i) == -1) {
+						if (!rowvisited[i] && rowstack.IndexOf(i) == -1) {
 							rowstack.Add(i);
-							//Console.WriteLine("rowstack add: " + i);
 						}
 					}
 				}

@@ -27,14 +27,9 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
-using System.Collections.Generic;
 using System.Text;
+
 using Accord.Math;
-using Accord.Math.Decompositions;
-using AForge;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-using NUnit.Framework;
 
 namespace monorfs
 {
@@ -131,8 +126,8 @@ public class Gaussian
 	public double Evaluate(double[] x)
 	{
 		double[]  diff = x.Subtract(Mean);
-		return Multiplier * ApproximateNegExp(0.5 * Accord.Math.Matrix.InnerProduct(diff, CovarianceInverse.Multiply(diff)));
-		//return multiplier * Math.Exp(-0.5 * Accord.Math.Matrix.InnerProduct(diff, CovarianceInverse.Multiply(diff)));
+		return Multiplier * ApproximateNegExp(0.5 * diff.InnerProduct(CovarianceInverse.Multiply(diff)));
+		//return Multiplier * Math.Exp(-0.5 * diff.InnerProduct(CovarianceInverse.Multiply(diff)));
 	}
 
 	/// <summary>
@@ -159,10 +154,11 @@ public class Gaussian
 	/// </summary>
 	/// <param name="a">First gaussian.</param>
 	/// <param name="b">Second gaussian.</param>
+	/// <param name="threshold">Mahalanobis distance to be considered close.</param> 
 	/// <returns>True if the gaussians are close enough to merge; false otherwise.</returns>
 	public static bool AreClose(Gaussian a, Gaussian b, double threshold)
 	{
-		return a.MahalanobisSquared(b.Mean) < threshold * threshold;
+		return a.SquareMahalanobis(b.Mean) < threshold * threshold;
 	}
 
 	/// <summary>
@@ -173,7 +169,7 @@ public class Gaussian
 	public double Mahalanobis(double[] point)
 	{
 		double[] diff = Mean.Subtract(point);
-		return Math.Sqrt(Accord.Math.Matrix.InnerProduct(diff, CovarianceInverse.Multiply(diff)));
+		return Math.Sqrt(diff.InnerProduct(CovarianceInverse.Multiply(diff)));
 	}
 
 	/// <summary>
@@ -181,10 +177,10 @@ public class Gaussian
 	/// </summary>
 	/// <param name="point">Point in R^N space.</param>
 	/// <returns>Squared distance between distribution and point.</returns>
-	public double MahalanobisSquared(double[] point)
+	public double SquareMahalanobis(double[] point)
 	{
 		double[] diff = Mean.Subtract(point);
-		return Accord.Math.Matrix.InnerProduct(diff, CovarianceInverse.Multiply(diff));
+		return diff.InnerProduct(CovarianceInverse.Multiply(diff));
 	}
 
 	/// <summary>

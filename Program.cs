@@ -30,8 +30,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
-using System.Runtime.InteropServices;
+
 using Accord.Extensions.Imaging;
+
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using NDesk.Options;
@@ -115,7 +116,7 @@ public class Program
 
 		NavigationAlgorithm algorithm = NavigationAlgorithm.PHD;
 
-		OptionSet options = new OptionSet() {
+		OptionSet options = new OptionSet {
 			{ "f|scene=",      "Scene description file. Simulated, recorded or device id.",    f       => scenefile     = f },
 			{ "r|recfile=",    "Recording file. Saves State and events for reviewing.",        r       => recfile       = r },
 			{ "c|command=",    "Auto-command file (simulates user input).",                    c       => commandfile   = c },

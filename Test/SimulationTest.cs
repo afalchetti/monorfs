@@ -27,11 +27,12 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+
 using Microsoft.Xna.Framework;
 using NUnit.Framework;
+
 using AE = monorfs.ArrayExtensions;
 
 namespace monorfs.Test
@@ -93,7 +94,7 @@ class SimulationTest
 	/// Simplified and instrumentalized mock update step to allow simulating
 	/// the simulation update step (the important part of the class).
 	/// </summary>
-	public void Update(GameTime time, bool forceslam, bool forcemapping, Action updatehook, Action measurehook, Action slamhook)
+	public void Update(GameTime time, Action updatehook, Action measurehook, Action slamhook)
 	{
 		double[] autocmd = commands[commandindex];
 		double   ds      = autocmd[0];
@@ -128,19 +129,7 @@ class SimulationTest
 		lastnavigationupdate = new GameTime(new TimeSpan(0), new TimeSpan(0));
 
 		for (int i = 0; i < loopcount; i++) {
-			Update(time, false, false, updatehook, measurehook, slamhook);
-			iterwork();
-			time = new GameTime(time.TotalGameTime.Add(simulation.FrameElapsed), simulation.FrameElapsed);
-		}
-	}
-
-	public void UpdateLoop(int loopcount, Action updatehook, Action measurehook, Action slamhook, Action iterwork,
-	                       Func<int, bool> forceslam, Func<int, bool> forcemapping)
-	{
-		GameTime time = new GameTime(new TimeSpan(0), new TimeSpan(0));
-
-		for (int i = 0; i < loopcount; i++) {
-			Update(time, forceslam(i), forcemapping(i), updatehook, measurehook, slamhook);
+			Update(time, updatehook, measurehook, slamhook);
 			iterwork();
 			time = new GameTime(time.TotalGameTime.Add(simulation.FrameElapsed), simulation.FrameElapsed);
 		}
