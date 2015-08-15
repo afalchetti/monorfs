@@ -587,7 +587,7 @@ public abstract class Vehicle : IDisposable
 	/// <param name="camera">Camera rotation matrix.</param>
 	private void RenderMeasure(double[] measurement, double[][] camera)
 	{
-		const float halflen = 0.03f;
+		const float halflen = 0.06f;
 		
 		Color color =  Color.Crimson;
 
@@ -598,12 +598,12 @@ public abstract class Vehicle : IDisposable
 		vertices[0] = new double[] {measurement[0] - halflen, measurement[1] - halflen, measurement[2]};
 		vertices[1] = new double[] {measurement[0] + halflen, measurement[1] + halflen, measurement[2]};
 		
-		Graphics.DrawUser2DPolygon(vertices, 0.01f, color, true);
+		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, true);
 
 		vertices[0] = new double[] {measurement[0] - halflen, measurement[1] + halflen, measurement[2]};
 		vertices[1] = new double[] {measurement[0] + halflen, measurement[1] - halflen, measurement[2]};
 
-		Graphics.DrawUser2DPolygon(vertices, 0.01f, color, true);
+		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, true);
 	}
 
 	/// <summary>
