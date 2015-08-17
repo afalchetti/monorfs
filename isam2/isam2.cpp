@@ -31,6 +31,7 @@
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/Values.h>
 #include <gtsam/nonlinear/ISAM2.h>
+#include <gtsam/nonlinear/Marginals.h>
 #include <gtsam/slam/PriorFactor.h>
 #include <gtsam/slam/BetweenFactor.h>
 #include "PixelRangeFactor.h"
@@ -52,8 +53,8 @@ public:
 	int            msize;
 	vector<double> trajectory;
 	vector<double> mapmodel;
-	vector<double> tmarginals;
-	vector<double> mmarginals;
+	vector<double> mapcovariances;
+	vector<double> plcovariances;
 	ISAM2          isam;
 	Values         estimate;
 	double         focal;
@@ -63,7 +64,7 @@ public:
 	ISAM2Navigator(double focal, Noise measurementnoise, Noise motionnoise)
 		: t(0), tlength(1), msize(0),
 		  trajectory(vector<double>{0.0, 0.0, 0.0}), mapmodel(vector<double>()),
-		  tmarginals(vector<double>(36)), mmarginals(vector<double>()),
+		  mapcovariances(vector<double>()), plcovariances(vector<double>()),
 		  isam(), estimate(), focal(focal),
 		  measurementnoise(measurementnoise), motionnoise(motionnoise) {}
 };
@@ -98,12 +99,12 @@ void marshalpoint(double* list, const Point3& state, const int n)
 	list[offset + 2] = state.z();
 }
 
-// write a covariance marginal matrix into a list
+// write a marginal covariance matrix into a list
 // at a given offset in "covariance units"
-// note that all marshaled marginals to the same list __must__
+// note that all marshaled covariances to the same list __must__
 // be square and have the same size, otherwise there could be index
 // bound errors (sigsev) and the offset will be wrong
-void marshalmarginal(double* list, const Matrix& covariance, const int n)
+void marshalcovariance(double* list, const Matrix& covariance, const int n)
 {
 	int side   = covariance.rows();
 	int offset = n * side * side;
@@ -152,13 +153,12 @@ ISAM2Navigator* newnavigator(double* initstate, double* measurementnoise, double
 	                       Point3(initstate[0], initstate[1], initstate[2]));
 
 	noiseModel::Diagonal::shared_ptr posenoise =
-	    noiseModel::Diagonal::Sigmas((Vector(6) << Vector3::Constant(0),Vector3::Constant(0)));
+	    noiseModel::Diagonal::Sigmas((Vector(6) << Vector3::Constant(0), Vector3::Constant(0)));
 
 	ISAM2Navigator* navigator = new ISAM2Navigator(focal,
 	                                               noiseModel::Diagonal::Sigmas(measurementsigma),
 	                                               noiseModel::Diagonal::Sigmas(motionsigma));
-
-	marshalmarginal(&navigator->tmarginals[0], getcovariance(posenoise), 0);
+	
 	navigator->estimate.insert(Symbol('x', 0), initpose);
 
 	NonlinearFactorGraph graph;
@@ -244,23 +244,66 @@ int update(ISAM2Navigator* navigator, double* odometry, double* measurements, in
 	navigator->tlength = navigator->tlength + 1;
 	navigator->msize   = max(navigator->msize, maxlabel + 1);
 
-	navigator->trajectory.resize(7 * navigator->tlength);
-	navigator->mapmodel  .resize(3 * navigator->msize, HUGE_VAL);
-	navigator->tmarginals.resize((7 * 7) * navigator->tlength);
-	navigator->mmarginals.resize((3 * 3) * navigator->msize);
+	// interop data
+	navigator->trajectory    .resize(7 * navigator->tlength);
+	navigator->mapmodel      .resize(3 * navigator->msize, HUGE_VAL);
+	navigator->mapcovariances.resize((3 * 3) * navigator->msize);
+	navigator->plcovariances .resize((3 * 3) * navigator->msize);
 
+	Marginals marginals(navigator->isam.getFactorsUnsafe(), navigator->estimate);
+	Symbol    symlastpose('x', navigator->t);
+	Pose3     lastpose = navigator->estimate.at<Pose3>(symlastpose);
+	Matrix    covpose  = marginals.marginalCovariance(symlastpose);
+
+	// this objects exists only to be able to use its evaluateError function,
+	// that calculates the jacobian of the measurement function
+	// since the measurements are zero, the output is the measurement function itself
+	// (though the output is not used)
+	PixelRangeFactor jacobcalculator(Symbol(), Symbol(), 0, 0, 0,
+	                                 navigator->measurementnoise, navigator->focal);
+	
+	// put every landmark and pose estimate into the interop buffer
 	for (auto item = navigator->estimate.begin(); item != navigator->estimate.end(); ++item) {
 		Symbol key(item->key);
 
-		Matrix covariance = navigator->isam.marginalCovariance(key);
-
 		if (key.chr() == 'x') {  // pose
 			marshalpose(&navigator->trajectory[0], static_cast<Pose3&>(item->value), key.index());
-			marshalmarginal(&navigator->tmarginals[0], covariance, key.index());
 		}
 		else if (key.chr() == 'l') {  // landmark
-			marshalpoint(&navigator->mapmodel[0], static_cast<Point3&>(item->value), key.index());
-			marshalmarginal(&navigator->mmarginals[0], covariance, key.index());
+			Point3      landmarkposition = static_cast<Point3&>(item->value);
+			vector<Key> vars;
+
+			vars.push_back(key);
+			vars.push_back(symlastpose);
+
+			// there are two things that need to be sent:
+			// the landmark covariance for visualization and
+			// the pose-landmark covariance projection to do data association
+			JointMarginal jointcovariance = marginals.jointMarginalCovariance(vars);
+
+			Matrix covinter    = jointcovariance.at(symlastpose, key);
+			Matrix covlandmark = jointcovariance.at(key,         key);
+
+			// JointMarginal doesn't seem to enforce any order on its fullMatrix()
+			// so it is reconstructed from the blocks to make sure it's consistent
+			Matrix covfull(9, 9);
+			covfull << covpose, covinter, covinter.transpose(), covlandmark;
+
+			Matrix jacobian(3, 9);
+			Matrix jpose;
+			Matrix jlandmark;
+
+			jacobcalculator.evaluateError(lastpose, landmarkposition, jpose, jlandmark);
+			jacobian << jpose, jlandmark;
+
+			// pose-landmark covariance projection into the measurement space
+			// (with measurement noise)
+			Matrix plcovariance = jacobian * covfull * jacobian.transpose()
+			                    + getcovariance(navigator->measurementnoise);
+			
+			marshalpoint     (&navigator->mapmodel      [0], landmarkposition, key.index());
+			marshalcovariance(&navigator->mapcovariances[0], covlandmark,      key.index());
+			marshalcovariance(&navigator->plcovariances [0], plcovariance,     key.index());
 		}
 	}
 
@@ -301,17 +344,17 @@ double* getmapmodel(ISAM2Navigator* navigator, int* length)
 	return &navigator->mapmodel[0];
 }
 
-// get the trajectory estimate covariance matrices held in the navigator
-double* trajectorymarginals(ISAM2Navigator* navigator, int* length)
+// get the map model covariances held in the navigator
+double* getmapcovariances(ISAM2Navigator* navigator, int* length)
 {
-	*length = navigator->tlength;
-	return &navigator->tmarginals[0];
+	*length = navigator->msize;
+	return &navigator->mapcovariances[0];
 }
 
 // get the map model covariances held in the navigator
-double* mapmarginals(ISAM2Navigator* navigator, int* length)
+double* getplcovariances(ISAM2Navigator* navigator, int* length)
 {
 	*length = navigator->msize;
-	return &navigator->mmarginals[0];
+	return &navigator->plcovariances[0];
 }
 }

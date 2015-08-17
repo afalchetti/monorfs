@@ -66,43 +66,17 @@ public class ISAM2Navigator : Navigator
 	public static DataAssociationAlgorithm DAAlgorithm { get { return Config.DAAlgorithm; } }
 
 	/// <summary>
-	/// Obtains the data association from the tracked vehicle.
-	/// </summary>
-	/// <remarks>
-	/// This delegate exposes a minimum amount of information
-	/// about the tracked vehicle.
-	/// Giving a full reference of the vehicle as a member field
-	/// would be calling for generating interdependencies
-	/// and could become problematic as an unintended source of
-	/// direct information. It is better to separate both
-	/// structures as much as possible.
-	/// </remarks>
-	private Func<List<int>> GetDataAssociation;
-
-	/// <summary>
-	/// Whether the tracked vehicle knows its data association.
-	/// </summary>
-	public bool HasDataAssociation { get; private set; }
-
-	/// <summary>
 	/// The handle.
 	/// </summary>
 	private HandleRef handle;
 
 	/// <summary>
-	/// Vehicle pose estimate.
+	/// Pose-landmark model.
+	/// Contains the covariances of the pose-landmark
+	/// pairs projected into the measurement space.
 	/// </summary>
-	private SimulatedVehicle estimate;
+	private List<Gaussian> plmodel;
 
-	/// <summary>
-	/// Map model estimation.
-	/// </summary>
-	private List<Gaussian> mapmodel;
-
-	/// <summary>
-	/// Previous SLAM step vehicle pose estimate.
-	/// </summary>
-	private SimulatedVehicle prevestimate;
 
 	/// <summary>
 	/// Most accurate estimate of the current vehicle pose.
@@ -169,16 +143,11 @@ public class ISAM2Navigator : Navigator
 		BestEstimate          = new SimulatedVehicle();
 		PreviousEstimate      = new SimulatedVehicle();
 		BestMapModel          = new List<Gaussian>();
+		plmodel           = new List<Gaussian>();
 		CandidateMapModel = new List<Gaussian>();
 
 		vehicle.State.CopyTo(BestEstimate    .State, 0);
 		vehicle.State.CopyTo(PreviousEstimate.State, 0);
-
-		HasDataAssociation = vehicle.HasDataAssociation;
-
-		if (HasDataAssociation) {
-			GetDataAssociation = () => vehicle.DataAssociation;
-		}
 
 		handle    = NewNavigator(vehicle.State, measurementnoise, motionnoise, focal);
 		nextlabel = 0;
@@ -252,7 +221,7 @@ public class ISAM2Navigator : Navigator
 		// updates the estimated complete path to show the batch nature of the algorithm
 		List<double[]> trajectory = GetTrajectory();
 		BestEstimate.State        = trajectory[trajectory.Count - 1];
-		BestMapModel              = GetMapModel();
+		BestMapModel              = GetMapModel(out plmodel);
 
 		// copy the new estimated trajectory (given by iSAM2) into the BestEstimate
 		// variable, using the previous timestamps, as they do not change
@@ -289,11 +258,11 @@ public class ISAM2Navigator : Navigator
 	public List<int> FindLabels(List<double[]> measurements)
 	{
 		if (DAAlgorithm == DataAssociationAlgorithm.Perfect) {
-			if (!HasDataAssociation) {
+			if (!RefVehicle.HasDataAssociation) {
 				throw new InvalidOperationException("Tried to use perfect data association when none exists.");
 			}
 
-			return GetDataAssociation();
+			return RefVehicle.DataAssociation;
 		}
 
 		double[][] I             = 0.001.Multiply(Accord.Math.Matrix.Identity(3).ToArray());
@@ -336,9 +305,8 @@ public class ISAM2Navigator : Navigator
 			Gaussian component = visible[i];
 
 			if (DAAlgorithm == DataAssociationAlgorithm.Mahalanobis) {
-				double[][] H = pose.MeasurementJacobian(component.Mean);
 				q[i] = new Gaussian(pose.MeasurePerfect(component.Mean),
-				                    H.Multiply(component.Covariance.MultiplyByTranspose(H)).Add(R),
+				                    plmodel[visibleLandmarks[i]].Covariance,
 				                    1.0);
 			}
 			else {
@@ -556,16 +524,27 @@ public class ISAM2Navigator : Navigator
 	/// <summary>
 	/// Get the map estimate.
 	/// </summary>
-	/// <returns>Map estimate.</returns>
-	private unsafe List<Gaussian> GetMapModel()
+	/// <param name="plmodel">Side model that contains the covariances of the
+	/// pose-landmark pairs projected into the measurement space.
+	/// Takes the form E = JSJ^T + R, where
+	/// J is the measurement jacobian in both the pose and landmark directions,
+	/// S is the joint covariance of the best estimate current pose and the landmark and
+	/// R is the measurement noise.
+	/// </param>
+	/// <returns>Map estimate as points with certain covariance (gaussians).</returns>
+	private unsafe List<Gaussian> GetMapModel(out List<Gaussian> plmodel)
 	{
 		int            length;
 		Gaussian       component;
-		List<Gaussian> mapmodel   = new List<Gaussian>();
+		List<Gaussian> mapmodel = new List<Gaussian>();
 
-		double* ptrmapmodel = (double*) getmapmodel(handle, out length);
-		double* ptrmapcov   = (double*) mapmarginals(handle, out length);
+		plmodel  = new List<Gaussian>();
 
+		double* ptrmapmodel = (double*) getmapmodel      (handle, out length);
+		double* ptrmapcov   = (double*) getmapcovariances(handle, out length);
+		double* ptrplcov    = (double*) getplcovariances (handle, out length);
+
+		// main model: mean and covariance
 		for (int i = 0, k = 0, h = 0; i < length; i++, k += 3, h += 9) {
 			double[]   mean       = new double[3];
 			double[][] covariance = {new double[3], new double[3], new double[3]};
@@ -588,6 +567,25 @@ public class ISAM2Navigator : Navigator
 			mapmodel.Add(component);
 		}
 
+		// side model: covariance projected into measurement space
+		// includes pose uncertainty and measurement noise
+		for (int i = 0, h = 0; i < length; i++, h += 9) {
+			double[][] covariance = {new double[3], new double[3], new double[3]};
+
+			covariance[0][0] = ptrplcov[h + 0];
+			covariance[0][1] = ptrplcov[h + 1];
+			covariance[0][2] = ptrplcov[h + 2];
+			covariance[1][0] = ptrplcov[h + 3];
+			covariance[1][1] = ptrplcov[h + 4];
+			covariance[1][2] = ptrplcov[h + 5];
+			covariance[2][0] = ptrplcov[h + 6];
+			covariance[2][1] = ptrplcov[h + 7];
+			covariance[2][2] = ptrplcov[h + 8];
+
+			component = new Gaussian(new double[3], covariance, 1.0);
+			plmodel.Add(component);
+		}
+
 		return mapmodel;
 	}
 
@@ -607,10 +605,10 @@ public class ISAM2Navigator : Navigator
 	private extern static IntPtr getmapmodel(HandleRef navigator, out int length);
 
 	[DllImport("libisam2.so")]
-	private extern static IntPtr trajectorymarginals(HandleRef navigator, out int length);
+	private extern static IntPtr getmapcovariances(HandleRef navigator, out int length);
 
 	[DllImport("libisam2.so")]
-	private extern static IntPtr mapmarginals(HandleRef navigator, out int length);
+	private extern static IntPtr getplcovariances(HandleRef navigator, out int length);
 }
 
 /// <summary>
