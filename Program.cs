@@ -111,6 +111,7 @@ public class Program
 		bool   simulate      = false;
 		bool   realtime      = false;
 		bool   viewer        = false;
+		bool   filterhistory = false;
 		bool   headless      = false;
 		bool   showhelp      = false;
 
@@ -127,6 +128,7 @@ public class Program
 			{ "s|simulate",    "Generate an artificial simulation instead of using a sensor.", s       => simulate      = s != null },
 			{ "R|realtime",    "Process the system in realtime, instead of a fixed step.",     R       => realtime      = R != null },
 			{ "v|view",        "View a precorded session.",                                    v       => viewer        = v != null },
+			{ "H|history=",    "Trajectory history mode: either 'filter' or 'smooth'",         h       => filterhistory = (h == "filter") },
 			{ "x|headless",    "Run headless, i.e. with no GUI",                               x       => headless      = x != null },
 			{ "h|help",        "Show this message and exit",                                   h       => showhelp      = h != null }
 		};
@@ -158,7 +160,7 @@ public class Program
 		if (viewer) {
 			string tmpdir;
 
-			using (Viewer sim = Viewer.FromFiles(recfile, scenefile, out tmpdir)) {
+			using (Viewer sim = Viewer.FromFiles(recfile, filterhistory, out tmpdir)) {
 				sim.Run();
 				Directory.Delete(tmpdir, true);
 			}

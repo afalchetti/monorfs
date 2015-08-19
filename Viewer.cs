@@ -165,23 +165,31 @@ public class Viewer : Manipulator
 	/// Create a visualization object from a pair of formatted description files.
 	/// </summary>
 	/// <param name="datafile">Compressed prerecorded data file.</param>
-	/// <param name="scenefile">Scene descriptor file, may be null or empty.</param>
+	/// <param name="filterhistory">If true, show the filtered trajectory history, otherwise, the smooth one,
+	/// i.e. the smooth history may change retroactively from future knowledge. Note however that the
+	/// recorded vehicle may not support smoothing and may perform the same in both modes.
+	/// Note also that this is not the algorithm mode, only the visualization; the algorithm
+	/// could still take past information into account, but it won't be visualized.</param> 
 	/// <param name="tmpdir">Temporary data directory, to be removed after use.</param>
 	/// <returns>Prepared visualization object.</returns>
 	/// <remarks>All file must be previously sorted by time value. This property is assumed.</remarks>
-	public static Viewer FromFiles(string datafile, string scenefile, out string tmpdir)
+	public static Viewer FromFiles(string datafile, bool filterhistory, out string tmpdir)
 	{
 		tmpdir         = Util.TemporaryDir();
 		string datadir = Path.Combine(tmpdir, "data");
 
 		ZipFile.ExtractToDirectory(datafile, datadir);
 
+		string scenefile    = Path.Combine(datadir, "scene.world");
 		string vehiclefile  = Path.Combine(datadir, "trajectory.out");
 		string estimatefile = Path.Combine(datadir, "estimate.out");
 		string mapfile      = Path.Combine(datadir, "maps.out");
 		string measurefile  = Path.Combine(datadir, "measurements.out");
 		string sidebarfile  = Path.Combine(datadir, "sidebar.avi");
 
+		if (!File.Exists(scenefile)) {
+			scenefile = "";
+		}
 		if (!File.Exists(measurefile)) {
 			measurefile = "";
 		}
@@ -199,7 +207,7 @@ public class Viewer : Manipulator
 		float[]           mapclip;
 
 		trajectory   = trajectoryFromDescriptor       (File.ReadAllLines(vehiclefile),  7);
-		estimate     = trajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), 7);
+		estimate     = trajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), 7, filterhistory);
 		map          = mapHistoryFromDescriptor       (File.ReadAllText(mapfile));
 
 		if (!string.IsNullOrEmpty(measurefile)) {
@@ -246,16 +254,22 @@ public class Viewer : Manipulator
 	}
 
 	/// <summary>
-	/// Get a trajectory from a formatted string descriptor.
+	/// Get a trajectory history from a formatted string descriptor.
 	/// </summary>
 	/// <param name="descriptor">Formatted trajectory vectors moving through time.</param>
 	/// <param name="dim">Expected state dimension.</param>
+	/// <param name="filterhistory">If true, show the filtered trajectory history, otherwise, the smooth one,
+	/// i.e. the smooth history may change retroactively from future knowledge. Note however that the
+	/// recorded vehicle may not support smoothing and may perform the same in both modes.
+	/// Note also that this is not the algorithm mode, only the visualization; the algorithm
+	/// could still take past information into account, but it won't be visualized.</param> 
 	/// <returns>The trajectory, list of vectors representing state as a function of discrete time
 	/// (time is delivered as the first entry of each tuple).</returns>
-	private static TimedTrajectory trajectoryHistoryFromDescriptor(string descriptor, int dim = 7)
+	private static TimedTrajectory trajectoryHistoryFromDescriptor(string descriptor, int dim = 7, bool filterhistory = false)
 	{
 		string[]        frames  = descriptor.Split(new string[] {"\n|\n"}, StringSplitOptions.RemoveEmptyEntries);
 		TimedTrajectory history = new TimedTrajectory();
+		TimedState      filtered = new TimedState();
 
 		foreach (string frame in frames) {
 			string[] lines = frame.Split(new char[] {'\n'}, StringSplitOptions.RemoveEmptyEntries);
@@ -268,7 +282,17 @@ public class Viewer : Manipulator
 				throw new FormatException("bad trajectory format: missing time");
 			}
 
-			history.Add(Tuple.Create(time, trajectoryFromDescriptor(lines.Submatrix(1, lines.Length - 1), dim)));
+			TimedState trajectory = trajectoryFromDescriptor(lines.Submatrix(1, lines.Length - 1), dim);
+
+
+			// filtering, disregard history updates (i.e. future affecting the past)
+			if (filterhistory) {
+				filtered.Add(trajectory[trajectory.Count - 1]);
+				history.Add(Tuple.Create(time, new TimedState(filtered)));
+			}
+			else {
+				history.Add(Tuple.Create(time, trajectory));
+			}
 		}
 
 		return history;

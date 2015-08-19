@@ -62,17 +62,27 @@ def readscene(descriptor):
 
 def readtrajectory(descriptor):
 	descriptor = normalizelinefeeds(descriptor)
-	points     = (tuple(float(n) for n in point.split()) for point in descriptor.split("\n"))
+	points     = (tuple(float(n) for n in point.split()) for point in descriptor.split("\n") if point)
 	
 	return [{"time": p[0], "pos": np.array((p[1], p[2], p[3]))} for p in points]
 
-def readfinaltrajectory(descriptor):
-	# get last block and remove first line (timestamp)
-	return readtrajectory(descriptor.rsplit("\n|\n", 1)[1].split("\n", 1)[1])
+# histfilter -> for every time, use the best estimate at that time, not at the end
+def readfinaltrajectory(descriptor, histfilter):
+	if histfilter:
+		history  = descriptor.split("\n|\n")
+		filtered = ""
+		
+		for i in xrange(len(history)):
+			filtered = filtered + history[i].rsplit("\n", 1)[1] + "\n"
+		
+		return readtrajectory(filtered)
+	else:
+		# get last block and remove first line (timestamp)
+		return readtrajectory(descriptor.rsplit("\n|\n", 1)[1].split("\n", 1)[1])
 
 def readmaps(descriptor):
 	descriptor  = normalizelinefeeds(descriptor)
-	descriptors = (block.split("\n", 1) for block in descriptor.split("\n|\n"))
+	descriptors = (block.split("\n", 1) for block in descriptor.split("\n|\n") if block)
 	
 	return [tuple((float(head), [parsegaussian(line) for line in tail.split("\n") if line != ""])) for (head, tail) in descriptors]
 
@@ -177,7 +187,7 @@ def plot(poseerror, maperror, posefile, mapfile):
 	mplot.subplots_adjust(bottom=0.15)
 	mp.savefig(mapfile)
 
-def processdir(directory, verbose = False):
+def processdir(directory, histfilter = False, verbose = False):
 	if verbose:
 		print "  -- reading scene"
 		
@@ -194,7 +204,7 @@ def processdir(directory, verbose = False):
 		print "  -- reading estimate"
 		
 	with open(os.path.join(directory, "estimate.out")) as efile:
-		estimate   = readfinaltrajectory(efile.read())
+		estimate   = readfinaltrajectory(efile.read(), histfilter)
 	
 	if verbose:
 		print "  -- reading maps"
@@ -214,7 +224,7 @@ def processdir(directory, verbose = False):
 
 	return (perror, merror)
 
-def processfile(datafile, verbose = False):
+def processfile(datafile, histfilter = False, verbose = False):
 	tmp     = tempfile.mkdtemp()
 	datadir = os.path.join(tmp, "data")
 
@@ -224,21 +234,52 @@ def processfile(datafile, verbose = False):
 		datazip.extractall(datadir)
 
 	print "processing", datafile
-	(perror, merror) = processdir(datadir, verbose)
+	(perror, merror) = processdir(datadir, histfilter, verbose)
 
 	shutil.rmtree(tmp)
 
 	return (perror, merror)
 
-def main():
-	if len(sys.argv) < 2:
-		print "usage: python plot.py pose.pdf map.pdf data1.zip [data2.zip [data3.zip ...]]"
-		return
-
-	n = len(sys.argv) - 3
+def processfile2(args):
+	return processfile(*args)
 	
-	pool = multiprocessing.Pool()
-	errors = pool.map(processfile, sys.argv[3:])
+def parsearg(argument):
+	parts = argument.split('=', 1)
+	if len(parts) < 2:
+		return [parts[0].lstrip('-'), ""]
+	else:
+		return [parts[0].lstrip('-'), parts[1].strip('\'"')]
+
+def print_usage():
+	print "usage: python plot.py [-history=('filter'|'smooth')] pose.pdf map.pdf data1.zip [data2.zip [data3.zip ...]]"
+
+def main():
+	if len(sys.argv) < 3:
+		print_usage()
+		return
+		
+	arg1 = parsearg(sys.argv[1])
+	
+	if arg1[0] == "history":
+		if len(sys.argv) < 4:
+			print_usage()
+			return
+		
+		posefile   = sys.argv[2]
+		mapfile    = sys.argv[3]
+		offset     = 4
+		histfilter = (arg1[1] == "filter")
+	else:
+		posefile = sys.argv[1]
+		mapfile  = sys.argv[2]
+		offset   = 3
+		histfilter = False
+	
+	verbose = False
+	
+	pool   = multiprocessing.Pool()
+	errors = pool.map(processfile2, [(f, histfilter, verbose) for f in sys.argv[offset:]])
+	n      = len(errors)
 	pool.close()
 	pool.join()
 	
@@ -248,12 +289,12 @@ def main():
 		perror, merror = errors[i]
 		totalp = addgraphs(totalp, perror)
 		totalm = addgraphs(totalm, merror)
-
+	
 	totalp = (np.array(totalp[0]), np.array(totalp[1]) / n)
 	totalm = (np.array(totalm[0]), np.array(totalm[1]) / n)
-
+	
 	print "plotting"
-	plot(totalp, totalm, sys.argv[1], sys.argv[2])
+	plot(totalp, totalm, posefile, mapfile)
 
 if __name__ == '__main__':
 	main()

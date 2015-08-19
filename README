@@ -34,6 +34,10 @@ autonomous navigation in 3D space. It consists of several components:
 # 200 particles and solving both mapping and localization
 monorfs -c=movroom.in -p=200
 
+# Same as above but saving the output to a specified record file
+# (default = "data.zip")
+monorfs -c=movroom.in -p=200 -r=output.zip
+
 # Start analyzing a recorded RGBD stream from file "room.oni" with assumed
 # odometry "movroom.in", 40 particles and perfect localization
 monorfs -f=room.oni -c=movroom.in -p=40 -y
@@ -53,4 +57,4 @@ monorfs -s -f=map.world -c=movements.in -a=isam2 -x
 monorfs -s -f=map.world -c=movements.in -p=200 -g=config.cfg
 
 # Open a previous run with a Viewer
-monorfs -v -f=map.world
+monorfs -v -r=recording.zip
