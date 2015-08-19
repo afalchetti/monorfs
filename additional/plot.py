@@ -164,11 +164,15 @@ def landmarkdistance(x, y, c):
 def addgraphs(a, b):
 	(ta, fa) = a
 	(tb, fb) = b
+	
+	t = ta if (max(ta) > max(tb)) else tb
 
-	fbproj = np.interp(ta, tb, fb)
-	fadd   = [fa[i] + fb[i] for i in xrange(len(ta))]
+	faproj = np.interp(t, ta, fa, right=float("inf"))
+	fbproj = np.interp(t, tb, fb, right=float("inf"))
+	
+	fadd   = [faproj[i] + fbproj[i] for i in xrange(len(t))]
 
-	return (ta, fadd)
+	return (t, fadd)
 
 def plot(poseerror, maperror, posefile, mapfile):	
 	pplot = mp.figure(1)
