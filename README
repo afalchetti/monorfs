@@ -2,7 +2,7 @@ MonoRFS
 Visual SLAM system using Random Finite Sets
 
 Author:  Angelo Falchetti
-Version: 0.3
+Version: 0.4
 
 This is a simple program that implements a Rao-Blackwellized PHD filter for
 autonomous navigation in 3D space. It consists of several components:

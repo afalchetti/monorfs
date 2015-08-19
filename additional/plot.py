@@ -241,6 +241,9 @@ def processfile(datafile, histfilter = False, verbose = False):
 	(perror, merror) = processdir(datadir, histfilter, verbose)
 
 	shutil.rmtree(tmp)
+	
+	np.savetxt(datafile + ".pose.data", perror)
+	np.savetxt(datafile  + ".map.data", merror)
 
 	return (perror, merror)
 
@@ -299,6 +302,9 @@ def main():
 	
 	print "plotting"
 	plot(totalp, totalm, posefile, mapfile)
+	
+	np.savetxt(posefile + ".data", totalp)
+	np.savetxt(mapfile  + ".data", totalm)
 
 if __name__ == '__main__':
 	main()
