@@ -48,6 +48,7 @@ public abstract class Vehicle : IDisposable
 	/// Internal motion model covariance matrix. Yaw-pitch-roll representation.
 	/// </summary>
 	private double[][] motionCovariance = Config.MotionCovariance;
+
 	/// <summary>
 	/// Internal motion model covariance matrix. Quaternion representation.
 	/// </summary>
@@ -226,6 +227,11 @@ public abstract class Vehicle : IDisposable
 	public List<double[]> MappedMeasurements { get; protected set; }
 
 	/// <summary>
+	/// Landmark 3d locations against which the measurements are performed, if known.
+	/// </summary>
+	public List<double[]> Landmarks { get; protected set; }
+
+	/// <summary>
 	/// Data association for the last measurement.
 	/// </summary>
 	public List<int> DataAssociation { get; protected set; }
@@ -277,6 +283,9 @@ public abstract class Vehicle : IDisposable
 		FilmArea    = film;
 		RangeClip   = clip;
 
+		HasDataAssociation = false;
+		DataAssociation    = new List<int>();
+		Landmarks          = new List<double[]>();
 		MappedMeasurements = new List<double[]>();
 
 		WayPoints = new TimedState();
@@ -380,7 +389,7 @@ public abstract class Vehicle : IDisposable
 	/// The graphics device must be ready, otherwise
 	/// the method will throw an exception.
 	/// </summary>
-	/// <param name="camera">Camera rotation matrix.</param>
+	/// <param name="camera">Camera 4d transform matrix.</param>
 	public virtual void Render(double[][] camera)
 	{
 		RenderFOV(camera);
@@ -394,7 +403,7 @@ public abstract class Vehicle : IDisposable
 
 	/// <summary>
 	/// Render the vehicle physical body on the graphics device.
-	/// <param name="camera">Camera rotation matrix.</param>
+	/// <param name="camera">Camera 4d transform matrix.</param>
 	/// </summary>
 	public void RenderBody(double[][] camera)
 	{
@@ -403,7 +412,7 @@ public abstract class Vehicle : IDisposable
 		Color innercolor =  Color.LightBlue;
 		Color outercolor =  Color.Blue;
 
-		double[] pos = camera.Multiply(Location);
+		double[] pos = camera.TransformH(Location);
 		
 		VertexPositionColor[] invertices  = new VertexPositionColor[4];
 		double[][]            outvertices = new double[4][];
@@ -422,7 +431,7 @@ public abstract class Vehicle : IDisposable
 		Graphics.DrawUser2DPolygon(outvertices, 0.02f, outercolor, true);
 		
 		Quaternion x = Orientation * new Quaternion(0.2f, 0, 0, 0) * Quaternion.Conjugate(Orientation);
-		pos = camera.Multiply(new double[3] {X + x.X, Y + x.Y, Z + x.Z});
+		pos = camera.TransformH(new double[3] {X + x.X, Y + x.Y, Z + x.Z});
 
 		outvertices[0] = new double[] {pos[0] - 0.4*halflen, pos[1] - 0.4*halflen, pos[2]};
 		outvertices[1] = new double[] {pos[0] - 0.4*halflen, pos[1] + 0.4*halflen, pos[2]};
@@ -438,7 +447,7 @@ public abstract class Vehicle : IDisposable
 		Graphics.DrawUser2DPolygon(outvertices, 0.02f, Color.Blue, true);
 		
 		x   = Orientation * new Quaternion(0, 0.2f, 0, 0) * Quaternion.Conjugate(Orientation);
-		pos = camera.Multiply(new double[3] {X + x.X, Y + x.Y, Z + x.Z});
+		pos = camera.TransformH(new double[3] {X + x.X, Y + x.Y, Z + x.Z});
 
 		outvertices[0] = new double[] {pos[0] - 0.2*halflen, pos[1] - 0.2*halflen, pos[2]};
 		outvertices[1] = new double[] {pos[0] - 0.2*halflen, pos[1] + 0.2*halflen, pos[2]};
@@ -454,7 +463,7 @@ public abstract class Vehicle : IDisposable
 		Graphics.DrawUser2DPolygon(outvertices, 0.02f, Color.Yellow, true);
 		
 		x   = Orientation * new Quaternion(0, 0, 0.2f, 0) * Quaternion.Conjugate(Orientation);
-		pos = camera.Multiply(new double[3] {X + x.X, Y + x.Y, Z + x.Z});
+		pos = camera.TransformH(new double[3] {X + x.X, Y + x.Y, Z + x.Z});
 
 		outvertices[0] = new double[] {pos[0] - 0.8*halflen, pos[1] - 0.8*halflen, pos[2]};
 		outvertices[1] = new double[] {pos[0] - 0.8*halflen, pos[1] + 0.8*halflen, pos[2]};
@@ -473,7 +482,7 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// Render the Field-of-View cone on the graphics device.
 	/// </summary>
-	/// <param name="camera">Camera rotation matrix.</param>
+	/// <param name="camera">Camera 4d transform matrix.</param>
 	public void RenderFOV(double[][] camera)
 	{
 		Color incolorA = Color.LightGreen; incolorA.A = 30;
@@ -494,7 +503,7 @@ public abstract class Vehicle : IDisposable
 		for (int i = 0; i < frustum.Length; i++) {
 			Quaternion local = Orientation *
 			                       new Quaternion((float) frustum[i][0], (float) frustum[i][1], (float) frustum[i][2], 0) * Quaternion.Conjugate(Orientation);
-			frustum[i] = camera.Multiply(new double[3] {local.X, local.Y, local.Z}.Add(Location));
+			frustum[i] = camera.TransformH(new double[3] {local.X, local.Y, local.Z}.Add(Location));
 			frustum[i][2] = -100;
 		}
 		
@@ -557,7 +566,7 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// Render the path that the vehicle has traveled so far.
 	/// </summary>
-	/// <param name="camera">Camera rotation matrix.</param>
+	/// <param name="camera">Camera 4d transform matrix.</param>
 	public void RenderTrajectory(double[][] camera)
 	{
 		RenderTrajectory(camera, Color.Yellow);
@@ -566,7 +575,7 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// Render the path that the vehicle has traveled so far.
 	/// </summary>
-	/// <param name="camera">Camera rotation matrix.</param>
+	/// <param name="camera">Camera 4d transform matrix.</param>
 	/// <param name="color">Trajectory color.</param>
 	public void RenderTrajectory(double[][] camera, Color color)
 	{
@@ -574,7 +583,7 @@ public abstract class Vehicle : IDisposable
 
 		for (int i = 0; i < WayPoints.Count; i++) {
 			double[] w  = WayPoints[i].Item2;
-			vertices[i] = camera.Multiply(new double[3] {w[0], w[1], w[2]});
+			vertices[i] = camera.TransformH(new double[3] {w[0], w[1], w[2]});
 		}
 
 		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, false);
@@ -584,14 +593,14 @@ public abstract class Vehicle : IDisposable
 	/// Simple point measurement rendering.
 	/// </summary>
 	/// <param name="measurement">Point measurement position.</param>
-	/// <param name="camera">Camera rotation matrix.</param>
+	/// <param name="camera">Camera 4d transform matrix.</param>
 	private void RenderMeasure(double[] measurement, double[][] camera)
 	{
 		const float halflen = 0.06f;
 		
 		Color color =  Color.Crimson;
 
-		measurement = camera.Multiply(measurement);
+		measurement = camera.TransformH(measurement);
 		
 		double[][] vertices = new double[2][];
 

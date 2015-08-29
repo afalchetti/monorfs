@@ -731,7 +731,7 @@ public class PHDNavigator : Navigator
 	/// The graphics device must be ready, otherwise
 	/// the method will throw an exception.
 	/// </summary>
-	/// <param name="camera">Camera rotation matrix.</param>
+	/// <param name="camera">Camera 4d transform matrix.</param>
 	public override void Render(double[][] camera)
 	{
 		if (RenderAllParticles) {

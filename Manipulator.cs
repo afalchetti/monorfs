@@ -115,6 +115,31 @@ public abstract class Manipulator : Game
 	/// Previous frame keyboard state.
 	/// </summary>
 	private KeyboardState prevkeyboard;
+
+	/// <summary>
+	/// Previous frame mouse state.
+	/// </summary>
+	private MouseState prevmouse;
+
+	/// <summary>
+	/// Focused landmark.
+	/// </summary>
+	private double[] mousefocus;
+
+	/// <summary>
+	/// Focused landmark rpojection on the screen.
+	/// </summary>
+	private double[] mousefocusproj;
+
+	/// <summary>
+	/// Smooth target position updater generator.
+	/// </summary>
+	private IEnumerator<double[]> targetupdater;
+
+	/// <summary>
+	/// True if the target is not moving and in a stable position.
+	/// </summary>
+	private bool targetreached;
 	
 	/// <summary>
 	/// Scene double buffer flipping destination rectangle.
@@ -128,19 +153,34 @@ public abstract class Manipulator : Game
 	protected Rectangle sidedest;
 
 	/// <summary>
-	/// Camera angle.
+	/// Camera ground angle.
 	/// </summary>
-	private double camangle;
+	private double camtheta;
 
 	/// <summary>
-	/// Camera zoom factor.
+	/// Camera elevation angle.
+	/// </summary>
+	private double camphi;
+
+	/// <summary>
+	/// Camera zoom factor (distance to target).
 	/// </summary>
 	private double camzoom;
+
+	/// <summary>
+	/// Camera target.
+	/// </summary>
+	private double[] camtarget;
 
 	/// <summary>
 	/// Camera matrix.
 	/// </summary>
 	private double[][] camera;
+
+	/// <summary>
+	/// Number of frames in smooth transitions.
+	/// </summary>
+	public const int TransitionFrames = 30;
 
 	/// <summary>
 	/// Text message displayed next to the rendered simulation. 
@@ -260,9 +300,19 @@ public abstract class Manipulator : Game
 		                                0, RenderTargetUsage.DiscardContents);
 
 		prevkeyboard = Keyboard.GetState();
-		camangle     = 0;
+		prevmouse    = Mouse.GetState();
+
+		mousefocus     = null;
+		mousefocusproj = null;
+		targetreached  = true;
+		targetupdater  = System.Linq.Enumerable.Empty<double[]>().GetEnumerator();
+		targetupdater.MoveNext();
+
+		camtheta     = 0;
+		camphi       = 0;
 		camzoom      = 1;
-		camera       = Accord.Math.Matrix.Identity(3).ToArray();
+		camtarget    = new double[3] {0, 0, 0};
+		camera       = Accord.Math.Matrix.Identity(4).ToArray();
 		Paused       = false;
 		
 		base.Initialize();
@@ -289,12 +339,15 @@ public abstract class Manipulator : Game
 		simtime = Realtime ? time : new GameTime(simtime.TotalGameTime.Add(FrameElapsed), FrameElapsed);
 
 		KeyboardState keyboard = Keyboard.GetState();
+		MouseState    mouse    = Mouse.GetState();
 
-		double dcamangle = 0;
+		double dcamtheta = 0;
+		double dcamphi   = 0;
 		double dcamzoom  = 0;
 		
 		bool fast = keyboard.IsKeyDown(Keys.LeftShift);
 		bool slow = keyboard.IsKeyDown(Keys.LeftControl);
+		bool alt  = keyboard.IsKeyDown(Keys.LeftAlt);
 
 		double multiplier = 1.0;
 		multiplier *= (fast) ? 2.0 : 1.0;
@@ -305,33 +358,55 @@ public abstract class Manipulator : Game
 			return;
 		}
 
-		if (keyboard.IsKeyDown(Keys.Up)) {
-			dcamangle += 0.06 * multiplier;
+		if (keyboard.IsKeyDown(Keys.Up) && !alt) {
+			dcamphi -= 0.06 * multiplier;
 		}
 
-		if (keyboard.IsKeyDown(Keys.Down)) {
-			dcamangle -= 0.06 * multiplier;
+		if (keyboard.IsKeyDown(Keys.Down) && !alt) {
+			dcamphi += 0.06 * multiplier;
 		}
 
-		if (keyboard.IsKeyDown(Keys.Right)) {
-			dcamzoom += 0.05 * multiplier;
+		if (keyboard.IsKeyDown(Keys.Right) && !alt) {
+			dcamtheta += 0.06 * multiplier;
 		}
 
-		if (keyboard.IsKeyDown(Keys.Left)) {
+		if (keyboard.IsKeyDown(Keys.Left) && !alt) {
+			dcamtheta -= 0.06 * multiplier;
+		}
+
+		if (keyboard.IsKeyDown(Keys.Up) && alt) {
 			dcamzoom -= 0.05 * multiplier;
+		}
+
+		if (keyboard.IsKeyDown(Keys.Down) && alt) {
+			dcamzoom += 0.05 * multiplier;
 		}
 
 		if (keyboard.IsKeyDown(Keys.Escape) && !prevkeyboard.IsKeyDown(Keys.Escape)) {
 			Paused = !Paused;
 		}
 
-		camangle += dcamangle;
-		camzoom   = Math.Max(0.1, Math.Min(10.0, camzoom * (1 + dcamzoom)));
-		camera    = camzoom.Multiply(MatrixExtensions.CreateRotationX(camangle));
+		if (!targetreached) {
+			camtarget     = targetupdater.Current;
+			targetreached = !targetupdater.MoveNext();
+		}
+
+		camtheta += dcamtheta;
+		camphi    = Math.Max(-Math.PI/2 + 0.01, Math.Min(Math.PI/2 - 0.01, camphi + dcamphi));
+		camzoom   = Math.Max(0.01, Math.Min(100.0, camzoom * (1 + dcamzoom)));
+		camera    = MatrixExtensions.AngleDistanceCamera(camtarget, camtheta, camphi, camzoom);
 
 		Update(simtime, keyboard, prevkeyboard, multiplier);
 
+		mousefocus = getMouseFocus(mouse, out mousefocusproj);
+
+		if (mouse.LeftButton == ButtonState.Pressed && prevmouse.LeftButton == ButtonState.Released) {
+			targetupdater = smoothTranslater(new double[3] {camtarget[0], camtarget[1], camtarget[2]}, mousefocus);
+			targetreached = !targetupdater.MoveNext();
+		}
+
 		prevkeyboard = keyboard;
+		prevmouse    = mouse;
 		base.Update(time);
 	}
 
@@ -359,6 +434,7 @@ public abstract class Manipulator : Game
 			
 			Explorer .Render(camera);
 			Navigator.Render(camera);
+			RenderHUD();
 		}
 
 		// sidebar
@@ -384,6 +460,89 @@ public abstract class Manipulator : Game
 		Flip.End();
 
 		base.Draw(time);
+	}
+
+	/// <summary>
+	/// Render any heads-up display.
+	/// </summary>
+	public void RenderHUD()
+	{
+		if (mousefocusproj != null) {
+			const float halflen = 0.085f;
+
+			Color      color    = Color.OrangeRed;
+			double[][] vertices = new double[8][];
+
+			vertices[0] = new double[] {mousefocusproj[0] -     halflen, mousefocusproj[1] -     halflen, mousefocusproj[2]};
+			vertices[1] = new double[] {mousefocusproj[0] - 1.3*halflen, mousefocusproj[1] +           0, mousefocusproj[2]};
+			vertices[2] = new double[] {mousefocusproj[0] -     halflen, mousefocusproj[1] +     halflen, mousefocusproj[2]};
+			vertices[3] = new double[] {mousefocusproj[0] +           0, mousefocusproj[1] + 1.3*halflen, mousefocusproj[2]};
+			vertices[4] = new double[] {mousefocusproj[0] +     halflen, mousefocusproj[1] +     halflen, mousefocusproj[2]};
+			vertices[5] = new double[] {mousefocusproj[0] + 1.3*halflen, mousefocusproj[1] +           0, mousefocusproj[2]};
+			vertices[6] = new double[] {mousefocusproj[0] +     halflen, mousefocusproj[1] -     halflen, mousefocusproj[2]};
+			vertices[7] = new double[] {mousefocusproj[0] +           0, mousefocusproj[1] - 1.3*halflen, mousefocusproj[2]};
+
+			Graphics.DrawUser2DPolygon(vertices, 0.03f, color, true);
+		}
+	}
+
+	/// <summary>
+	/// Get the closest landmark to the mouse.
+	/// If no landmark is near enough, returns null.
+	/// </summary>
+	/// <param name="mouse">Mouse state.</param>
+	/// <param name="projected">Viewport projection of the closest landmark.
+	/// Null if no landmark is close enough</param>
+	/// <returns>Focused landmark.</returns>
+	private double[] getMouseFocus(MouseState mouse, out double[] projected)
+	{
+		Point mousepos = mouse.Position;
+		projected = null;
+
+		double[] closest    = null;
+		double   closedist2 = double.MaxValue;
+
+		foreach (double[] landmark in Explorer.Landmarks) {
+			double[] proj = camera.TransformH(landmark);
+
+			Vector3  screen    = Vector3.Transform(new Vector3((float) proj[0], (float) proj[1], (float) proj[2]), effect.Projection);
+			Point    screenxy  = scenedest.Center + new Point((int)(screen.X * scenedest.Width / 2.0), -(int)(screen.Y * scenedest.Height / 2.0));
+			double[] diff      = new double[2] {mousepos.X - screenxy.X, mousepos.Y - screenxy.Y};
+			double   distance2 = diff.SquareEuclidean();
+
+			if (distance2 < closedist2) {
+				closest    = landmark;
+				projected  = proj;
+				closedist2 = distance2;
+			}
+		}
+
+
+
+		if (closedist2 > 10 * 10) {
+			projected = null;
+			return null;
+		}
+		
+		return closest;
+	}
+
+	/// <summary>
+	/// Create a generator of smooth transition between target position.
+	/// </summary>
+	/// <param name="initial">Initial position.</param>
+	/// <param name="final">Final position.</param>
+	/// <returns>Transition generator.</returns>
+	private IEnumerator<double[]> smoothTranslater(double[] initial, double[] final)
+	{
+		if (final == null) {
+			yield break;
+		}
+
+		for (int x = 0; x <= TransitionFrames; x++) {
+			double alpha = Util.SmoothTransition((double) x / TransitionFrames);
+			yield return (1-alpha).Multiply(initial).Add(alpha.Multiply(final));
+		}
 	}
 
 	/// <summary>

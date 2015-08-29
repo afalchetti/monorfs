@@ -76,11 +76,6 @@ public class SimulatedVehicle : Vehicle
 	public static bool PerfectStill { get { return Config.PerfectStill; } }
 
 	/// <summary>
-	/// Landmark 3d locations against which the measurements are performed.
-	/// </summary>
-	public List<double[]> Landmarks { get; set; }
-
-	/// <summary>
 	/// Poisson distributed random generator with parameter lambda = ClutterCount.
 	/// </summary>
 	/// <remarks>The type is general distribution to allow for zero clutter (dirac distribution)</remarks>
@@ -425,7 +420,7 @@ public class SimulatedVehicle : Vehicle
 	/// Render the vehicle on the graphics device.
 	/// The graphics device must be ready, otherwise
 	/// the method will throw an exception.
-	/// <param name="camera">Camera rotation matrix.</param>
+	/// <param name="camera">Camera 4d transform matrix.</param>
 	/// </summary>
 	public override void Render(double[][] camera)
 	{
@@ -440,7 +435,7 @@ public class SimulatedVehicle : Vehicle
 	/// Simple point landmark rendering.
 	/// </summary>
 	/// <param name="landmark">Point landmark position.</param>
-	/// <param name="camera">Camera rotation matrix.</param>
+	/// <param name="camera">Camera 4d transform matrix.</param>
 	private void RenderLandmark(double[] landmark, double[][] camera)
 	{
 		const float halflen = 0.024f;
@@ -448,7 +443,7 @@ public class SimulatedVehicle : Vehicle
 		Color innercolor =  Color.LightGray;
 		Color outercolor =  Color.Black;
 
-		landmark = camera.Multiply(landmark);
+		landmark = camera.TransformH(landmark);
 		
 		VertexPositionColor[] invertices  = new VertexPositionColor[4];
 		double[][]            outvertices = new double[4][];

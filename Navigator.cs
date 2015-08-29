@@ -230,7 +230,7 @@ public abstract class Navigator : IDisposable
 	/// The graphics device must be ready, otherwise
 	/// the method will throw an exception.
 	/// </remarks>
-	/// <param name="camera">Camera rotation matrix.</param>
+	/// <param name="camera">Camera 4d transform matrix.</param>
 	public virtual void Render(double[][] camera)
 	{
 		RenderTrajectory(camera);
@@ -240,7 +240,7 @@ public abstract class Navigator : IDisposable
 	/// <summary>
 	/// Render the map model, i.e. its estimated landmarks and covariances.
 	/// </summary>
-	/// <param name="camera">Camera rotation matrix.</param>
+	/// <param name="camera">Camera 4d transform matrix.</param>
 	public void RenderMap(double[][] camera) {
 		foreach (Gaussian component in BestMapModel) {
 			RenderGaussian(component, camera);
@@ -250,7 +250,7 @@ public abstract class Navigator : IDisposable
 	/// <summary>
 	/// Render estimate of the path that the vehicle has traveled so far.
 	/// </summary>
-	/// <param name="camera">Camera rotation matrix.</param>
+	/// <param name="camera">Camera 4d transform matrix.</param>
 	public void RenderTrajectory(double[][] camera)
 	{
 		double[][] vertices = new double[WayPoints.Count][];
@@ -258,7 +258,7 @@ public abstract class Navigator : IDisposable
 
 		for (int i = 0; i < WayPoints.Count; i++) {
 			double[] w  = WayPoints[i].Item2;
-			vertices[i] = camera.Multiply(new double[3] {w[0], w[1], w[2]});
+			vertices[i] = camera.TransformH(new double[3] {w[0], w[1], w[2]});
 		}
 
 		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, false);
@@ -268,7 +268,7 @@ public abstract class Navigator : IDisposable
 	/// Render the 5-sigma ellipse of gaussian.
 	/// </summary>
 	/// <param name="gaussian">Gaussian to be rendered.</param>
-	/// <param name="camera">Camera rotation matrix.</param>
+	/// <param name="camera">Camera 4d transform matrix.</param>
 	public void RenderGaussian(Gaussian gaussian, double[][] camera)
 	{
 		Color incolor  = Color.DeepSkyBlue; incolor.A  = 200;
@@ -290,7 +290,8 @@ public abstract class Navigator : IDisposable
 			outcolor = Color.Red;
 		}
 
-		double[][] covariance = camera.Multiply(gaussian.Covariance).MultiplyByTranspose(camera).Submatrix(0, 1, 0, 1);
+		double[][] camrot     = camera.Submatrix(0, 2, 0, 2);
+		double[][] covariance = camrot.Multiply(gaussian.Covariance).MultiplyByTranspose(camrot).Submatrix(0, 1, 0, 1);
 
 		var        decomp = new EigenvalueDecomposition(covariance.ToMatrix());
 		double[,]  stddev = decomp.DiagonalMatrix;
@@ -311,7 +312,7 @@ public abstract class Navigator : IDisposable
 
 		for (int i = 0; i < points.Length; i++) {
 			points  [i]  = linear.Multiply(pinterval[i]);
-			points  [i]  = new double[3] {points[i][0], points[i][1], 0}.Add(camera.Multiply(gaussian.Mean));
+			points  [i]  = new double[3] {points[i][0], points[i][1], 0}.Add(camera.TransformH(gaussian.Mean));
 			vertices[i]  = new VertexPositionColor(points[i].ToVector3(), incolor);
 		}
 

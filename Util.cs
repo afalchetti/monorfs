@@ -138,6 +138,22 @@ public static class Util
 	}
 
 	/// <summary>
+	/// Maps the [0, 1] range to itself from a linear interpolation value
+	/// to a smoother interpolation value that has softer derivative changes along the interval.
+	/// </summary>
+	/// <param name="x">Linear transition.</param>
+	/// <returns>Smooth value.</returns>
+	public static double SmoothTransition(double x)
+	{
+		if (x < 0.5) {
+			return 2 * x * x;
+		}
+		else {
+			return 1 - 2 * (x - 1) * (x - 1);
+		}
+	}
+
+	/// <summary>
 	/// Realize a random vector from a gaussian distribution around a specified mean
 	/// vector with a given covvariance.
 	/// </summary>

@@ -39,6 +39,8 @@ namespace monorfs
 /// </summary>
 public static class MatrixExtensions
 {
+	public readonly static Vector3 UpVector = new Vector3(0, 0, 1);
+
 	/// <summary>
 	/// Reverse the order of the columns of a matrix.
 	/// </summary>
@@ -62,114 +64,104 @@ public static class MatrixExtensions
 	}
 
 	/// <summary>
-	/// Get a 2x2 rotation matrix of a specified angle.
+	/// Transform a 3D point using an homography matrix.
 	/// </summary>
-	/// <param name="angle">Angle measured in radians, counterclockwise starting from (0, 1).</param>
-	/// <returns>The rotation matrix.</returns>
-	public static double[][] Rotation2(double angle)
+	/// <returns>3D transformed point in cartesian coordinates.</returns>
+	/// <param name="point">3D point in cartesian coordinates.</param>
+	/// <param name="transformation">Homography 4x4 transformation matrix.</param>
+	public static double[] TransformH(this double[][] transformation, double[] point)
 	{
-		double ct = Math.Cos(angle);
-		double st = Math.Sin(angle);
-		return new double[2][] {new double[2] {ct, -st}, new double[2] {st, ct}};
-	}
-	/*
-	/// <summary>
-	/// Write a 2x2 rotation matrix of a specified angle inside another matrix.
-	/// </summary>
-	/// <param name="angle">Angle measured in radians, counterclockwise starting from (0, 1).</param>
-	/// <returns>The rotation matrix.</returns>
-	/// */
-
-	/// <summary>
-	/// Write a 2x2 rotation matrix of a specified angle inside another matrix.
-	/// </summary>
-	/// <param name="angle">Angle measured in radians, counterclockwise starting from (0, 1).</param>
-	/// <param name="matrix">Output matrix.Must have enough room to accomodate the 2x2 rotation.</param>
-	/// <param name="offx">X-index offset to start writing.</param>
-	/// <param name="offy">Y-index offset to start writing.</param>
-	public static void Rotation2(double angle, ref double[][] matrix, int offx, int offy)
-	{
-		double ct = Math.Cos(angle);
-		double st = Math.Sin(angle);
-		matrix[offx    ][offy]     =  ct;
-		matrix[offx + 1][offy]     = -st;
-		matrix[offx    ][offy + 1] =  st;
-		matrix[offx + 1][offy + 1] =  ct;
+		double[] homographic = transformation.Multiply(point.Concatenate(1));
+		return new double[3] {homographic[0] / homographic[3],
+		                      homographic[1] / homographic[3],
+		                      homographic[2] / homographic[3]};
 	}
 
 	/// <summary>
-	/// Get a 3x3 homographic rotation matrix of a specified angle.
+	/// Create a look-at camera from its spherical coordinates
+	/// relative to the target.
 	/// </summary>
-	/// <param name="angle">Angle measured in radians, counterclockwise starting from (0, 1).</param>
-	/// <returns>The homographic rotation matrix.</returns>
-	public static double[][] Rotation2H(double angle)
+	/// <param name="target">Target position.</param>
+	/// <param name="ground">Ground angle, in [0, 2pi].</param>
+	/// <param name="elevation">Elevation angle, in [-pi/2, pi/2].</param>
+	/// <param name="zoom">Zoom factor.</param>
+	/// <returns>Camera matrix.</returns>
+	public static double[][] AngleDistanceCamera(double[] target, double ground, double elevation, double zoom)
 	{
-		double ct = Math.Cos(angle);
-		double st = Math.Sin(angle);
-		return new double[3][] {new double[3] {ct, -st, 0}, new double[3] {st, ct, 0}, new double[3] {0, 0, 1}};
+		double[][] camera;
+
+		camera       = CreateTranslation(new double[3] {-target[0], -target[1], -target[2]});
+		camera       = CreateRotationY(ground).Multiply(camera);
+		camera       = CreateRotationX(elevation).Multiply(camera);
+		camera[3][3] = zoom;
+
+		return camera;
 	}
 
 	/// <summary>
-	/// Get a 3x3 translation matrix of a specified movement.
+	/// Creates a 4x4 transformation matrix for translating every point
+	/// in the same amount.
 	/// </summary>
-	/// <param name="move">Translation offset in xy-coordinates.</param>
-	/// <returns>The homographic translation matrix.</returns>
-	public static double[][] Translation2H(double[] move)
+	/// <param name="target">New zero position.</param>
+	/// <returns>Transformation matrix.</returns>
+	public static double[][] CreateTranslation(double[] target)
 	{
-		return new double[3][] {new double[3] {0, 0, move[0]}, new double[3] {0, 0, move[1]}, new double[3] {0, 0, 1}};
+		return new double[4][] {new double[4] {1, 0, 0, target[0]},
+		                        new double[4] {0, 1, 0, target[1]},
+		                        new double[4] {0, 0, 1, target[2]},
+		                        new double[4] {0, 0, 0, 1}};
 	}
 
 	/// <summary>
-	/// Get a complete 3x3 homographic transform matrix.
-	/// </summary>
-	/// <param name="translation">Translation offset in xy-coordinates.</param>
-	/// <param name="angle">Angle measured in radians, counterclockwise starting from (0, 1).</param>
-	/// <returns>The homographic transformation matrix.</returns>
-	public static double[][] TransformH(double[] translation, double angle)
-	{
-		double ct = Math.Cos(angle);
-		double st = Math.Sin(angle);
-		return new double[3][] {new double[3] {ct, -st, translation[0]}, new double[3] {st, ct, translation[1]}, new double[3] {0, 0, 1}};
-	}
-
-	/// <summary>
-	/// Creates a 3x3 rotation matrix for rotating in the yz plane
+	/// Creates a 4x4 rotation matrix for rotating in the yz plane
 	/// with a given angle.
 	/// </summary>
 	/// <param name="angle">Angle measured in radians, counterclockwise starting from (0, 0, 1).</param>
-	/// <returns>The rotation matrix.</returns>
+	/// <returns>Transformation matrix.</returns>
 	public static double[][] CreateRotationX(double angle)
 	{
 		double ct = Math.Cos(angle);
 		double st = Math.Sin(angle);
-		return new double[3][] {new double[3] {1, 0, 0}, new double[3] {0, ct, -st}, new double[3] {0, st, ct}};
+
+		return new double[4][] {new double[4] {1,  0,   0, 0},
+		                        new double[4] {0, ct, -st, 0},
+		                        new double[4] {0, st,  ct, 0},
+		                        new double[4] {0,  0,   0, 1}};
 	}
 
 	/// <summary>
-	/// Creates a 3x3 rotation matrix for rotating in the xz plane
+	/// Creates a 4x4 rotation matrix for rotating in the xz plane
 	/// with a given angle.
 	/// </summary>
 	/// <param name="angle">Angle measured in radians, counterclockwise starting from (1, 0, 0).</param>
-	/// <returns>The rotation matrix.</returns>
+	/// <returns>Transformation matrix.</returns>
 	public static double[][] CreateRotationY(double angle)
 	{
 		double ct = Math.Cos(angle);
 		double st = Math.Sin(angle);
-		return new double[3][] {new double[3] {st, 0, ct}, new double[3] {0, 1, 0}, new double[3] {ct, 0, -st}};
-	}
+		
+		return new double[4][] {new double[4] { ct, 0, st, 0},
+		                        new double[4] {  0, 1,  0, 0},
+		                        new double[4] {-st, 0, ct, 0},
+		                        new double[4] {  0, 0,  0, 1}};
+		}
 
 	/// <summary>
-	/// Creates a 3x3 rotation matrix for rotating in the xy plane
+	/// Creates a 4x4 rotation matrix for rotating in the xy plane
 	/// with a given angle.
 	/// </summary>
 	/// <param name="angle">Angle measured in radians, counterclockwise starting from (0, 1, 0).</param>
-	/// <returns>The rotation matrix.</returns>
+	/// <returns>Transformation matrix.</returns>
 	public static double[][] CreateRotationZ(double angle)
 	{
 		double ct = Math.Cos(angle);
 		double st = Math.Sin(angle);
-		return new double[3][] {new double[3] {ct, -st, 0}, new double[3] {st, ct, 0}, new double[3] {0, 0, 1}};
-	}
+
+		return new double[4][] {new double[4] {ct, -st, 0, 0},
+		                        new double[4] {st,  ct, 0, 0},
+		                        new double[4] { 0,   0, 1, 0},
+		                        new double[4] { 0,   0, 0, 1}};
+		}
 
 	/// <summary>
 	/// Obtain the corresponding rotation matriz from a quaternion.
@@ -201,6 +193,32 @@ public static class MatrixExtensions
 	public static Vector3 ToVector3(this double[] x)
 	{
 		return new Vector3((float) x[0], (float) x[1], (float) x[2]);
+	}
+
+	/// <summary>
+	/// Transform a MonoGame matrix to a double jagged array.
+	/// </summary>
+	/// <param name="matrix">MonoGame matrix.</param>
+	/// <returns>Jagged array.</returns>
+	public static double[][] ToJagged(this Microsoft.Xna.Framework.Matrix matrix)
+	{
+		return new double[4][] { new double[4] {matrix.M11, matrix.M12, matrix.M13, matrix.M14},
+		                         new double[4] {matrix.M21, matrix.M22, matrix.M23, matrix.M24},
+		                         new double[4] {matrix.M31, matrix.M32, matrix.M33, matrix.M34},
+		                         new double[4] {matrix.M41, matrix.M42, matrix.M43, matrix.M44} };
+	}
+
+	/// <summary>
+	/// Transform a double jagged array to a MonoGame matrix.
+	/// </summary>
+	/// <param name="matrix">Jagged array.</param>
+	/// <returns>MonoGame matrix.</returns>
+	public static Microsoft.Xna.Framework.Matrix ToXnaMatrix(this double[][] matrix)
+	{
+		return new Microsoft.Xna.Framework.Matrix((float) matrix[0][0], (float) matrix[0][1], (float) matrix[0][2], (float) matrix[0][3],
+		                                          (float) matrix[1][0], (float) matrix[1][1], (float) matrix[1][2], (float) matrix[1][3],
+		                                          (float) matrix[2][0], (float) matrix[2][1], (float) matrix[2][2], (float) matrix[2][3],
+		                                          (float) matrix[3][0], (float) matrix[3][1], (float) matrix[3][2], (float) matrix[3][3]);
 	}
 
 	/// <summary>
