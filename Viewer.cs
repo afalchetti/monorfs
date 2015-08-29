@@ -495,6 +495,8 @@ public class Viewer : Manipulator
 			Paused = true;
 		}
 
+		bool speedup = keyboard.IsKeyDown(Keys.LeftShift);
+
 		SideBuffer2            = SidebarHistory[i];
 		Explorer .WayPoints    = VehicleWaypoints;
 		Explorer .State        = Explorer.WayPoints[Explorer.WayPoints.Count - 1].Item2;
@@ -510,19 +512,19 @@ public class Viewer : Manipulator
 		
 		// frame-by-frame fine time lookup, reverse
 		if (keyboard.IsKeyDown(Keys.Q) && !prevkeyboard.IsKeyDown(Keys.Q)) {
-			i--;
+			i -= (speedup) ? 8 : 1;
 			Paused = true;
 		}
 		
 		// frame-by-frame, forward
 		if (keyboard.IsKeyDown(Keys.W) && !prevkeyboard.IsKeyDown(Keys.W)) {
-			i++;
+			i += (speedup) ? 8 : 1;
 			Paused = true;
 		}
 
 		// normal speed, reverse
 		if (keyboard.IsKeyDown(Keys.A)) {
-			i--;
+			i -= (speedup) ? 8 : 1;
 			Paused = true;
 		}
 
@@ -532,7 +534,7 @@ public class Viewer : Manipulator
 		}
 
 		if (!Paused) {
-			i++;
+			i += (speedup) ? 8 : 1;
 		}
 	}
 	
