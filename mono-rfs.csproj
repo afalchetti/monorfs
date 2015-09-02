@@ -139,6 +139,8 @@
     <Compile Include="ISAM2Navigator.cs" />
     <Compile Include="Test\UtilTest.cs" />
     <Compile Include="Config.cs" />
+    <Compile Include="RecordVehicle.cs" />
+    <Compile Include="FileParser.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

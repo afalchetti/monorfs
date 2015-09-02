@@ -32,16 +32,18 @@ using System.IO;
 using System.IO.Compression;
 
 using Accord.Extensions.Imaging;
-using Accord.Math;
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 
+using FP = monorfs.FileParser;
+
 using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedTrajectory   = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<System.Tuple<double, double[]>>>>;
 using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
+using monorfs;
 
 namespace monorfs
 {
@@ -85,7 +87,7 @@ public class Viewer : Manipulator
 		get {
 			TimedState waypoints = new TimedState();
 
-			for (int k = 0; k <= i; k++) {
+			for (int k = 0; k <= FrameIndex; k++) {
 				waypoints.Add(Trajectory[k]);
 			}
 
@@ -116,7 +118,7 @@ public class Viewer : Manipulator
 	/// <summary>
 	/// Frame index currently shown onscreen.
 	/// </summary>
-	private int i;
+	private int FrameIndex;
 
 	/// <summary>
 	/// Construct a visualization from its components.
@@ -139,7 +141,7 @@ public class Viewer : Manipulator
 		Estimate     = estimate;
 		Map          = map;
 		Measurements = measurements;
-		i            = 0;
+		FrameIndex   = 0;
 
 		while (Measurements.Count < map.Count) {
 			Measurements.Add(Tuple.Create(map[Measurements.Count].Item1, new List<double[]>()));
@@ -190,13 +192,13 @@ public class Viewer : Manipulator
 		if (!File.Exists(scenefile)) {
 			scenefile = "";
 		}
+
 		if (!File.Exists(measurefile)) {
 			measurefile = "";
 		}
 
 		if (!File.Exists(sidebarfile)) {
 			sidebarfile = "";
-
 		}
 
 		SimulatedVehicle  explorer;
@@ -206,19 +208,19 @@ public class Viewer : Manipulator
 		TimedMeasurements measurements;
 		float[]           mapclip;
 
-		trajectory   = trajectoryFromDescriptor       (File.ReadAllLines(vehiclefile),  7);
-		estimate     = trajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), 7, filterhistory);
-		map          = mapHistoryFromDescriptor       (File.ReadAllText(mapfile));
+		trajectory   = FP.TrajectoryFromDescriptor       (File.ReadAllLines(vehiclefile),  7);
+		estimate     = FP.TrajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), 7, filterhistory);
+		map          = FP.MapHistoryFromDescriptor       (File.ReadAllText(mapfile));
 
 		if (!string.IsNullOrEmpty(measurefile)) {
-			measurements = measurementsFromDescriptor(File.ReadAllText(measurefile));
+			measurements = FP.MeasurementsFromDescriptor(File.ReadAllText(measurefile));
 		}
 		else {
 			measurements = new TimedMeasurements();
 		}
 
 		if (!string.IsNullOrEmpty(scenefile)) {
-			explorer = VehicleFromSimFile(File.ReadAllText(scenefile), out mapclip);
+			explorer = FP.VehicleFromSimFile(File.ReadAllText(scenefile), out mapclip);
 		}
 		else {
 			explorer = new SimulatedVehicle(new double[3] {0, 0, 0}, 0, new double[3] {0, 0, 1}, new List<double[]>());
@@ -254,187 +256,86 @@ public class Viewer : Manipulator
 	}
 
 	/// <summary>
-	/// Get a trajectory history from a formatted string descriptor.
+	/// Allow the viewer to run logic such as updating the world,
+	/// and gathering input.
 	/// </summary>
-	/// <param name="descriptor">Formatted trajectory vectors moving through time.</param>
-	/// <param name="dim">Expected state dimension.</param>
-	/// <param name="filterhistory">If true, show the filtered trajectory history, otherwise, the smooth one,
-	/// i.e. the smooth history may change retroactively from future knowledge. Note however that the
-	/// recorded vehicle may not support smoothing and may perform the same in both modes.
-	/// Note also that this is not the algorithm mode, only the visualization; the algorithm
-	/// could still take past information into account, but it won't be visualized.</param> 
-	/// <returns>The trajectory, list of vectors representing state as a function of discrete time
-	/// (time is delivered as the first entry of each tuple).</returns>
-	private static TimedTrajectory trajectoryHistoryFromDescriptor(string descriptor, int dim = 7, bool filterhistory = false)
+	/// <param name="time">Provides a snapshot of timing values.</param>
+	/// <param name="keyboard">Current keyboard state information.</param>
+	/// <param name="prevkeyboard">Old keyboard state information. Used to get newly pressed keys.</param>
+	/// <param name="multiplier">Movement scale multiplier.</param>
+	protected override void Update(GameTime time, KeyboardState keyboard, KeyboardState prevkeyboard, double multiplier)
 	{
-		string[]        frames  = descriptor.Split(new string[] {"\n|\n"}, StringSplitOptions.RemoveEmptyEntries);
-		TimedTrajectory history = new TimedTrajectory();
-		TimedState      filtered = new TimedState();
-
-		foreach (string frame in frames) {
-			string[] lines = frame.Split(new char[] {'\n'}, StringSplitOptions.RemoveEmptyEntries);
-			double time    = -1;
-
-			try {
-				time = double.Parse(lines[0]);
-			}
-			catch (FormatException) {
-				throw new FormatException("bad trajectory format: missing time");
-			}
-
-			TimedState trajectory = trajectoryFromDescriptor(lines.Submatrix(1, lines.Length - 1), dim);
-
-
-			// filtering, disregard history updates (i.e. future affecting the past)
-			if (filterhistory) {
-				filtered.Add(trajectory[trajectory.Count - 1]);
-				history.Add(Tuple.Create(time, new TimedState(filtered)));
-			}
-			else {
-				history.Add(Tuple.Create(time, trajectory));
-			}
+		if (FrameIndex >= Trajectory.Count) {
+			FrameIndex = Trajectory.Count - 1;
+			Paused     = true;
+		}
+		else if (FrameIndex < 0) {
+			FrameIndex = 0;
+			Paused     = true;
 		}
 
-		return history;
+		bool speedup = keyboard.IsKeyDown(Keys.LeftShift);
+
+		SideBuffer2            = SidebarHistory[FrameIndex];
+		Explorer .WayPoints    = VehicleWaypoints;
+		Explorer .State        = Explorer.WayPoints[Explorer.WayPoints.Count - 1].Item2;
+		Navigator.BestMapModel = Map[mapindices[FrameIndex]].Item2;
+		Navigator.BestEstimate.WayPoints = Estimate[FrameIndex].Item2;
+
+		Explorer.MappedMeasurements.Clear();
+		foreach (double[] z in Measurements[mapindices[FrameIndex]].Item2) {
+			Explorer.MappedMeasurements.Add(Explorer.MeasureToMap(z));
+		}
+
+		Message = string.Format("time = {0,12:N4}        frame = {1,5:N0}", Estimate[FrameIndex].Item1, FrameIndex);
+		
+		// frame-by-frame fine time lookup, reverse
+		if (keyboard.IsKeyDown(Keys.Q) && !prevkeyboard.IsKeyDown(Keys.Q)) {
+			FrameIndex -= (speedup) ? 8 : 1;
+			Paused      = true;
+		}
+		
+		// frame-by-frame, forward
+		if (keyboard.IsKeyDown(Keys.W) && !prevkeyboard.IsKeyDown(Keys.W)) {
+			FrameIndex += (speedup) ? 8 : 1;
+			Paused      = true;
+		}
+
+		// normal speed, reverse
+		if (keyboard.IsKeyDown(Keys.A)) {
+			FrameIndex -= (speedup) ? 8 : 1;
+			Paused      = true;
+		}
+
+		// normal speed, forward
+		if (keyboard.IsKeyDown(Keys.S)) {
+			Paused = false;
+		}
+
+		if (!Paused) {
+			FrameIndex += (speedup) ? 8 : 1;
+		}
 	}
-
+	
 	/// <summary>
-	/// Get a trajectory from a formatted string descriptor.
+	/// This is called when the viewer should draw itself.
 	/// </summary>
-	/// <param name="lines">Array of formatted state vectors moving through time.</param>
-	/// <param name="dim">Expected state dimension.</param>
-	/// <returns>The trajectory, list of vectors representing state as a function of discrete time
-	/// (time is delivered as the first entry of each tuple).</returns>
-	private static TimedState trajectoryFromDescriptor(string[] lines, int dim = 7)
+	/// <param name="time">Provides a snapshot of timing values.</param>
+	protected override void Draw(GameTime time)
 	{
-		TimedState trajectory = new TimedState();
+		base.Draw(time);
 
-		foreach (string line in lines) {
-			double[] values = ParseDoubleList(line);
+		// overwrite the sidebar
+		// TODO clean this up, shouldn't need to overwrite but instead use an unified interface.
+		//      the problem probably is that explorer shouldn't be in charge of rendering, only
+		//      providing the Texture2D and this should be overridable in the update method
+		Graphics.SetRenderTarget(null);
+		Flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
+		           DepthStencilState.Default, RasterizerState.CullNone);
 
-			if (values.Length != dim + 1) {  // state + time
-				throw new FormatException("wrong state dimension");
-			}
-
-			trajectory.Add(Tuple.Create(values[0], values.Submatrix(1, values.Length - 1)));
-		}
-
-		return trajectory;
-	}
-
-	/// <summary>
-	/// Get a map trajectory (or history) from a formatted string descriptor.
-	/// </summary>
-	/// <param name="descriptor">Formatted map descriptor moving through time.</param>
-	/// <param name="dim">Expected world dimension.</param>
-	/// <returns>The map history, list of vectors representing map model components as a function of discrete time
-	/// (time is delivered as the first entry of each tuple).</returns>
-	private static TimedMapModel mapHistoryFromDescriptor(string descriptor, int dim = 3)
-	{
-		string[]      frames  = descriptor.Split(new string[] {"\n|\n"}, StringSplitOptions.RemoveEmptyEntries);
-		TimedMapModel history = new TimedMapModel();
-
-		foreach (string frame in frames) {
-			string[] lines = frame.Split(new char[] {'\n'}, StringSplitOptions.RemoveEmptyEntries);
-			double time    = -1;
-
-			try {
-				time = double.Parse(lines[0]);
-			}
-			catch (FormatException) {
-				throw new FormatException("bad map format: missing time");
-			}
-
-			history.Add(Tuple.Create(time, mapFromDescriptor(lines.Submatrix(1, lines.Length - 1), dim)));
-		}
-
-		return history;
-	}
-
-	/// <summary>
-	/// Get a map model from a formatted string descriptor.
-	/// </summary>
-	/// <param name="lines">Formatted map descriptor as an array of lines.</param>
-	/// <param name="dim">Expected world dimension.</param>
-	/// <returns>The map model as a vector of gaussian components.</returns>
-	private static List<Gaussian> mapFromDescriptor(string[] lines, int dim = 3)
-	{
-		List<Gaussian> map = new List<Gaussian>();
-
-		for (int i = 0; i < lines.Length; i++) {
-			Gaussian component = ParseGaussianDescriptor(lines[i]);
-			map.Add(component);
-
-			if (component.Mean.Length != dim) {
-				throw new FormatException("wrong gaussian dimension");
-			}
-		}
-
-		return map;
-	}
-
-	/// <summary>
-	/// Get a measurement history from a formatted string descriptor.
-	/// </summary>
-	/// <param name="descriptor">Formatted measurement history descriptor through time.</param>
-	/// <param name="dim">Expected measurement dimension.</param>
-	/// <returns>The measurement history, list of vectors representing point measurements as a function of discrete time
-	/// (time is delivered as the first entry of each tuple).</returns>
-	private static TimedMeasurements measurementsFromDescriptor(string descriptor, int dim = 3)
-	{
-		string[]          frames  = descriptor.Split('\n');
-		TimedMeasurements history = new TimedMeasurements();
-
-		// measurements have one less data than everything else as they come
-		// in between frames; to simplify edge cases, add an "empty" measurement at the beggining
-		history.Add(Tuple.Create(0.0, new List<double[]>()));
-
-		foreach (string frame in frames) {
-			string[] parts = frame.Split(':');
-			double time    = -1;
-
-			if (parts.Length != 2) {
-				throw new FormatException("bad measurement format: no ':' delimiter found");
-			}
-
-			try {
-				time = double.Parse(parts[0]);
-			}
-			catch (FormatException) {
-				throw new FormatException("bad measurement format: missing time");
-			}
-
-			string[]       points       = parts[1].Split(';');
-			List<double[]> measurements = new List<double[]>();
-
-			foreach (string point in points) {
-				if (point == "") {
-					continue;
-				}
-
-				string[] strcomps   = point.Split(' ');
-				double[] components = new double[strcomps.Length];
-
-				if (components.Length != dim) {
-					throw new FormatException("wrong measurement dimension");
-				}
-
-				for (int i = 0; i < strcomps.Length; i++) {
-					try {
-						components[i] = double.Parse(strcomps[i]);
-					}
-					catch (FormatException) {
-						throw new FormatException("bad measurement format: invalid point");
-					}
-				}
-
-				measurements.Add(components);
-			}
-
-			history.Add(Tuple.Create(time, measurements));
-		}
-
-		return history;
+		Flip.Draw(SideBuffer2, sidedest, SideBuffer2.Bounds, Color.White);
+		
+		Flip.End();
 	}
 
 	/// <summary>
@@ -474,89 +375,6 @@ public class Viewer : Manipulator
 		}
 
 		return frames;
-	}
-
-	/// <summary>
-	/// Allow the viewer to run logic such as updating the world,
-	/// and gathering input.
-	/// </summary>
-	/// <param name="time">Provides a snapshot of timing values.</param>
-	/// <param name="keyboard">Current keyboard state information.</param>
-	/// <param name="prevkeyboard">Old keyboard state information. Used to get newly pressed keys.</param>
-	/// <param name="multiplier">Movement scale multiplier.</param>
-	protected override void Update(GameTime time, KeyboardState keyboard, KeyboardState prevkeyboard, double multiplier)
-	{
-		if (i >= Trajectory.Count) {
-			i  = Trajectory.Count - 1;
-			Paused = true;
-		}
-		else if (i < 0) {
-			i = 0;
-			Paused = true;
-		}
-
-		bool speedup = keyboard.IsKeyDown(Keys.LeftShift);
-
-		SideBuffer2            = SidebarHistory[i];
-		Explorer .WayPoints    = VehicleWaypoints;
-		Explorer .State        = Explorer.WayPoints[Explorer.WayPoints.Count - 1].Item2;
-		Navigator.BestMapModel = Map[mapindices[i]].Item2;
-		Navigator.BestEstimate.WayPoints = Estimate[i].Item2;
-
-		Explorer.MappedMeasurements.Clear();
-		foreach (double[] z in Measurements[mapindices[i]].Item2) {
-			Explorer.MappedMeasurements.Add(Explorer.MeasureToMap(z));
-		}
-
-		Message = string.Format("time = {0,12:N4}        frame = {1,5:N0}", Estimate[i].Item1, i);
-		
-		// frame-by-frame fine time lookup, reverse
-		if (keyboard.IsKeyDown(Keys.Q) && !prevkeyboard.IsKeyDown(Keys.Q)) {
-			i -= (speedup) ? 8 : 1;
-			Paused = true;
-		}
-		
-		// frame-by-frame, forward
-		if (keyboard.IsKeyDown(Keys.W) && !prevkeyboard.IsKeyDown(Keys.W)) {
-			i += (speedup) ? 8 : 1;
-			Paused = true;
-		}
-
-		// normal speed, reverse
-		if (keyboard.IsKeyDown(Keys.A)) {
-			i -= (speedup) ? 8 : 1;
-			Paused = true;
-		}
-
-		// normal speed, forward
-		if (keyboard.IsKeyDown(Keys.S)) {
-			Paused = false;
-		}
-
-		if (!Paused) {
-			i += (speedup) ? 8 : 1;
-		}
-	}
-	
-	/// <summary>
-	/// This is called when the viewer should draw itself.
-	/// </summary>
-	/// <param name="time">Provides a snapshot of timing values.</param>
-	protected override void Draw(GameTime time)
-	{
-		base.Draw(time);
-
-		// overwrite the sidebar
-		// TODO clean this up, shouldn't need to overwrite but instead use an unified interface.
-		//      the problem probably is that explorer shouldn't be in charge of rendering, only
-		//      providing the Texture2D and this should be overridable in the update method
-		Graphics.SetRenderTarget(null);
-		Flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
-		           DepthStencilState.Default, RasterizerState.CullNone);
-
-		Flip.Draw(SideBuffer2, sidedest, SideBuffer2.Bounds, Color.White);
-		
-		Flip.End();
 	}
 }
 }

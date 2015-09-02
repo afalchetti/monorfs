@@ -320,9 +320,16 @@ public abstract class Vehicle : IDisposable
 			this.WayPoints.Add(Tuple.Create(0.0, Util.SClone(that.state)));
 		}
 	}
-	
+
 	/// <summary>
-	/// Apply the motion model to the vehicle.
+	/// Apply the motion model to the vehicle. It corresponds to a
+	/// 3D odometry model following the equation:
+	/// 
+	/// x = x + q dx q* + N(0, Q)
+	/// o = dq o dq* + N(0, Q')
+	/// 
+	/// where q is the midrotation quaternion (halfway between the old and new orientations) and N(a, b) is a normal function
+	/// with mean 'a' and covariance matrix 'b'.
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <param name="dx">Moved distance from odometry in the local vertical movement-perpendicular direction since last timestep.</param>
@@ -331,7 +338,20 @@ public abstract class Vehicle : IDisposable
 	/// <param name="dyaw">Angle variation from odometry in the yaw coordinate since last timestep.</param>
 	/// <param name="dpitch">Angle variation from odometry in the pitch coordinate since last timestep.</param>
 	/// <param name="droll">Angle variation from odometry in the roll coordinate since last timestep.</param>
-	public abstract void Update(GameTime time, double dx, double dy, double dz, double dyaw, double dpitch, double droll);
+	public virtual void Update(GameTime time, double dx, double dy, double dz, double dyaw, double dpitch, double droll)
+	{
+		// note that the framework uses Yaw = Y, Pitch = X, Roll = Z => YXZ Tait-Bryan parametrization
+		// this is equivalent to a plane pointing upwards with its wings on the X direction
+		Quaternion dorientation   = Quaternion.CreateFromYawPitchRoll((float) dyaw, (float) dpitch, (float) droll);
+		Quaternion neworientation = Orientation * dorientation;
+		Quaternion midrotation    = Quaternion.Slerp(Orientation, neworientation, 0.5f);
+		Quaternion dlocation      = midrotation * new Quaternion((float) dx, (float) dy, (float) dz, 0) * Quaternion.Conjugate(midrotation);
+
+		Location    = new double[3] {X + dlocation.X, Y + dlocation.Y, Z + dlocation.Z};
+		Orientation = Quaternion.Normalize(neworientation);
+
+		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(State)));
+	}
 
 	/// <summary>
 	/// Obtain several measurements from the hidden state.
@@ -349,12 +369,25 @@ public abstract class Vehicle : IDisposable
 	}
 
 	/// <summary>
-	/// Transform a measurement vector in measurement space
-	/// into a map-space vector.
+	/// Transform a measurement vector in measurement space (pixel-range)
+	/// into a map-space vector  (x-y plane).
 	/// </summary>
-	/// <param name="measurement">Measurement in measurement space.</param>
-	/// <returns>Measurement iin map space.</returns>
-	public abstract double[] MeasureToMap(double[] measurement);
+	/// <param name="measurement">Measurement expressed as pixel-range.</param>
+	/// <returns>Measurement expressed in x-y plane.</returns>
+	public double[] MeasureToMap(double[] measurement)
+	{
+		double   px    = measurement[0];
+		double   py    = measurement[1];
+		double   range = measurement[2];
+
+		double   alpha = range / Math.Sqrt(VisionFocal * VisionFocal + px * px + py * py);
+		double[] diff  = new double[3] {alpha * px, alpha * py, alpha * VisionFocal};
+
+		Quaternion rotated = Orientation *
+		                     new Quaternion((float) diff[0], (float) diff[1], (float) diff[2], 0) * Quaternion.Conjugate(Orientation);
+
+		return new double[3] {X + rotated.X, Y + rotated.Y, Z + rotated.Z};
+	}
 
 	/// <summary>
 	/// Compute the difference between the state of two vehicles.
@@ -398,6 +431,10 @@ public abstract class Vehicle : IDisposable
 
 		foreach (double[] measure in MappedMeasurements) {
 			RenderMeasure(measure, camera);
+		}
+
+		foreach (double[] landmark in Landmarks) {
+			RenderLandmark(landmark, camera);
 		}
 	}
 
@@ -613,6 +650,37 @@ public abstract class Vehicle : IDisposable
 		vertices[1] = new double[] {measurement[0] + halflen, measurement[1] - halflen, measurement[2]};
 
 		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, true);
+	}
+
+	/// <summary>
+	/// Simple point landmark rendering.
+	/// </summary>
+	/// <param name="landmark">Point landmark position.</param>
+	/// <param name="camera">Camera 4d transform matrix.</param>
+	private void RenderLandmark(double[] landmark, double[][] camera)
+	{
+		const float halflen = 0.024f;
+
+		Color innercolor =  Color.LightGray;
+		Color outercolor =  Color.Black;
+
+		landmark = camera.TransformH(landmark);
+
+		VertexPositionColor[] invertices  = new VertexPositionColor[4];
+		double[][]            outvertices = new double[4][];
+
+		outvertices[0] = new double[] {landmark[0] - halflen, landmark[1] - halflen, landmark[2]};
+		outvertices[1] = new double[] {landmark[0] - halflen, landmark[1] + halflen, landmark[2]};
+		outvertices[2] = new double[] {landmark[0] + halflen, landmark[1] + halflen, landmark[2]};
+		outvertices[3] = new double[] {landmark[0] + halflen, landmark[1] - halflen, landmark[2]};
+
+		invertices[0] = new VertexPositionColor(outvertices[0].ToVector3(), innercolor);
+		invertices[1] = new VertexPositionColor(outvertices[1].ToVector3(), innercolor);
+		invertices[2] = new VertexPositionColor(outvertices[3].ToVector3(), innercolor);
+		invertices[3] = new VertexPositionColor(outvertices[2].ToVector3(), innercolor);
+
+		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
+		Graphics.DrawUser2DPolygon(outvertices, 0.02f, outercolor, true);
 	}
 
 	/// <summary>

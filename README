@@ -32,29 +32,36 @@ autonomous navigation in 3D space. It consists of several components:
 
 # Start analyzing a live RGBD stream with assumed odometry "movroom.in",
 # 200 particles and solving both mapping and localization
-monorfs -c=movroom.in -p=200
+monorfs -i=kinect -c=movroom.in -p=200
 
 # Same as above but saving the output to a specified record file
 # (default = "data.zip")
-monorfs -c=movroom.in -p=200 -r=output.zip
+monorfs -i=kinect -c=movroom.in -p=200 -r=output.zip
 
 # Start analyzing a recorded RGBD stream from file "room.oni" with assumed
 # odometry "movroom.in", 40 particles and perfect localization
-monorfs -f=room.oni -c=movroom.in -p=40 -y
+monorfs -i=kinect -f=room.oni -c=movroom.in -p=40 -y
 
 # Start a new simulation with a world description given in file "map.world",
 # movement commands in "moves.in" (odometry), with 20 particles and
 # assuming perfect localization (at startup, this can be changed later)
-monorfs -s -f=map.world -c=movements.in -p=20 -y
+monorfs -i=simulation -f=map.world -c=movements.in -p=20 -y
 
 # Similar to above but use isam2 SLAM algorithm
-monorfs -s -f=map.world -c=movements.in -a=isam2
+monorfs -i=simulation -f=map.world -c=movements.in -a=isam2
 
 # The same as the above, but in headless mode
-monorfs -s -f=map.world -c=movements.in -a=isam2 -x
+monorfs -i=simulation -f=map.world -c=movements.in -a=isam2 -x
 
 # Using a configuration file to change the algorithm's parameters
-monorfs -s -f=map.world -c=movements.in -p=200 -g=config.cfg
+monorfs -i=simulation -f=map.world -c=movements.in -p=200 -g=config.cfg
+
+# Use a prerecorded data file
+monorfs -i=record -f=data.zip -c=movements.in
 
 # Open a previous run with a Viewer
 monorfs -v -r=recording.zip
+
+# Use filtering mode in the viewer, i.e.
+# don't update past history
+monorfs -v -r=recording.zip -H=filter

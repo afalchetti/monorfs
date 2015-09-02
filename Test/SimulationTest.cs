@@ -64,7 +64,7 @@ class SimulationTest
 	[SetUp]
 	public void setup() {
 		try {
-			simulation = Simulation.FromFiles("test.world", "test.in", 1, false, true, false);
+			simulation = Simulation.FromFiles("test.world", "test.in", 1, VehicleType.Simulation, NavigationAlgorithm.PHD, false, false);
 			commands   = simulation.Commands;
 			explorer   = simulation.Explorer;
 			navigator  = simulation.Navigator as PHDNavigator;

@@ -190,22 +190,13 @@ public class SimulatedVehicle : Vehicle
 			return;
 		}
 
-		// note that the framework uses Yaw = Y, Pitch = X, Roll = Z => YXZ Tait-Bryan parametrization
-		// this is equivalent to a plane pointing upwards with its wings on the X direction
-		Quaternion dorientation   = Quaternion.CreateFromYawPitchRoll((float) dyaw, (float) dpitch, (float) droll);
-		Quaternion neworientation = Orientation * dorientation;
-		Quaternion midrotation    = Quaternion.Slerp(Orientation, neworientation, 0.5f);
-		Quaternion dlocation      = midrotation * new Quaternion((float) dx, (float) dy, (float) dz, 0) * Quaternion.Conjugate(midrotation);
+		base.Update(time, dx, dy, dz, dyaw, dpitch, droll);
 
-		Location    = new double[3] {X + dlocation.X, Y + dlocation.Y, Z + dlocation.Z};
-		Orientation = neworientation;
-
-		// Do a better noise (radial), though it seems to work just fine
 		State       = State.Add(time.ElapsedGameTime.TotalSeconds.Multiply(
-		                             U.RandomGaussianVector(new double[7] {0, 0, 0, 0, 0, 0, 0}, MotionCovarianceQ)));
+		                            U.RandomGaussianVector(new double[7] {0, 0, 0, 0, 0, 0, 0}, MotionCovarianceQ)));
 		Orientation = Quaternion.Normalize(Orientation);
 
-		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(State)));
+		WayPoints[WayPoints.Count - 1] = Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(State));
 	}
 	
 	/// <summary>
@@ -314,27 +305,6 @@ public class SimulatedVehicle : Vehicle
 	}
 
 	/// <summary>
-	/// Transform a measurement vector in measurement space (pixel-range)
-	/// into a map-space vector  (x-y plane).
-	/// </summary>
-	/// <param name="measurement">Measurement expressed as pixel-range.</param>
-	/// <returns>Measurement expressed in x-y plane.</returns>
-	public override double[] MeasureToMap(double[] measurement)
-	{
-		double   px    = measurement[0];
-		double   py    = measurement[1];
-		double   range = measurement[2];
-
-		double   alpha = range / Math.Sqrt(VisionFocal * VisionFocal + px * px + py * py);
-		double[] diff  = new double[3] {alpha * px, alpha * py, alpha * VisionFocal};
-
-		Quaternion rotated = Orientation *
-			                     new Quaternion((float) diff[0], (float) diff[1], (float) diff[2], 0) * Quaternion.Conjugate(Orientation);
-
-		return new double[3] {X + rotated.X, Y + rotated.Y, Z + rotated.Z};
-	}
-
-	/// <summary>
 	/// Obtain the jacobian of the measurement model.
 	/// Designed to be used with EKF filters.
 	/// </summary>
@@ -414,52 +384,6 @@ public class SimulatedVehicle : Vehicle
 	public double DetectionProbabilityM(double[] measurement)
 	{
 		return VisibleM(measurement) ? detectionProbability : 0;
-	}
-
-	/// <summary>
-	/// Render the vehicle on the graphics device.
-	/// The graphics device must be ready, otherwise
-	/// the method will throw an exception.
-	/// <param name="camera">Camera 4d transform matrix.</param>
-	/// </summary>
-	public override void Render(double[][] camera)
-	{
-		base.Render(camera);
-
-		foreach (double[] landmark in Landmarks) {
-			RenderLandmark(landmark, camera);
-		}
-	}
-
-	/// <summary>
-	/// Simple point landmark rendering.
-	/// </summary>
-	/// <param name="landmark">Point landmark position.</param>
-	/// <param name="camera">Camera 4d transform matrix.</param>
-	private void RenderLandmark(double[] landmark, double[][] camera)
-	{
-		const float halflen = 0.024f;
-		
-		Color innercolor =  Color.LightGray;
-		Color outercolor =  Color.Black;
-
-		landmark = camera.TransformH(landmark);
-		
-		VertexPositionColor[] invertices  = new VertexPositionColor[4];
-		double[][]            outvertices = new double[4][];
-
-		outvertices[0] = new double[] {landmark[0] - halflen, landmark[1] - halflen, landmark[2]};
-		outvertices[1] = new double[] {landmark[0] - halflen, landmark[1] + halflen, landmark[2]};
-		outvertices[2] = new double[] {landmark[0] + halflen, landmark[1] + halflen, landmark[2]};
-		outvertices[3] = new double[] {landmark[0] + halflen, landmark[1] - halflen, landmark[2]};
-
-		invertices[0] = new VertexPositionColor(outvertices[0].ToVector3(), innercolor);
-		invertices[1] = new VertexPositionColor(outvertices[1].ToVector3(), innercolor);
-		invertices[2] = new VertexPositionColor(outvertices[3].ToVector3(), innercolor);
-		invertices[3] = new VertexPositionColor(outvertices[2].ToVector3(), innercolor);
-
-		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
-		Graphics.DrawUser2DPolygon(outvertices, 0.02f, outercolor, true);
 	}
 }
 }

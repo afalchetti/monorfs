@@ -86,7 +86,7 @@ public class Program
 	/// </summary>
 	private static void ShowHelp(OptionSet options)
 	{
-		Console.WriteLine("Usage: monorfs ");
+		Console.WriteLine("MonoRFS");
 		Console.WriteLine("Showcase a Rao-Blackwellized PHD SLAM navigator.");
 		Console.WriteLine("If no options are specified a simulation of the full slam algorithm is run with one particle.");
 		Console.WriteLine();
@@ -108,13 +108,13 @@ public class Program
 		string configfile    = "";
 		int    particlecount = 1;
 		bool   onlymapping   = false;
-		bool   simulate      = false;
 		bool   realtime      = false;
 		bool   viewer        = false;
 		bool   filterhistory = false;
 		bool   headless      = false;
 		bool   showhelp      = false;
 
+		VehicleType         input     = VehicleType.Simulation;
 		NavigationAlgorithm algorithm = NavigationAlgorithm.PHD;
 
 		OptionSet options = new OptionSet {
@@ -122,10 +122,10 @@ public class Program
 			{ "r|recfile=",    "Recording file. Saves State and events for reviewing.",        r       => recfile       = r },
 			{ "c|command=",    "Auto-command file (simulates user input).",                    c       => commandfile   = c },
 			{ "g|config=",     "Configuration file. Contains global constants",                g       => configfile    = g },
-			{ "a|algorithm=",  "SLAM solver algorithm (phd or isam2)",                         a       => algorithm     = (a != "isam2") ? NavigationAlgorithm.PHD : NavigationAlgorithm.ISAM2 },
+			{ "a|algorithm=",  "SLAM solver algorithm (phd or isam2)",                         a       => algorithm     = (a == "isam2") ? NavigationAlgorithm.ISAM2 : NavigationAlgorithm.PHD },
 			{ "p|particles=",  "Number of particles used for the RB-PHD",                      (int p) => particlecount = p },
 			{ "y|onlymap",     "Only do mapping, assuming known localization.",                y       => onlymapping   = y != null },
-			{ "s|simulate",    "Generate an artificial simulation instead of using a sensor.", s       => simulate      = s != null },
+			{ "i|input=",      "Vehicle input stream: 'kinect', 'simulation' or 'record'",     i       => input         = (i == "kinect") ? VehicleType.Kinect : (i == "record") ? VehicleType.Record : VehicleType.Simulation },
 			{ "R|realtime",    "Process the system in realtime, instead of a fixed step.",     R       => realtime      = R != null },
 			{ "v|view",        "View a precorded session.",                                    v       => viewer        = v != null },
 			{ "H|history=",    "Trajectory history mode: either 'filter' or 'smooth'",         h       => filterhistory = (h == "filter") },
@@ -166,7 +166,7 @@ public class Program
 			}
 		}
 		else {
-			using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, onlymapping, simulate, realtime, algorithm)) {
+			using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, input, algorithm, onlymapping, realtime)) {
 				if (headless) {
 					sim.RunHeadless();
 				}
@@ -182,9 +182,22 @@ public class Program
 
 				// with artificial data, the scene file has useful information
 				// with real sensors it isn't that useful and it's way too heavy
-				if (simulate) {
+				if (input == VehicleType.Simulation) {
 					Console.WriteLine("  -- copying scene file");
 					File.Copy(scenefile, Path.Combine(output, "scene.world"));
+				}
+				else if (input == VehicleType.Record) {
+					Console.WriteLine("  -- copying scene file");
+
+					string innertmp  = Util.TemporaryDir();
+					string innerdata = Path.Combine(innertmp, "data");
+
+					ZipFile.ExtractToDirectory(scenefile, innerdata);
+
+					string innerscenefile = Path.Combine(innerdata, "scene.world");
+					File.Copy(innerscenefile, Path.Combine(output,  "scene.world"));
+
+					Directory.Delete(innertmp, true);
 				}
 
 				Console.WriteLine("  -- writing trajectory history");

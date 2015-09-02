@@ -35,6 +35,8 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 
+using FP = monorfs.FileParser;
+
 using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
 
@@ -44,6 +46,11 @@ namespace monorfs
 /// Navigation algorithm.
 /// </summary>
 public enum NavigationAlgorithm { PHD, ISAM2 }
+
+/// <summary>
+/// Vehicle input type.
+/// </summary>
+public enum VehicleType { Kinect, Simulation, Record }
 
 /// <summary>
 /// Interactive manipulator for a simulation of vehicle navigation through a landmark map.
@@ -205,33 +212,39 @@ public class Simulation : Manipulator
 	/// Can be null or empty (no automatic instructions).</param>
 	/// <param name="particlecount">Number of particles for the RB-PHD algorithm.
 	/// If only mapping is done, it's not used, but the mode can be changed at runtime.</param>
+	/// <param name="input">Vehicle input type, either a sensor or a simulation algorithm.</param>
+	/// <param name="algorithm">SLAM navigation algorithm.</param>
 	/// <param name="onlymapping">If true, no localization is executed and the robot's position
 	/// is assumed perfectly known.</param>
-	/// <param name="simulate">True means a full simulation is performed;
-	/// false uses real sensor data (real device or a recording from a file).</param>
 	/// <param name="realtime">If true, the system works at the highest speed it can;
 	/// otherwise, the framerate is fixed and even if processing takes longer than the timestep, the simulation works
 	/// as it had taken exactly the nominal rate.</param>
-	/// <param name="algorithm">SLAM navigation algorithm.</param>
 	/// <returns>Prepared simulation object.</returns>
 	public static Simulation FromFiles(string scenefile, string commandfile = "", int particlecount = 5,
-	                                   bool onlymapping = false, bool simulate = true, bool realtime = false,
-	                                   NavigationAlgorithm algorithm = NavigationAlgorithm.PHD)
+	                                   VehicleType input = VehicleType.Simulation,
+	                                   NavigationAlgorithm algorithm = NavigationAlgorithm.PHD,
+	                                   bool onlymapping = false, bool realtime = false)
 	{
 		Vehicle        explorer;
 		List<double[]> commands;
 		float[]        mapclip;
 
-		if (simulate) {
-			explorer = VehicleFromSimFile(File.ReadAllText(scenefile), out mapclip);
-		}
-		else {
-			explorer = VehicleFromSensor(scenefile, out mapclip);
+		switch (input) {
+		case VehicleType.Kinect:
+			explorer = FP.VehicleFromSensor(scenefile, out mapclip);
+			break;
+		case VehicleType.Record:
+			explorer = FP.VehicleFromRecord(scenefile, out mapclip);
+			break;
+		case VehicleType.Simulation:
+		default:
+			explorer = FP.VehicleFromSimFile(File.ReadAllText(scenefile), out mapclip);
+			break;
 		}
 
 		try {
 			if (!string.IsNullOrEmpty(commandfile)) {
-				commands =  commandsFromDescriptor(File.ReadAllLines(commandfile));
+				commands =  FP.CommandsFromDescriptor(File.ReadAllLines(commandfile));
 			}
 			else {
 				commands = new List<double[]>();
@@ -245,23 +258,6 @@ public class Simulation : Manipulator
 		string title = "monorfs - simulating " + scenefile + " [" + algorithm + "]";
 
 		return new Simulation(title, explorer, commands, particlecount, onlymapping, realtime, mapclip, algorithm);
-	}
-
-	/// <summary>
-	/// Create a command list from a descriptor string array.
-	/// </summary>
-	/// <param name="commandstr">Command descriptor array.</param>
-	/// <returns>Command list.</returns>
-	private static List<double[]> commandsFromDescriptor(string[] commandstr)
-	{
-		List<double[]> commands = new List<double[]>(commandstr.Length);
-
-		for (int i = 0; i < commandstr.Length; i++) {
-			commands.Add(ParseDoubleList(commandstr[i]));
-			// the item structure is {dlocx, dlocy, dlocz, dyaw, dpitch, droll}
-		}
-
-		return commands;
 	}
 
 	/// <summary>
