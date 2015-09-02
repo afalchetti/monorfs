@@ -82,6 +82,11 @@ public static class Config
 	public static double ExplorationThreshold = 1e-5;
 	public static bool   RenderAllParticles   = true;
 
+	public static double MotionCovarianceMultiplier      = 1.0;
+	public static double MeasurementCovarianceMultiplier = 1.0;
+	public static double NavigatorPD                     = DetectionProbability;
+	public static double NavigatorClutterDensity         = ClutterDensity;
+
 	// ISAM2Navigator
 	public static double MatchThreshold       = 3.0;
 	public static int    NewLandmarkThreshold = 3;

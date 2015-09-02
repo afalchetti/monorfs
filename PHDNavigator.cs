@@ -82,6 +82,26 @@ public class PHDNavigator : Navigator
 	public static double ExplorationThreshold { get { return Config.ExplorationThreshold; } }
 
 	/// <summary>
+	/// Overestimation of the real motion covariance by the navigator.
+	/// </summary>
+	public static double MotionCovarianceMultiplier { get { return Config.MotionCovarianceMultiplier; } }
+
+	/// <summary>
+	/// Overestimation of the real measurement covariance by the navigator.
+	/// </summary>
+	public static double MeasurementCovarianceMultiplier { get { return Config.MeasurementCovarianceMultiplier; } }
+
+	/// <summary>
+	/// Assumed probability of detection.
+	/// </summary>
+	public static double PD { get { return Config.NavigatorPD; } }
+
+	/// <summary>
+	/// Assumed clutter density.
+	/// </summary>
+	public static double ClutterDensity { get { return Config.NavigatorClutterDensity; } }
+
+	/// <summary>
 	/// Number of particles for the Montecarlo filter.
 	/// </summary>
 	public int ParticleCount { get; set; }
@@ -237,7 +257,10 @@ public class PHDNavigator : Navigator
 		toexplore        = new List<double[]>  [particlecount];
 
 		for (int i = 0; i < particlecount; i++) {
-			VehicleParticles[i] = new SimulatedVehicle(vehicle, 1.8, 1.8, 0.7, 5e-7);
+			VehicleParticles[i] = new SimulatedVehicle(vehicle,
+			                                           MotionCovarianceMultiplier,
+			                                           MeasurementCovarianceMultiplier,
+			                                           PD, ClutterDensity);
 			MapModels       [i] = new List<Gaussian>(model);
 			VehicleWeights  [i] = 1.0 / particlecount;
 			toexplore       [i] = new List<double[]>(explore);
