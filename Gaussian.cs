@@ -192,29 +192,29 @@ public class Gaussian
 		{
 			StringBuilder serialized = new StringBuilder();
 
-			serialized.Append(Weight.ToString("F6"));
+			serialized.Append(Weight.ToString("g6"));
 			serialized.Append(";");
 			
-			serialized.Append(Mean[0].ToString("F6"));
+			serialized.Append(Mean[0].ToString("g6"));
 
 			for (int i = 1; i < Mean.Length; i++) {
 				serialized.Append(" ");
-				serialized.Append(Mean[i].ToString("F6"));
+				serialized.Append(Mean[i].ToString("g6"));
 			}
 
 			serialized.Append(";");
 			
-			serialized.Append(Covariance[0][0].ToString("F6"));
+			serialized.Append(Covariance[0][0].ToString("g6"));
 			
 			for (int k = 1; k < Covariance[0].Length; k++) {
 				serialized.Append(" ");
-				serialized.Append(Covariance[0][k].ToString("F6"));
+				serialized.Append(Covariance[0][k].ToString("g6"));
 			}
 
 			for (int i = 1; i < Covariance   .Length; i++) {
 			for (int k = 0; k < Covariance[i].Length; k++) {
 				serialized.Append(" ");
-				serialized.Append(Covariance[i][k].ToString("F6"));
+				serialized.Append(Covariance[i][k].ToString("g6"));
 			}
 			}
 

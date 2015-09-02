@@ -120,7 +120,7 @@ public class Simulation : Manipulator
 	{
 		get
 		{
-			return string.Join("\n|\n", Navigator.WayTrajectories.ConvertAll(t => t.Item1.ToString("F6") + "\n" + 
+			return string.Join("\n|\n", Navigator.WayTrajectories.ConvertAll(t => t.Item1.ToString("g6") + "\n" + 
 			                                                                      Simulation.SerializeWayPoints(t.Item2)));
 		
 		}
@@ -133,7 +133,7 @@ public class Simulation : Manipulator
 	{
 		get
 		{
-			return string.Join("\n", WayMeasurements.ConvertAll(m => m.Item1.ToString("F6") + ":" + string.Join(";",
+			return string.Join("\n", WayMeasurements.ConvertAll(m => m.Item1.ToString("g6") + ":" + string.Join(";",
 			                                                         m.Item2.ConvertAll(x => string.Join(" ", x)))));
 		}
 	}
@@ -146,7 +146,7 @@ public class Simulation : Manipulator
 	{
 		get
 		{
-			return string.Join("\n|\n", Navigator.WayMaps.ConvertAll(m => m.Item1.ToString("F6") + "\n" + string.Join("\n",
+			return string.Join("\n|\n", Navigator.WayMaps.ConvertAll(m => m.Item1.ToString("g6") + "\n" + string.Join("\n",
 			                                                              m.Item2.ConvertAll(g => g.LinearSerialization))));
 		}
 	}
@@ -160,14 +160,14 @@ public class Simulation : Manipulator
 	{
 		return string.Join("\n", waypoints.ConvertAll(s => {double time = s.Item1;
 		                                                    double[] p = s.Item2;
-		                                                    return time.ToString("F6") + " " +
-		                                                           p[0].ToString("F6") + " " +
-		                                                           p[1].ToString("F6") + " " +
-		                                                           p[2].ToString("F6") + " " +
-		                                                           p[3].ToString("F6") + " " +
-		                                                           p[4].ToString("F6") + " " +
-		                                                           p[5].ToString("F6") + " " +
-		                                                           p[6].ToString("F6");}));
+		                                                    return time.ToString("g6") + " " +
+		                                                           p[0].ToString("g6") + " " +
+		                                                           p[1].ToString("g6") + " " +
+		                                                           p[2].ToString("g6") + " " +
+		                                                           p[3].ToString("g6") + " " +
+		                                                           p[4].ToString("g6") + " " +
+		                                                           p[5].ToString("g6") + " " +
+		                                                           p[6].ToString("g6");}));
 	}
 
 	/// <summary>

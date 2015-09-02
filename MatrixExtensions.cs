@@ -288,16 +288,5 @@ public static class MatrixExtensions
 	{
 		return matrix.ToMatrix().Determinant();
 	}
-	
-	/// <summary>
-	/// Calculate the inverse of a jagged matrix.
-	/// </summary>
-	/// <remarks>Jagged version of the Accord.Net function.</remarks>
-	/// <param name="matrix">Original matrix.</param>
-	/// <returns>Matrix inverse.</returns>
-	public static double[][] Inverse(this double[][] matrix)
-	{
-		return matrix.ToMatrix().Inverse().ToArray();
-	}
 }
 }

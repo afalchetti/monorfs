@@ -157,13 +157,13 @@ public class ISAM2Navigator : Navigator
 	/// Change the mode of the navigator to solving full slam.
 	/// Currently do nothing.
 	/// </summary>
-	public override void StartSlamInternal() {}
+	protected override void StartSlamInternal() {}
 
 	/// <summary>
 	/// Change the mode of the navigator to do only mapping.
 	/// Currently do nothing.
 	/// </summary>
-	public override void StartMappingInternal() {}
+	protected override void StartMappingInternal() {}
 
 	/// <summary>
 	/// Reset the map model to an empty map.

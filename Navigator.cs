@@ -55,7 +55,7 @@ public abstract class Navigator : IDisposable
 	/// Estimated trajectory history.
 	/// Accounts for the fact that estimates can retroactively change.
 	/// </summary>
-	public TimedTrajectory WayTrajectories { get; set; }
+	public TimedTrajectory WayTrajectories { get; protected set; }
 
 	/// <summary>
 	/// Most current estimated trajectory.
@@ -67,7 +67,7 @@ public abstract class Navigator : IDisposable
 	/// <summary>
 	/// Best map history.
 	/// </summary>
-	public TimedMapModel WayMaps { get; set; }
+	public TimedMapModel WayMaps { get; protected set; }
 
 	/// <summary>
 	/// Most accurate estimate of the current vehicle pose.
@@ -144,7 +144,7 @@ public abstract class Navigator : IDisposable
 	/// <summary>
 	/// Do any additional work needed to start the slam mode.
 	/// </summary>
-	public virtual void StartSlamInternal() {}
+	protected virtual void StartSlamInternal() {}
 
 	/// <summary>
 	/// Change the mode of the navigator to do only mapping.
@@ -162,7 +162,7 @@ public abstract class Navigator : IDisposable
 	/// <summary>
 	/// Do any additional work needed to start the mapping mode.
 	/// </summary>
-	public virtual void StartMappingInternal() {}
+	protected virtual void StartMappingInternal() {}
 
 	/// <summary>
 	/// Reset any information about the map to nothing.

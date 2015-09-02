@@ -214,7 +214,7 @@ public class PHDNavigator : Navigator
 	/// Change the mode of the navigator to solving full slam.
 	/// The unique particle currently in use will be multiplied into new localization particles.
 	/// </summary>
-	public override void StartSlamInternal()
+	protected override void StartSlamInternal()
 	{
 		CollapseParticles(ParticleCount);
 	}
@@ -224,7 +224,7 @@ public class PHDNavigator : Navigator
 	/// The vehicle pose resets to the correct location, but the map is inherited
 	/// from the previous best particle (maximum a posteriori).
 	/// </summary>
-	public override void StartMappingInternal()
+	protected override void StartMappingInternal()
 	{
 		CollapseParticles(1);
 	}
