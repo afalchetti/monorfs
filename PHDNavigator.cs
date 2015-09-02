@@ -102,6 +102,12 @@ public class PHDNavigator : Navigator
 	public static double ClutterDensity { get { return Config.NavigatorClutterDensity; } }
 
 	/// <summary>
+	/// If true every particle history is rendered onscreen;
+	/// otherwise, only the best particle is.
+	/// </summary>
+	public static bool RenderAllParticles { get { return Config.RenderAllParticles; } }
+
+	/// <summary>
 	/// Number of particles for the Montecarlo filter.
 	/// </summary>
 	public int ParticleCount { get; set; }
@@ -161,12 +167,6 @@ public class PHDNavigator : Navigator
 	/// Previous frame unexplored particles (delayed birth avoids spurious measurement super-certainty).
 	/// </summary>
 	private List<double[]>[] toexplore;
-
-	/// <summary>
-	/// If true every particle history is rendered onscreen;
-	/// otherwise, only the best particle is.
-	/// </summary>
-	public static bool RenderAllParticles { get { return Config.RenderAllParticles; } }
 
 	/// <summary>
 	/// Render output.
@@ -487,7 +487,7 @@ public class PHDNavigator : Navigator
 				random -= VehicleWeights[k];
 			}
 			
-			particles[i] = new SimulatedVehicle(VehicleParticles[k - 1], RenderAllParticles);
+			particles[i] = new SimulatedVehicle(VehicleParticles[k - 1], true);
 			models   [i] = new List<Gaussian>(MapModels[k - 1]);
 			weights  [i] = 1.0 / weights.Length;
 			random      += 1.0 / weights.Length;
