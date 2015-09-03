@@ -144,13 +144,17 @@ public abstract class Manipulator : Game
 	/// <summary>
 	/// Scene double buffer flipping destination rectangle.
 	/// </summary>
-	private Rectangle scenedest;
+	protected Rectangle SceneDest;
 
 	/// <summary>
 	/// Sidebar double buffer flipping destination rectangle.
 	/// </summary>
-	/// FIXME this should be private. It is protected only as a temporal workaround to the explorer renderside dissociation
-	protected Rectangle sidedest;
+	protected Rectangle SideDest;
+
+	/// <summary>
+	/// Screen ratio between scene and side targets, in [0, 1].
+	/// </summary>
+	protected double ScreenCut { get; set; }
 
 	/// <summary>
 	/// Camera ground angle.
@@ -223,6 +227,8 @@ public abstract class Manipulator : Game
 		graphicsManager.PreferMultiSampling       = true;
 		graphicsManager.IsFullScreen              = false;
 
+		ScreenCut = (Explorer.HasSidebar) ? 0.7 : 1.0;
+
 		FrameElapsed = new TimeSpan((long) (10000000/fps));
 		Message      = "";
 		messagepos   = new Vector2(350, graphicsManager.PreferredBackBufferHeight - 30);
@@ -239,7 +245,7 @@ public abstract class Manipulator : Game
 	/// <param name="height">Screen height.</param>
 	/// <param name="aspect">Target aspect ratio.</param>
 	/// <returns> Biggest centered rectangle.</returns>
-	private Rectangle clipCenter(int width, int height, float aspect)
+	private static Rectangle clipCenter(int width, int height, float aspect)
 	{
 		float rectheight = height;
 		float rectwidth  = rectheight * aspect;
@@ -277,23 +283,21 @@ public abstract class Manipulator : Game
 		effect.LightingEnabled    = false;
 		effect.VertexColorEnabled = true;
 
-		double screencut = (Explorer.HasSidebar) ? 0.7 : 1.0;
-
-		scenedest = clipCenter((int)(graphicsManager.PreferredBackBufferWidth * screencut),
+		SceneDest = clipCenter((int) (graphicsManager.PreferredBackBufferWidth * ScreenCut),
 		                       graphicsManager.PreferredBackBufferHeight - 40,
 		                       (MapClip[1] - MapClip[0]) / (MapClip[3] - MapClip[2]));
 
-		sidedest = clipCenter((int)(graphicsManager.PreferredBackBufferWidth * (1 - screencut)),
+		SideDest = clipCenter((int) (graphicsManager.PreferredBackBufferWidth * (1 - ScreenCut)),
 		                      graphicsManager.PreferredBackBufferHeight - 40,
 		                      (float) Explorer.SidebarWidth / Explorer.SidebarHeight);
 
-		sidedest.X += (int)(graphicsManager.PreferredBackBufferWidth * screencut);
+		SideDest.X += (int) (graphicsManager.PreferredBackBufferWidth * ScreenCut);
 		
-		SceneBuffer = new RenderTarget2D(Graphics, 2 * scenedest.Width, 2 * scenedest.Height,
+		SceneBuffer = new RenderTarget2D(Graphics, 2 * SceneDest.Width, 2 * SceneDest.Height,
 		                                 false, SurfaceFormat.Color, DepthFormat.Depth16,
 		                                 0, RenderTargetUsage.DiscardContents);
 
-		SideBuffer = new RenderTarget2D(Graphics, sidedest.Width, sidedest.Height,
+		SideBuffer = new RenderTarget2D(Graphics, SideDest.Width, SideDest.Height,
 		                                false, SurfaceFormat.Color, DepthFormat.Depth16,
 		                                0, RenderTargetUsage.DiscardContents);
 
@@ -451,8 +455,8 @@ public abstract class Manipulator : Game
 		Flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
 		           DepthStencilState.Default, RasterizerState.CullNone);
 
-		Flip.Draw(SceneBuffer, scenedest, SceneBuffer.Bounds, Color.White);
-		Flip.Draw(SideBuffer,  sidedest,  SideBuffer .Bounds, Color.White);
+		Flip.Draw(SceneBuffer, SceneDest, SceneBuffer.Bounds, Color.White);
+		Flip.Draw(SideBuffer,  SideDest,  SideBuffer .Bounds, Color.White);
 		Flip.DrawString(font, Message, messagepos, Color.White);
 		
 		Flip.End();
@@ -504,7 +508,7 @@ public abstract class Manipulator : Game
 			double[] proj = camera.TransformH(landmark);
 
 			Vector3  screen    = Vector3.Transform(new Vector3((float) proj[0], (float) proj[1], (float) proj[2]), effect.Projection);
-			Point    screenxy  = scenedest.Center + new Point((int)(screen.X * scenedest.Width / 2.0), -(int)(screen.Y * scenedest.Height / 2.0));
+			Point    screenxy  = SceneDest.Center + new Point((int)(screen.X * SceneDest.Width / 2.0), -(int)(screen.Y * SceneDest.Height / 2.0));
 			double[] diff      = new double[2] {mousepos.X - screenxy.X, mousepos.Y - screenxy.Y};
 			double   distance2 = diff.SquareEuclidean();
 

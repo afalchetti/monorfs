@@ -32,14 +32,14 @@ autonomous navigation in 3D space. It consists of several components:
 
 # Start analyzing a live RGBD stream with assumed odometry "movroom.in",
 # 200 particles and solving both mapping and localization
-monorfs -i=kinect -c=movroom.in -p=200
+monorfs -i=kinect -f=room.oni -c=movroom.in -p=200
 
 # Same as above but saving the output to a specified record file
 # (default = "data.zip")
-monorfs -i=kinect -c=movroom.in -p=200 -r=output.zip
+monorfs -i=kinect -f=room.oni -c=movroom.in -p=200 -r=output.zip
 
-# Start analyzing a recorded RGBD stream from file "room.oni" with assumed
-# odometry "movroom.in", 40 particles and perfect localization
+# Start analyzing a recorded RGBD stream from file "room.oni",
+# 40 particles and perfect localization
 monorfs -i=kinect -f=room.oni -c=movroom.in -p=40 -y
 
 # Start a new simulation with a world description given in file "map.world",

@@ -160,6 +160,11 @@ public class Viewer : Manipulator
 		// note that the sidebar video read has to wait until LoadContent to get an appropiate Graphics context
 		this.sidebarfile = sidebarfile;
 		IsFixedTimeStep  = true;
+
+		// override base class behavior (that is based on explorer HasSidebar)
+		if (!string.IsNullOrEmpty(sidebarfile)) {
+			ScreenCut = 0.7;
+		}
 	}
 
 	/// <summary>
@@ -236,6 +241,7 @@ public class Viewer : Manipulator
 
 		if (!string.IsNullOrEmpty(sidebarfile)) {
 			SidebarHistory = frameListFromAvi(sidebarfile);
+			SidebarHistory.Insert(0, nulltexture);
 
 			for (int i = SidebarHistory.Count; i < Trajectory.Count; i++) {
 				SidebarHistory.Add(nulltexture);
@@ -323,14 +329,11 @@ public class Viewer : Manipulator
 		base.Draw(time);
 
 		// overwrite the sidebar
-		// TODO clean this up, shouldn't need to overwrite but instead use an unified interface.
-		//      the problem probably is that explorer shouldn't be in charge of rendering, only
-		//      providing the Texture2D and this should be overridable in the update method
 		Graphics.SetRenderTarget(null);
 		Flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
 		           DepthStencilState.Default, RasterizerState.CullNone);
 
-		Flip.Draw(SideBuffer2, sidedest, SideBuffer2.Bounds, Color.White);
+		Flip.Draw(SideBuffer2, SideDest, SideBuffer2.Bounds, Color.White);
 		
 		Flip.End();
 	}

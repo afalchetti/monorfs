@@ -329,6 +329,10 @@ public abstract class Vehicle : IDisposable
 		this.MappedMeasurements = that.MappedMeasurements;
 		this.Landmarks          = that.Landmarks;
 
+		this.VisionFocal  = that.VisionFocal;
+		this.FilmArea     = that.FilmArea;
+		this.RangeClip    = that.RangeClip;
+
 		this.motionCovariance      = that.motionCovariance.MemberwiseClone();
 		this.MotionCovarianceQ     = that.MotionCovarianceQ.MemberwiseClone();
 		this.MeasurementCovariance = that.MeasurementCovariance.MemberwiseClone();
