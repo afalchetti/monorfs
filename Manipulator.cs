@@ -504,7 +504,7 @@ public abstract class Manipulator : Game
 		double[] closest    = null;
 		double   closedist2 = double.MaxValue;
 
-		foreach (double[] landmark in Explorer.Landmarks) {
+		foreach (double[] landmark in mousetargets()) {
 			double[] proj = camera.TransformH(landmark);
 
 			Vector3  screen    = Vector3.Transform(new Vector3((float) proj[0], (float) proj[1], (float) proj[2]), effect.Projection);
@@ -527,6 +527,28 @@ public abstract class Manipulator : Game
 		}
 		
 		return closest;
+	}
+
+	/// <summary>
+	/// Enumerate all candidate targets for mouse selection.
+	/// </summary>
+	private IEnumerable<double[]> mousetargets()
+	{
+		yield return Explorer.Location;
+
+		foreach (double[] landmark in Explorer.Landmarks) {
+			yield return landmark;
+		}
+
+		foreach (double[] measurement in Explorer.MappedMeasurements) {
+			yield return measurement;
+		}
+
+		foreach (Gaussian component in Navigator.BestMapModel) {
+			if (component.Weight > 0.8) {
+				yield return component.Mean;
+			}
+		}
 	}
 
 	/// <summary>
