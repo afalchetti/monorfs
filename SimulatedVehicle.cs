@@ -29,10 +29,10 @@
 using System;
 using System.Collections.Generic;
 
+using AForge;
 using Accord.Math;
 using Accord.Statistics.Distributions.Univariate;
 
-using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
 
 using U  = monorfs.Util;
@@ -96,7 +96,23 @@ public class SimulatedVehicle : Vehicle
 	/// <param name="axis">Orientation rotation axis.</param>
 	/// <param name="landmarks">Landmark 3d locations against which the measurements are performed.</param>
 	public SimulatedVehicle(double[] location, double theta, double[] axis, List<double[]> landmarks)
-		: base(location, theta, axis)
+		: this(location, theta, axis, landmarks, 575.8156,
+		       new Rectangle(-640 / 2, -480 / 2, 640, 480),
+		       new Range(0.1f, 10f)) {}
+
+	/// <summary>
+	/// Construct a new Vehicle object from its initial state.
+	/// </summary>
+	/// <param name="location">Spatial coordinates.</param>
+	/// <param name="theta">Orientation angle.</param>
+	/// <param name="axis">Orientation rotation axis.</param>
+	/// <param name="landmarks">Landmark 3d locations against which the measurements are performed.</param>
+	/// <param name="focal">Focal lenghth.</param>
+	/// <param name="film">Film area.</param>
+	/// <param name="clip">Range clipping area.</param>
+	public SimulatedVehicle(double[] location, double theta, double[] axis, List<double[]> landmarks,
+	                        double focal, Rectangle film, Range clip)
+		: base(location, theta, axis, focal, film, clip)
 	{
 		ClutterCount = ClutterDensity * FilmArea.Height * FilmArea.Width * RangeClip.Length;
 
@@ -123,7 +139,6 @@ public class SimulatedVehicle : Vehicle
 	public SimulatedVehicle(SimulatedVehicle that, bool copytrajectory = false)
 		: this((Vehicle) that, copytrajectory)
 	{
-		this.Landmarks            = that.Landmarks;
 		this.detectionProbability = that.detectionProbability;
 		this.ClutterDensity       = that.ClutterDensity;
 		this.ClutterCount         = that.ClutterCount;

@@ -108,7 +108,7 @@ public abstract class Vehicle : IDisposable
 	private double[] state;
 
 	/// <summary>
-	/// Get or set the internal state as a vector.
+	/// Internal state as a vector.
 	/// </summary>
 	public double[] State {
 		get { return state; }
@@ -116,7 +116,7 @@ public abstract class Vehicle : IDisposable
 	}
 
 	/// <summary>
-	/// Get or set the location x-axis coordinate.
+	/// Location x-axis coordinate.
 	/// </summary>
 	public double X
 	{
@@ -125,7 +125,7 @@ public abstract class Vehicle : IDisposable
 	}
 
 	/// <summary>
-	/// Get or set the location y-axis coordinate.
+	/// Location y-axis coordinate.
 	/// </summary>
 	public double Y
 	{
@@ -134,7 +134,7 @@ public abstract class Vehicle : IDisposable
 	}
 
 	/// <summary>
-	/// Get or set the location z-axis coordinate.
+	/// Location z-axis coordinate.
 	/// </summary>
 	public double Z
 	{
@@ -143,7 +143,7 @@ public abstract class Vehicle : IDisposable
 	}
 
 	/// <summary>
-	/// Get or set the space location of the vehicle, i.e. its coordinates.
+	/// Space location of the vehicle, i.e. its coordinates.
 	/// </summary>
 	public double[] Location
 	{
@@ -152,7 +152,7 @@ public abstract class Vehicle : IDisposable
 	}
 
 	/// <summary>
-	/// Get or set the rotation quaternion scalar component.
+	/// Rotation quaternion scalar component.
 	/// </summary>
 	public double W
 	{
@@ -161,7 +161,7 @@ public abstract class Vehicle : IDisposable
 	}
 
 	/// <summary>
-	/// Get or set the rotation quaternion vector component.
+	/// Rotation quaternion vector component.
 	/// </summary>
 	public double[] K
 	{
@@ -171,12 +171,32 @@ public abstract class Vehicle : IDisposable
 	
 
 	/// <summary>
-	/// Get or set the orientation of the vehicle.
+	/// Orientation of the vehicle.
 	/// </summary>
 	public Quaternion Orientation
 	{
 		get { return new Quaternion((float) State[4], (float) State[5], (float) State[6], (float) State[3]); }
 		set { State[3] = value.W; State[4] = value.X; State[5] = value.Y; State[6] = value.Z; }
+	}
+
+	/// <summary>
+	/// Angle in angle-axis representation.
+	/// </summary>
+	public double Angle
+	{
+		get { return 2 * Math.Acos(W); }
+	}
+
+	/// <summary>
+	/// Axis in angle-axis representation.
+	/// </summary>
+	public double[] Axis
+	{
+		get
+		{
+			double normalize = Math.Sqrt(1 - W * W);
+			return (normalize > 1e-8) ? K.Divide(normalize) : new double[3] {1, 0, 0};
+		}
 	}
 
 	/// <summary>
@@ -307,6 +327,7 @@ public abstract class Vehicle : IDisposable
 		this.SidebarWidth       = that.SidebarWidth;
 		this.SidebarHeight      = that.SidebarHeight;
 		this.MappedMeasurements = that.MappedMeasurements;
+		this.Landmarks          = that.Landmarks;
 
 		this.motionCovariance      = that.motionCovariance.MemberwiseClone();
 		this.MotionCovarianceQ     = that.MotionCovarianceQ.MemberwiseClone();

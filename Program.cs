@@ -167,6 +167,8 @@ public class Program
 		}
 		else {
 			using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, input, algorithm, onlymapping, realtime)) {
+				SimulatedVehicle initPose = new SimulatedVehicle(sim.Explorer);
+
 				if (headless) {
 					sim.RunHeadless();
 				}
@@ -181,24 +183,10 @@ public class Program
 				Console.WriteLine("writing output");
 
 				// with artificial data, the scene file has useful information
-				// with real sensors it isn't that useful and it's way too heavy
-				if (input == VehicleType.Simulation) {
-					Console.WriteLine("  -- copying scene file");
-					File.Copy(scenefile, Path.Combine(output, "scene.world"));
-				}
-				else if (input == VehicleType.Record) {
-					Console.WriteLine("  -- copying scene file");
-
-					string innertmp  = Util.TemporaryDir();
-					string innerdata = Path.Combine(innertmp, "data");
-
-					ZipFile.ExtractToDirectory(scenefile, innerdata);
-
-					string innerscenefile = Path.Combine(innerdata, "scene.world");
-					File.Copy(innerscenefile, Path.Combine(output,  "scene.world"));
-
-					Directory.Delete(innertmp, true);
-				}
+				// with real sensors only write pose and focal characteristics
+				Console.WriteLine("  -- writing scene file");
+				string scenedata = FileParser.VehicleToDescriptor(initPose);
+				File.WriteAllText(Path.Combine(output, "scene.world"), scenedata);
 
 				Console.WriteLine("  -- writing trajectory history");
 				File.WriteAllText(Path.Combine(output, "trajectory.out"),   sim.SerializedTrajectory);

@@ -31,7 +31,10 @@ using System.IO;
 using System.IO.Compression;
 using System.Collections.Generic;
 
+using AForge;
 using Accord.Math;
+
+using Microsoft.Xna.Framework;
 
 using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedTrajectory   = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<System.Tuple<double, double[]>>>>;
@@ -249,20 +252,23 @@ public static class FileParser
 	/// <summary>
 	/// Create a vehicle from a simulation file.
 	/// </summary>
-	/// <param name="scene">Scene descriptor text.</param>
-	/// <param name="mapclip">Secondary output; initial observable area.</param>
+	/// <param name="descriptor">Scene descriptor text.</param>
 	/// <returns>Simulated vehicle parsed from file.</returns>
-	public static SimulatedVehicle VehicleFromSimFile(string scene, out float[] mapclip)
+	public static SimulatedVehicle VehicleFromSimFile(string descriptor)
 	{
-		Dictionary<string, List<string>> dict = Util.ParseDictionary(scene);
+		Dictionary<string, List<string>> dict = Util.ParseDictionary(descriptor);
 
-		mapclip = ParseDoubleList(dict["world"][0]).ToSingle();
+		double[] vehiclepose = ParseDoubleList(dict["pose"][0]);
 
-		if (mapclip.Length != 4) {
-			throw new FormatException("The map clipping area must be specified by four elements: left, right, bottom, top");
+		double[] focaldata = null;
+
+		if (dict.ContainsKey("focal")) {
+			focaldata = ParseDoubleList(dict["focal"][0]);
+
+			if (focaldata.Length != 7) {
+				throw new FormatException("Focal description must have exactly seven arguments: focal distance, rangemin, rangemax, filmleft, filmtop, filmwidth, filmheight");
+			}
 		}
-
-		double[] vehiclepose = ParseDoubleList(dict["vehicle"][0]);
 
 		if (vehiclepose.Length != 7) {
 			throw new FormatException("Vehicle description must have exactly seven arguments: x, y, z (location), theta, ax, ay, az (rotation axis)");
@@ -285,16 +291,54 @@ public static class FileParser
 			maploc.Add(landmark);
 		}
 
-		return new SimulatedVehicle(location, angle, axis, maploc);
+		if (focaldata != null) {
+			double    focal = focaldata[0];
+			Range     clip  = new Range((float) focaldata[1], (float) focaldata[2]);
+			Rectangle film  = new Rectangle((int) focaldata[3], (int) focaldata[4], (int) focaldata[5], (int) focaldata[6]);
+
+			return new SimulatedVehicle(location, angle, axis, maploc, focal, film, clip);
+		}
+		else {
+			return new SimulatedVehicle(location, angle, axis, maploc);
+		}
+	}
+
+	/// <summary>
+	/// Create a vehicle descriptor string.
+	/// </summary>
+	/// <param name="vehicle">Vehicle to be .</param>
+	/// <returns>Simulated vehicle descriptor string.</returns>
+	public static string VehicleToDescriptor(Vehicle vehicle)
+	{
+		string descriptor = "";
+
+		descriptor += "pose\n\t"
+		            + string.Join(" ", vehicle.Location.Convert(x => x.ToString("g6"))) + " "
+		            + vehicle.Angle  .ToString("g6") + " "
+		            + string.Join(" ", vehicle.Axis.Convert(x => x.ToString("g6"))) + "\n";
+
+		descriptor += "focal\n\t"
+		            + vehicle.VisionFocal    .ToString("g6") + " "
+		            + vehicle.RangeClip.Min  .ToString("g6") + " "
+		            + vehicle.RangeClip.Max  .ToString("g6") + " "
+		            + vehicle.FilmArea.Left  .ToString("g6") + " "
+		            + vehicle.FilmArea.Top   .ToString("g6") + " "
+		            + vehicle.FilmArea.Width .ToString("g6") + " "
+		            + vehicle.FilmArea.Height.ToString("g6") + "\n";
+
+		descriptor += "landmarks\n\t" + string.Join("\n\t",
+		                                    vehicle.Landmarks.ConvertAll(l =>
+		                                        string.Join(" ", l.Convert(x => x.ToString("g6"))))) + "\n";
+
+		return descriptor;
 	}
 
 	/// <summary>
 	/// Create a vehicle from a record file.
 	/// </summary>
 	/// <param name="datafile">Vehicle descriptor file.</param>
-	/// <param name="mapclip">Secondary output; initial observable area.</param>
 	/// <returns>Prerecorded vehicle parsed from file.</returns>
-	public static RecordVehicle VehicleFromRecord(string datafile, out float[] mapclip)
+	public static RecordVehicle VehicleFromRecord(string datafile)
 	{
 		string tmpdir  = Util.TemporaryDir();
 		string datadir = Path.Combine(tmpdir, "data");
@@ -321,7 +365,7 @@ public static class FileParser
 		TimedState        trajectory;
 		TimedMeasurements measurements;
 
-		SimulatedVehicle template = VehicleFromSimFile(File.ReadAllText(scenefile), out mapclip);
+		SimulatedVehicle template = VehicleFromSimFile(File.ReadAllText(scenefile));
 
 		trajectory   = TrajectoryFromDescriptor  (File.ReadAllLines(trajectoryfile),  7);
 		measurements = MeasurementsFromDescriptor(File.ReadAllText(measurefile));
@@ -336,11 +380,9 @@ public static class FileParser
 	/// Create a vehicle from a real sensor device.
 	/// </summary>
 	/// <param name="sensor">Device (or recorded file) path.</param>
-	/// <param name="mapclip">Secondary output; initial observable area.</param>
 	/// <returns>Vehicle linked to sensor.</returns>
-	public static KinectVehicle VehicleFromSensor(string sensor, out float[] mapclip)
+	public static KinectVehicle VehicleFromSensor(string sensor)
 	{
-		mapclip = new float[4] {-6, 6, -3, 3};
 		return new KinectVehicle(sensor);
 	}
 

@@ -41,6 +41,7 @@ public static class Config
 	// Simulation
 	public static TimeSpan MeasureElapsed = new TimeSpan(10000000/30);
 	public static bool     UseOdometry    = true;
+	public static float[]  MapClip        = new float[4] {-6, 6, -3, 3};
 
 	// Vehicle
 	public static double[][] MotionCovariance = new double[6][] { new double[6] {5e-3, 0, 0, 0, 0, 0},

@@ -130,12 +130,11 @@ public class Viewer : Manipulator
 	/// <param name="map">Recorded maximum-a-posteriori estimate for the map.</param>
 	/// <param name="measurements">Recorded vehicle measurements.</param>
 	/// <param name="fps">Frame rate.</param>
-	/// <param name="mapclip">Initial observable area in the form [left, right, bottom, top]</param>
 	/// <param name="sidebarfile">Sidebar video filename.</param>
 	public Viewer(string title, SimulatedVehicle explorer, TimedState trajectory, TimedTrajectory estimate,
 	              TimedMapModel map, TimedMeasurements measurements,
-	              double fps, float[] mapclip, string sidebarfile)
-		: base(title, explorer, new PHDNavigator(explorer, 1, false), false, mapclip, fps)
+	              double fps, string sidebarfile)
+		: base(title, explorer, new PHDNavigator(explorer, 1, false), false, fps)
 	{
 		Trajectory   = trajectory;
 		Estimate     = estimate;
@@ -206,7 +205,6 @@ public class Viewer : Manipulator
 		TimedTrajectory   estimate;
 		TimedMapModel     map;
 		TimedMeasurements measurements;
-		float[]           mapclip;
 
 		trajectory   = FP.TrajectoryFromDescriptor       (File.ReadAllLines(vehiclefile),  7);
 		estimate     = FP.TrajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), 7, filterhistory);
@@ -220,14 +218,13 @@ public class Viewer : Manipulator
 		}
 
 		if (!string.IsNullOrEmpty(scenefile)) {
-			explorer = FP.VehicleFromSimFile(File.ReadAllText(scenefile), out mapclip);
+			explorer = FP.VehicleFromSimFile(File.ReadAllText(scenefile));
 		}
 		else {
 			explorer = new SimulatedVehicle(new double[3] {0, 0, 0}, 0, new double[3] {0, 0, 1}, new List<double[]>());
-			mapclip = new float[4] {-6, 6, -3, 3};
 		}
 
-		return new Viewer("monorfs - viewing " + datafile, explorer, trajectory, estimate, map, measurements, 30, mapclip, sidebarfile);
+		return new Viewer("monorfs - viewing " + datafile, explorer, trajectory, estimate, map, measurements, 30, sidebarfile);
 	}
 
 	/// <summary>

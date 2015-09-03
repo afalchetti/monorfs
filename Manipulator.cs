@@ -109,7 +109,7 @@ public abstract class Manipulator : Game
 	/// Map clipping area.
 	/// It is formatted as [left, right, bottom, top].
 	/// </summary>
-	public float[] MapClip { get; private set; }
+	public readonly float[] MapClip = Config.MapClip;
 
 	/// <summary>
 	/// Previous frame keyboard state.
@@ -204,16 +204,14 @@ public abstract class Manipulator : Game
 	/// <param name="explorer">Explorer vehicle.</param>
 	/// <param name="navigator">SLAM solver.</param>
 	/// <param name="realtime">Realtime data processing.</param>
-	/// <param name="mapclip">Map visible bounds.</param>
 	/// <param name="fps">Frame per seconds.</param>
-	protected Manipulator(string title, Vehicle explorer, Navigator navigator, bool realtime, float[] mapclip, double fps = 30)
+	protected Manipulator(string title, Vehicle explorer, Navigator navigator, bool realtime, double fps = 30)
 	{
 		Window.Title = title;
 
 		Explorer      = explorer;
 		Navigator     = navigator;
 		Realtime      = realtime;
-		MapClip       = mapclip;
 
 		graphicsManager = new GraphicsDeviceManager(this);
 

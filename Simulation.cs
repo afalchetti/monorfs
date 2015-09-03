@@ -183,16 +183,15 @@ public class Simulation : Manipulator
 	/// <param name="realtime">If true, the system works at the highest speed it can;
 	/// otherwise, the framerate is fixed and even if processing takes longer than the timestep, the simulation works
 	/// as it had taken exactly the nominal rate.</param>
-	/// <param name="mapclip">Initial observable area in the form [left, right, bottom, top]</param>
 	/// <param name="algorithm">SLAM navigation algorithm.</param>
 	public Simulation(string title, Vehicle explorer, List<double[]> commands, int particlecount,
-	                  bool onlymapping, bool realtime, float[] mapclip,
+	                  bool onlymapping, bool realtime,
 	                  NavigationAlgorithm algorithm)
 		: base(title, explorer,
 		       (algorithm == NavigationAlgorithm.PHD) ?
 		           (Navigator) new PHDNavigator(explorer, particlecount, onlymapping) :
 		           (Navigator) new ISAM2Navigator(explorer, onlymapping),
-		        realtime, mapclip)
+		        realtime)
 	{
 		Commands        = commands;
 		commandindex    = 0;
@@ -227,18 +226,17 @@ public class Simulation : Manipulator
 	{
 		Vehicle        explorer;
 		List<double[]> commands;
-		float[]        mapclip;
 
 		switch (input) {
 		case VehicleType.Kinect:
-			explorer = FP.VehicleFromSensor(scenefile, out mapclip);
+			explorer = FP.VehicleFromSensor(scenefile);
 			break;
 		case VehicleType.Record:
-			explorer = FP.VehicleFromRecord(scenefile, out mapclip);
+			explorer = FP.VehicleFromRecord(scenefile);
 			break;
 		case VehicleType.Simulation:
 		default:
-			explorer = FP.VehicleFromSimFile(File.ReadAllText(scenefile), out mapclip);
+			explorer = FP.VehicleFromSimFile(File.ReadAllText(scenefile));
 			break;
 		}
 
@@ -257,7 +255,7 @@ public class Simulation : Manipulator
 
 		string title = "monorfs - simulating " + scenefile + " [" + algorithm + "]";
 
-		return new Simulation(title, explorer, commands, particlecount, onlymapping, realtime, mapclip, algorithm);
+		return new Simulation(title, explorer, commands, particlecount, onlymapping, realtime, algorithm);
 	}
 
 	/// <summary>
