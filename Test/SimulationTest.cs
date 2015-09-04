@@ -33,7 +33,8 @@ using System.Linq;
 using Microsoft.Xna.Framework;
 using NUnit.Framework;
 
-using AE = monorfs.ArrayExtensions;
+using AE         = monorfs.ArrayExtensions;
+using TimedState = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 
 namespace monorfs.Test
 {
@@ -49,6 +50,8 @@ class SimulationTest
 	private GameTime       lastnavigationupdate;
 	private List<double[]> commands;
 	private int            commandindex;
+	private int            nparticles;
+	private Vehicle        initpose;
 
 	private readonly Action nop = () => {};
 
@@ -64,10 +67,12 @@ class SimulationTest
 	[SetUp]
 	public void setup() {
 		try {
-			simulation = Simulation.FromFiles("test.world", "test.in", 1, VehicleType.Simulation, NavigationAlgorithm.PHD, false, false);
+			nparticles = 20;
+			simulation = Simulation.FromFiles("map.world", "movroom.in", nparticles, VehicleType.Simulation, NavigationAlgorithm.PHD, false, false);
 			commands   = simulation.Commands;
 			explorer   = simulation.Explorer;
 			navigator  = simulation.Navigator as PHDNavigator;
+			initpose   = new SimulatedVehicle(simulation.Explorer);
 		}
 		catch (Exception) {
 			if (simulation != null) {
@@ -94,7 +99,8 @@ class SimulationTest
 	/// Simplified and instrumentalized mock update step to allow simulating
 	/// the simulation update step (the important part of the class).
 	/// </summary>
-	public void Update(GameTime time, Action updatehook, Action measurehook, Action slamhook)
+	public void Update(GameTime time, Action updatehook,
+	                   Action measurehook, Action slamhook)
 	{
 		double[] autocmd = commands[commandindex];
 		double   ds      = autocmd[0];
@@ -115,7 +121,7 @@ class SimulationTest
 		if (time.TotalGameTime - lastnavigationupdate.TotalGameTime >= Simulation.MeasureElapsed) {
 			List<double[]> measurements = explorer.Measure();
 			measurehook();
-			
+
 			navigator.SlamUpdate(time, measurements);
 			slamhook();
 
@@ -123,10 +129,11 @@ class SimulationTest
 		}
 	}
 
-	public void UpdateLoop(int loopcount, Action updatehook, Action measurehook, Action slamhook, Action iterwork)
+	public void UpdateLoop(int loopcount, Action updatehook, Action measurehook,
+	                       Action slamhook, Action iterwork)
 	{
 		GameTime time        = new GameTime(new TimeSpan(0), new TimeSpan(0));
-		lastnavigationupdate = new GameTime(new TimeSpan(0), new TimeSpan(0));
+		lastnavigationupdate = new GameTime(new TimeSpan(-1, 0, 0), TimeSpan.Zero);
 
 		for (int i = 0; i < loopcount; i++) {
 			Update(time, updatehook, measurehook, slamhook);
@@ -138,23 +145,75 @@ class SimulationTest
 	[Test]
 	public void perfectparticle()
 	{
-		UpdateLoop(300,
-		() =>
-		{
-			navigator.VehicleParticles[0].State = explorer.State;
-		},
-		nop, nop,
-		() =>
-		{
-			string message = "best particle: " + navigator.BestParticle + "\n" +
-			                 "real vehicle:  " + string.Join(", ", Array.ConvertAll(explorer.State,                                           s => s.ToString("F2"))) + "\n" +
-			                 "best estimate: " + string.Join(", ", Array.ConvertAll(navigator.VehicleParticles[navigator.BestParticle].State, s => s.ToString("F2"))) + "\n" +
-			                 "real weight:   " + navigator.VehicleWeights[0] + "\n" +
-			                 "best weight:   " + navigator.VehicleWeights[navigator.BestParticle] + "\n";
+		// the "perfect particle" (the real vehicle) should be very
+		// likely (although not exactly perfect)
+		int iterations = 20;
+		int success    = 0;
 
-			Assert.AreEqual(0, navigator.BestParticle, message);
-			Assert.IsTrue(explorer.State.SequenceEqual(navigator.VehicleParticles[navigator.BestParticle].State)/*, message*/);
-		});
+		for (int h = 0; h < iterations; h++) {
+			List<Gaussian> goodmapmodel = new List<Gaussian>();
+			int nloops = 80;
+			int iperfect = 0;
+			int[] nbest = new int[nparticles];
+			bool missed = false;
+
+			explorer = new SimulatedVehicle(initpose);
+			navigator = new PHDNavigator(explorer, nparticles, false);
+
+			UpdateLoop(nloops,
+			updatehook: () =>
+			{
+				navigator.VehicleParticles[iperfect].State     = explorer.State;
+				navigator.VehicleParticles[iperfect].WayPoints = new TimedState(explorer.WayPoints);
+				navigator.MapModels[iperfect]                  = goodmapmodel;
+			},
+			measurehook: nop,
+			slamhook: () =>
+			{
+				bool found = false;
+				for (int i = 0; i < nparticles; i++) {
+					if (navigator.VehicleParticles[i].State.SequenceEqual(explorer.State)) {
+						goodmapmodel = navigator.MapModels[i];
+						found        = true;
+						break;
+					}
+				}
+				
+				// if not found it was removed in the resampling stage;
+				// this should not happen too often.
+				// An exact approach would be to hook in the middle of the SlamUpdate()
+				// call, before resampling, to remember the correct model, but that is too invasive;
+				// for testing, just give up after the particle is lost and analyze the previous history
+				if (!found) {
+					missed = true;
+				}
+				
+				if (!missed) {
+					nbest[navigator.BestParticle]++;
+				}
+			},
+			iterwork: nop);
+
+			// find out how many rounds was it able to make before the particle got lost
+			int rounds = 0;
+			for (int i = 0; i < nparticles; i++) {
+				rounds += nbest[i];
+			}
+
+			Console.WriteLine("rounds = " + rounds);
+
+			bool perfectwins = true;
+			for (int i = 0; i < nparticles; i++) {
+				if (nbest[iperfect] < nbest[i]) {
+					perfectwins = false;
+				}
+			}
+
+			success += perfectwins ? 1 : 0;
+		}
+
+		Console.WriteLine("success rate: " + (double) success / iterations);
+		Assert.Greater((double) success / iterations, 0.5);
 	}
 
 	[Test]
@@ -182,11 +241,13 @@ class SimulationTest
 			navigator.VehicleParticles[4] = particles[4];
 			navigator.VehicleWeights  [0] = 0.11;
 			navigator.VehicleWeights  [1] = 0.28;
-			navigator.VehicleWeights  [2] = 0.3;
+			navigator.VehicleWeights  [2] = 0.31;
 			navigator.VehicleWeights  [3] = 0.01;
-			navigator.VehicleWeights  [4] = 0.3;
+			navigator.VehicleWeights  [4] = 0.29;
 			
 			navigator.ResampleParticles();
+
+			Assert.IsTrue(particles[2].State.SequenceEqual(navigator.BestEstimate.State));
 
 			// these three have probabilities higher than 0.2 so they must always be in the resampled particles
 			Assert.IsTrue(navigator.VehicleParticles.Any(x => particles[1].State.SequenceEqual(x.State)));

@@ -314,7 +314,8 @@ public class PHDNavigator : Navigator
 
 			// debug: force the correct particle into the mix (it should always win)
 			// or use a really close match (it too should win)
-			//VehicleParticles[0].State = RefVehicle.State;
+			//VehicleParticles[0].State = (double[]) RefVehicle.State.Clone();
+			//VehicleParticles[0].WayPoints = new TimedState(RefVehicle.WayPoints);
 			//VehicleParticles[0].X += 0.0001;
 		}
 
@@ -331,7 +332,7 @@ public class PHDNavigator : Navigator
 	public override void SlamUpdate(GameTime time, List<double[]> measurements)
 	{
 		// map update
-		Parallel.For (0, VehicleParticles.Length, i => {
+		System.Threading.Tasks.Parallel.For (0, VehicleParticles.Length, i => {
 			List<Gaussian> predicted, corrected;
 
 			predicted = PredictConditional(measurements, VehicleParticles[i], MapModels[i], toexplore[i]);
@@ -354,6 +355,16 @@ public class PHDNavigator : Navigator
 			}
 
 			VehicleWeights = VehicleWeights.Divide(sum);
+			double maxweight = 0;
+
+			int prev = BestParticle;
+
+			for (int i = 0; i < VehicleWeights.Length; i++) {
+				if (VehicleWeights[i] > maxweight) {
+					maxweight    = VehicleWeights[i];
+					BestParticle = i;
+				}
+			}
 
 			if (ParticleDepleted()) {
 				ResampleParticles();
@@ -492,11 +503,17 @@ public class PHDNavigator : Navigator
 			weights  [i] = 1.0 / weights.Length;
 			random      += 1.0 / weights.Length;
 
-			if (weights[i] > maxweight) {
-				maxweight = weights[i];
+			if (VehicleWeights[k - 1] > maxweight) {
+				maxweight = VehicleWeights[k - 1];
 				BestParticle = i;
 			}
 		}
+
+		// debug: force the first particle to remain there
+		// use with "make the first particle the real particle" on Update()
+		// to also carry its map model
+		//particles[0] = VehicleParticles[0];
+		//models[0]    = MapModels[0];
 
 		VehicleParticles = particles;
 		VehicleWeights   = weights;
