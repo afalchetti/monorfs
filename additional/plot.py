@@ -50,14 +50,12 @@ def readscene(descriptor):
 	descriptor = normalizelinefeeds(descriptor)
 	dictionary = parsedict(descriptor)
 	
-	vehicle    = tuple(float(n) for n in dictionary["vehicle"][0].split())
-	world      = tuple(float(n) for n in dictionary["world"][0].split())
+	vehicle    = tuple(float(n) for n in dictionary["pose"][0].split())
 	landmarks  = [np.array(tuple(float(n) for n in line.split())) for line in dictionary["landmarks"]]
 	
 	return {"vehicle": {"pos": np.array((vehicle[0], vehicle[1], vehicle[2])),
 	                    "theta": vehicle[3],
 	                    "axis": np.array((vehicle[4], vehicle[5], vehicle[6]))},
-	        "worldclip": {"left": world[0], "right": world[1], "top": world[2], "bottom": world[3]},
 	        "map": landmarks}
 
 def readtrajectory(descriptor):
@@ -152,6 +150,9 @@ def mapdistance(a, b, c, p):
 		temp = a
 		a    = b
 		b    = temp
+
+	if len(a) == 0:
+		return c**p
 	
 	distances = [[landmarkdistance(ai, bk, c)**p for ai in a] + [c**p for i in xrange(len(b) - len(a))] for bk in b]
 	indices   = munkres.Munkres().compute(distances)
