@@ -151,7 +151,7 @@ public class SimulatedVehicle : Vehicle
 	/// <param name="that">Copied general vehicle.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
 	public SimulatedVehicle(Vehicle that, bool copytrajectory = false)
-		: base(that, copytrajectory) {}
+		: this(that, 1, 1, Config.DetectionProbability, Config.ClutterDensity, copytrajectory) {}
 
 	/// <summary>
 	/// Perform a deep copy of another general vehicle,
@@ -164,7 +164,7 @@ public class SimulatedVehicle : Vehicle
 	/// <param name="clutter">Clutter density.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
 	public SimulatedVehicle(Vehicle that, double motioncovmultiplier, double measurecovmultiplier, double pdetection, double clutter, bool copytrajectory = false)
-	           : this(that, copytrajectory)
+		: base(that, copytrajectory)
 	{
 		this.detectionProbability = pdetection;
 		this.ClutterDensity       = clutter;
