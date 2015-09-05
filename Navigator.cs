@@ -47,6 +47,12 @@ namespace monorfs
 public abstract class Navigator : IDisposable
 {
 	/// <summary>
+	/// If true, the component rendering distinguishes between visible/nonvisible
+	/// instead of their weight.
+	/// </summary>
+	public bool ShowVisible { get { return Config.ShowVisible; } }
+
+	/// <summary>
 	/// Reference vehicle. Only used if mapping mode is enabled (no localization).
 	/// </summary>
 	public Vehicle RefVehicle { get; private set; }
@@ -290,6 +296,11 @@ public abstract class Navigator : IDisposable
 			outcolor = Color.Red;
 		}
 
+		if (ShowVisible) {
+			outcolor = (BestEstimate.Visible(gaussian.Mean)) ? Color.Blue : Color.Red;
+		}
+
+		double[]   camloc     = camera.TransformH(gaussian.Mean);
 		double[][] camrot     = camera.Submatrix(0, 2, 0, 2);
 		double[][] covariance = camrot.Multiply(gaussian.Covariance).MultiplyByTranspose(camrot).Submatrix(0, 1, 0, 1);
 
@@ -312,7 +323,7 @@ public abstract class Navigator : IDisposable
 
 		for (int i = 0; i < points.Length; i++) {
 			points  [i]  = linear.Multiply(pinterval[i]);
-			points  [i]  = new double[3] {points[i][0], points[i][1], 0}.Add(camera.TransformH(gaussian.Mean));
+			points  [i]  = new double[3] {points[i][0], points[i][1], 0}.Add(camloc);
 			vertices[i]  = new VertexPositionColor(points[i].ToVector3(), incolor);
 		}
 

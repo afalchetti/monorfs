@@ -306,6 +306,7 @@ public class PHDNavigator : Navigator
 	{
 		if (OnlyMapping) {
 			VehicleParticles[0].State = RefVehicle.State;
+			VehicleParticles[0].WayPoints = new TimedState(RefVehicle.WayPoints);
 		}
 		else {
 			for (int i = 0; i < VehicleParticles.Length; i++) {
@@ -314,7 +315,7 @@ public class PHDNavigator : Navigator
 
 			// debug: force the correct particle into the mix (it should always win)
 			// or use a really close match (it too should win)
-			//VehicleParticles[0].State = (double[]) RefVehicle.State.Clone();
+			//VehicleParticles[0].State = RefVehicle.State;
 			//VehicleParticles[0].WayPoints = new TimedState(RefVehicle.WayPoints);
 			//VehicleParticles[0].X += 0.0001;
 		}

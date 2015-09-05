@@ -41,7 +41,7 @@ using ME = monorfs.MatrixExtensions;
 namespace monorfs
 {
 /// <summary>
-/// Vehicle model.
+/// Simulation vehicle model.
 /// It uses a 3d odometry motion model (yaw-pitch-roll) and
 /// a pixel-range measurement model.
 /// </summary>
@@ -352,17 +352,7 @@ public class SimulatedVehicle : Vehicle
 	/// <returns>True if the landmark is visible; false otherwise.</returns>
 	public bool Visible(double[] landmark)
 	{
-		double[]   diff  = landmark.Subtract(Location);
-		Quaternion local = Quaternion.Conjugate(Orientation) *
-			                    new Quaternion((float) diff[0], (float) diff[1], (float) diff[2], 0) * Orientation;
-
-		double px   = VisionFocal * local.X / local.Z;
-		double py   = VisionFocal * local.Y / local.Z;
-
-		double range2 = local.LengthSquared();
-
-		return local.Z > 0 && RangeClip.Min * RangeClip.Min < range2 && range2 < RangeClip.Max * RangeClip.Max &&
-		       FilmArea.Left < px && px < FilmArea.Right && FilmArea.Top < py && py < FilmArea.Bottom;
+		return VisibleM(MeasurePerfect(landmark));
 	}
 
 	/// <summary>

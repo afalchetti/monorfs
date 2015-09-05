@@ -40,8 +40,8 @@ public static class Config
 {
 	// Simulation
 	public static TimeSpan MeasureElapsed = new TimeSpan(10000000/30);
-	public static bool     UseOdometry    = true;
 	public static float[]  MapClip        = new float[4] {-6, 6, -3, 3};
+	public static bool     UseOdometry    = true;
 
 	// Vehicle
 	public static double[][] MotionCovariance = new double[6][] { new double[6] {5e-3, 0, 0, 0, 0, 0},
@@ -70,6 +70,9 @@ public static class Config
 
 	// KinectVehicle
 	public static int KinectDelta = 8;
+
+	// Navigator
+	public static bool ShowVisible = true;
 
 	// PHDNavigator
 	public static double[][] BirthCovariance = new double[3][] { new double[3] {1e-3, 0, 0},
