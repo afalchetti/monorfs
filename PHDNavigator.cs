@@ -257,10 +257,9 @@ public class PHDNavigator : Navigator
 		toexplore        = new List<double[]>  [particlecount];
 
 		for (int i = 0; i < particlecount; i++) {
-			VehicleParticles[i] = new SimulatedVehicle(vehicle,
-			                                           MotionCovarianceMultiplier,
-			                                           MeasurementCovarianceMultiplier,
-			                                           PD, ClutterDensity);
+			VehicleParticles[i] = RefVehicle.TrackClone(MotionCovarianceMultiplier,
+			                                            MeasurementCovarianceMultiplier,
+			                                            PD, ClutterDensity);
 			MapModels       [i] = new List<Gaussian>(model);
 			VehicleWeights  [i] = 1.0 / particlecount;
 			toexplore       [i] = new List<double[]>(explore);
@@ -499,7 +498,7 @@ public class PHDNavigator : Navigator
 				random -= VehicleWeights[k];
 			}
 			
-			particles[i] = new SimulatedVehicle(VehicleParticles[k - 1], true);
+			particles[i] = RefVehicle.TrackClone(VehicleParticles[k - 1], true);
 			models   [i] = new List<Gaussian>(MapModels[k - 1]);
 			weights  [i] = 1.0 / weights.Length;
 			random      += 1.0 / weights.Length;

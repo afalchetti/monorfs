@@ -347,6 +347,43 @@ public abstract class Vehicle : IDisposable
 	}
 
 	/// <summary>
+	/// Clone a vehicle with an associated simulation particle.
+	/// Polymorphism on the return value is allowed and encouraged
+	/// to provide specific traits for particular reference vehicle.
+	/// Assume default cloning parameters.
+	/// </summary>
+	/// <param name="vehicle">Vehicle to clone.</param>
+	/// <param name="copytrajectory">If true, copy the whole trajectory history.</param>
+	/// <returns>The clone.</returns>
+	public virtual SimulatedVehicle TrackClone(SimulatedVehicle vehicle,
+	                                           bool             copytrajectory = false)
+	{
+		return new SimulatedVehicle(vehicle, copytrajectory);
+	}
+
+	/// <summary>
+	/// Clone a vehicle with an associated simulation particle.
+	/// Polymorphism on the return value is allowed and encouraged
+	/// to provide specific traits for particular reference vehicle.
+	/// Specify all cloning parameters.
+	/// </summary>
+	/// <param name="motioncovmultiplier">Motion covariance multiplier.</param>
+	/// <param name="measurecovmultiplier">Measurement covariance multiplier.</param>
+	/// <param name="pdetection">Detection probability.</param>
+	/// <param name="clutter">Clutter density.</param>
+	/// <param name="copytrajectory">If true, copy the whole trajectory history.</param>
+	/// <returns>The clone.</returns>
+	public virtual SimulatedVehicle TrackClone(double  motioncovmultiplier,
+	                                           double  measurecovmultiplier,
+	                                           double  pdetection,
+	                                           double  clutter,
+	                                           bool    copytrajectory = false)
+	{
+		return new SimulatedVehicle(this, motioncovmultiplier, measurecovmultiplier,
+		                            pdetection, clutter, copytrajectory);
+	}
+
+	/// <summary>
 	/// Apply the motion model to the vehicle. It corresponds to a
 	/// 3D odometry model following the equation:
 	/// 
