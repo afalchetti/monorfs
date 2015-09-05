@@ -340,7 +340,7 @@ public class KinectVehicle : Vehicle
 			colorframe = ColorFrameToArray(frameref);
 		}
 
-		interest = ExtractKeypoints(colorframe, depthframe, (int) resx, (int) resy, 50, 25);
+		interest = ExtractKeypoints(colorframe, depthframe, (int) ResX, (int) ResY, 100);
 	}
 
 	/// <summary>
@@ -490,38 +490,33 @@ public class KinectVehicle : Vehicle
 	}
 
 	/// <summary>
-	/// Extract keypoints from an image using the FAST methodology.
+	/// Extract keypoints from an image using the FREAK methodology.
 	/// </summary>
 	/// <param name="image">Input color image.</param>
 	/// <param name="depth">Input depth map.</param>
 	/// <param name="width">Input image width.</param>
 	/// <param name="height">Input image height.</param>
 	/// <param name="threshold">Selection threshold value. Higher gives less keypoints.</param>
-	/// <param name="maxcount">Maximum number of interest points. The highest scored keypoints are chosen.</param>
 	/// <returns>List of keypoints in measurement space.</returns>
-	private static List<SparseItem> ExtractKeypoints(Color[] image, float[][] depth, int width, int height, int threshold = 20, int maxcount = int.MaxValue)
+	private static List<SparseItem> ExtractKeypoints(Color[] image, float[][] depth, int width, int height, int threshold = 20)
 	{
-		var detector = new FastCornersDetector(threshold);
-		int topcount = maxcount; // this is the end index; it may grow if invalid items are found
+		var detector = new FastRetinaKeypointDetector(threshold);
 		int border   = Math.Min(50, (int) (width * 0.05));
 		List<SparseItem> keypoints = new List<SparseItem>();
 
+		detector.ComputeDescriptors = FastRetinaKeypointDescriptorType.None;
+
 		using (UnmanagedImage bitmap = ColorMatrixToImage(image, width, height)) {
-			IntPoint[] features  = detector.ProcessImage(bitmap).ToArray();
+			FastRetinaKeypoint[] features  = detector.ProcessImage(bitmap).ToArray();
 
-			Array.Sort(detector.Scores, features, new ReverseComparer());
-
-			for (int i = 0; i < features.Length && i < topcount; i++) {
-				IntPoint point = features[i];
+			for (int i = 0; i < features.Length; i++) {
+				FastRetinaKeypoint point = features[i];
 
 				int x = (int) point.X;
 				int y = (int) point.Y;
 
 				if (x >= border && x < bitmap.Width - border && y >= border && y < bitmap.Height - border && depth[x][y] != 0) {
 					keypoints.Add(new SparseItem(x, y, depth[x][y]));
-				}
-				else {
-					topcount++;
 				}
 			}
 		}
