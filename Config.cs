@@ -81,7 +81,7 @@ public static class Config
 	public static double BirthWeight          = 0.05;
 	public static double MinWeight            = 1e-2;
 	public static double MinEffectiveParticle = 0.3;
-	public static int    MaxQuantity          = 100;
+	public static int    MaxQuantity          = 500;
 	public static double MergeThreshold       = 3e0;
 	public static double ExplorationThreshold = 1e-5;
 	public static bool   RenderAllParticles   = true;

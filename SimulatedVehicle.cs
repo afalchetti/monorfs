@@ -361,7 +361,7 @@ public class SimulatedVehicle : Vehicle
 	/// </summary>
 	/// <param name="measurement">Queried landmark in pixel-range coordinates.</param>
 	/// <returns>True if the landmark is visible; false otherwise.</returns>
-	public bool VisibleM(double[] measurement)
+	public virtual bool VisibleM(double[] measurement)
 	{
 		return FilmArea.Left < measurement[0] && measurement[0] < FilmArea.Right &&
 		       FilmArea.Top  < measurement[1] && measurement[1] < FilmArea.Bottom &&

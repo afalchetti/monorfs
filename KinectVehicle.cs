@@ -88,12 +88,22 @@ public class KinectVehicle : Vehicle
 	/// <summary>
 	/// Device resolution on the X-axis, properly scaled.
 	/// </summary>
-	private float resx;
+	public float ResX { get; private set; }
 
 	/// <summary>
 	/// Device resolution on the Y-axis, properly scaled.
 	/// </summary>
-	private float resy;
+	public float ResY { get; private set; }
+
+	/// <summary>
+	/// Last measurement's depth frame.
+	/// </summary>
+	public float[][] DepthFrame;
+
+	/// <summary>
+	/// Last measurement's color frame.
+	/// </summary>
+	public Color[] ColorFrame;
 
 	/// <summary>
 	/// X coordinate depth->world coefficient.
@@ -193,6 +203,9 @@ public class KinectVehicle : Vehicle
 			
 			depth = device.CreateVideoStream(Device.SensorType.Depth);
 			color = device.CreateVideoStream(Device.SensorType.Color);
+
+			DepthFrame = new float[0][];
+			ColorFrame = new Color[0];
 			
 			depthcache   = new Queue<float[][]>();
 			colorcache   = new Queue<Color[]>();
@@ -215,8 +228,8 @@ public class KinectVehicle : Vehicle
 			SidebarWidth  = (int) (depth.VideoMode.Resolution.Width  / Delta);
 			SidebarHeight = (int) (depth.VideoMode.Resolution.Height / Delta) * 2;
 
-			resx    = depth.VideoMode.Resolution.Width  / Delta;
-			resy    = depth.VideoMode.Resolution.Height / Delta;
+			ResX    = depth.VideoMode.Resolution.Width  / Delta;
+			ResY    = depth.VideoMode.Resolution.Height / Delta;
 			xzalpha = 2 * (float) Math.Tan(depth.HorizontalFieldOfView / 2);
 			yzalpha = 2 * (float) Math.Tan(depth.VerticalFieldOfView   / 2);
 			
@@ -244,21 +257,18 @@ public class KinectVehicle : Vehicle
 	public override List<double[]> Measure()
 	{
 		List<double[]> measurements = new List<double[]>();
-
-		float[][] depthframe;
-		Color[]   colorframe;
 		
-		NextFrame(out depthframe, out colorframe, out interest);
+		NextFrame(out DepthFrame, out ColorFrame, out interest);
 
 		for (int i = 0; i < interest.Count; i++) {
 			float range = GetRange(interest[i].I, interest[i].K, (float) interest[i].Value);
 
-			measurements.Add(new double[3] {interest[i].I - resx / 2, interest[i].K - resy / 2, range});
+			measurements.Add(new double[3] {interest[i].I - ResX / 2, interest[i].K - ResY / 2, range});
 		}
 		
 		if (depthsensed != null) {
-			DepthMatrixToTexture(depthsensed, depthframe);
-			ColorMatrixToTexture(colorsensed, colorframe);
+			DepthMatrixToTexture(depthsensed, DepthFrame);
+			ColorMatrixToTexture(colorsensed, ColorFrame);
 		}
 
 		MappedMeasurements.Clear();
@@ -590,8 +600,8 @@ public class KinectVehicle : Vehicle
 	private float GetRange(int px, int py, float z)
 	{
 		// depth in OpenNI is the processed z-axis, not the range and its measured in meters
-		float nx = px / resx - 0.5f;
-		float ny = 0.5f - py / resy;
+		float nx = px / ResX - 0.5f;
+		float ny = 0.5f - py / ResY;
 
 		z /= 5000;
 
@@ -656,6 +666,48 @@ public class KinectVehicle : Vehicle
 
         return point;
     }
+
+	/// <summary>
+	/// Clone an associated vehicle with a new associated simulation particle.
+	/// Polymorphism on the return value is allowed and encouraged
+	/// to provide specific traits for particular reference vehicle.
+	/// Assume default cloning parameters.
+	/// </summary>
+	/// <param name="vehicle">Vehicle to clone.</param>
+	/// <param name="copytrajectory">If true, copy the whole trajectory history.</param>
+	/// <returns>The clone.</returns>
+	public override SimulatedVehicle TrackClone(SimulatedVehicle vehicle,
+	                                            bool             copytrajectory = false)
+	{
+		if (vehicle is SimulatedKinectVehicle) {
+			return new SimulatedKinectVehicle((SimulatedKinectVehicle) vehicle, copytrajectory);
+		}
+		else {
+			throw new ArgumentException("A Kinect vehicle should be tracked with SimulatedKinectVehicles");
+		}
+	}
+
+	/// <summary>
+	/// Clone this vehicle with an associated simulation particle.
+	/// Polymorphism on the return value is allowed and encouraged
+	/// to provide specific traits for particular reference vehicle.
+	/// Specify all cloning parameters.
+	/// </summary>
+	/// <param name="motioncovmultiplier">Motion covariance multiplier.</param>
+	/// <param name="measurecovmultiplier">Measurement covariance multiplier.</param>
+	/// <param name="pdetection">Detection probability.</param>
+	/// <param name="clutter">Clutter density.</param>
+	/// <param name="copytrajectory">If true, copy the whole trajectory history.</param>
+	/// <returns>The clone.</returns>
+	public override SimulatedVehicle TrackClone(double  motioncovmultiplier,
+	                                            double  measurecovmultiplier,
+	                                            double  pdetection,
+	                                            double  clutter,
+	                                            bool    copytrajectory = false)
+	{
+		return new SimulatedKinectVehicle(this, motioncovmultiplier, measurecovmultiplier,
+		                                  pdetection, clutter, copytrajectory);
+	}
 
 	/// <summary>
 	/// Dispose all assets.
