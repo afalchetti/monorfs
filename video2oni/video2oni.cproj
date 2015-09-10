@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{9A8792E0-BD59-4766-A00E-2EDA4E1E4974}</ProjectGuid>
+    <Compiler>
+      <Compiler ctype="GppCompiler" />
+    </Compiler>
+    <Language>CPP</Language>
+    <Target>Bin</Target>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\Debug</OutputPath>
+    <Externalconsole>true</Externalconsole>
+    <OutputName>video2oni</OutputName>
+    <CompileTarget>Bin</CompileTarget>
+    <DefineSymbols>DEBUG MONODEVELOP</DefineSymbols>
+    <SourceDirectory>.</SourceDirectory>
+    <Includes>
+      <Includes>
+        <Include>${ProjectDir}/lib/OpenNI/Include</Include>
+      </Includes>
+    </Includes>
+    <LibPaths>
+      <LibPaths>
+        <LibPath>${ProjectDir}/lib/OpenNI/Platform/Linux/Bin/x64-Debug</LibPath>
+      </LibPaths>
+    </LibPaths>
+    <Libs>
+      <Libs>
+        <Lib>OpenNI</Lib>
+        <Lib>opencv_core</Lib>
+        <Lib>opencv_highgui</Lib>
+        <Lib>opencv_imgproc</Lib>
+      </Libs>
+    </Libs>
+    <ExtraCompilerArguments>-std=c++11 -ggdb -O0</ExtraCompilerArguments>
+    <ExtraLinkerArguments>-Wl,-rpath='$ORIGIN'</ExtraLinkerArguments>
+    <CustomCommands>
+      <CustomCommands>
+        <Command type="AfterBuild" command="cp -ru ${ProjectDir}/lib/OpenNI/Platform/Linux/Bin/x64-Debug/lib{OpenNI,nimCodecs,nimMockNodes,nimRecorder}.so ${ProjectDir}/bin/Debug" workingdir="${ProjectDir}" externalConsole="True" />
+      </CustomCommands>
+    </CustomCommands>
+    <Commandlineparameters>output.oni i ../../data/room/depth.txt ../../data/room/rgb.txt</Commandlineparameters>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <OutputPath>bin\Release</OutputPath>
+    <Externalconsole>true</Externalconsole>
+    <OutputName>video2oni</OutputName>
+    <CompileTarget>Bin</CompileTarget>
+    <OptimizationLevel>3</OptimizationLevel>
+    <DefineSymbols>MONODEVELOP</DefineSymbols>
+    <SourceDirectory>.</SourceDirectory>
+    <ExtraCompilerArguments>-std=c++11 -O3</ExtraCompilerArguments>
+    <Libs>
+      <Libs>
+        <Lib>OpenNI</Lib>
+        <Lib>opencv_core</Lib>
+        <Lib>opencv_highgui</Lib>
+        <Lib>opencv_imgproc</Lib>
+      </Libs>
+    </Libs>
+    <ExtraLinkerArguments>-Wl,-rpath='$ORIGIN'</ExtraLinkerArguments>
+    <CustomCommands>
+      <CustomCommands>
+        <Command type="AfterBuild" command="cp -ru ${ProjectDir}/lib/OpenNI/Platform/Linux/Bin/x64-Release/lib{OpenNI,nimCodecs,nimMockNodes,nimRecorder}.so ${ProjectDir}/bin/Release" workingdir="${ProjectDir}" externalConsole="True" />
+      </CustomCommands>
+    </CustomCommands>
+    <Includes>
+      <Includes>
+        <Include>${ProjectDir}/lib/OpenNI/Include</Include>
+      </Includes>
+    </Includes>
+    <LibPaths>
+      <LibPaths>
+        <LibPath>${ProjectDir}/lib/OpenNI/Platform/Linux/Bin/x64-Release</LibPath>
+      </LibPaths>
+    </LibPaths>
+    <Commandlineparameters>output.oni i ../../data/room/depth.txt ../../data/room/rgb.txt</Commandlineparameters>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="video2oni.cpp" />
+  </ItemGroup>
+</Project>

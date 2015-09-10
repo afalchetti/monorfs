@@ -1,0 +1,19 @@
+# Output files
+bin/*
+obj/*
+
+# Visual Studio files
+*.suo
+*.user
+*.sdf
+*.opensdf
+*.filters
+
+# Libraries
+lib/*
+*.dll
+*.so
+
+# Data files
+data/*
+dep/*

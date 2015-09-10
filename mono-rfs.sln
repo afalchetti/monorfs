@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "mono-rfs", "mono-rfs.csproj
 EndProject
 Project("{2857B73E-F847-4B02-9238-064979017E93}") = "isam2", "isam2\isam2.cproj", "{55AB62F6-DA11-4F72-8D9F-FA95F677E3FD}"
 EndProject
+Project("{2857B73E-F847-4B02-9238-064979017E93}") = "video2oni", "video2oni\video2oni.cproj", "{9A8792E0-BD59-4766-A00E-2EDA4E1E4974}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{55AB62F6-DA11-4F72-8D9F-FA95F677E3FD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{55AB62F6-DA11-4F72-8D9F-FA95F677E3FD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{55AB62F6-DA11-4F72-8D9F-FA95F677E3FD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9A8792E0-BD59-4766-A00E-2EDA4E1E4974}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9A8792E0-BD59-4766-A00E-2EDA4E1E4974}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9A8792E0-BD59-4766-A00E-2EDA4E1E4974}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9A8792E0-BD59-4766-A00E-2EDA4E1E4974}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(MonoDevelopProperties) = preSolution
 		Policies = $0
