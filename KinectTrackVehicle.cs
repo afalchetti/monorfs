@@ -1,5 +1,5 @@
 ﻿// SimulatedVehicle.cs
-// Vehicle motion and measurement model using a simulated environment
+// Vehicle motion and measurement model to track a KinectVehicle
 // Part of MonoRFS
 //
 // Copyright (c) 2015, Angelo Falchetti
@@ -27,13 +27,6 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
-using System.Collections.Generic;
-
-using AForge;
-using Accord.Math;
-using Accord.Statistics.Distributions.Univariate;
-
-using Microsoft.Xna.Framework;
 
 using U  = monorfs.Util;
 using ME = monorfs.MatrixExtensions;
@@ -45,7 +38,7 @@ namespace monorfs
 /// Similar to SimulatedVehicle, but adds
 /// a better visibility model for Kinect.
 /// </summary>
-public class SimulatedKinectVehicle : SimulatedVehicle
+public class KinectTrackVehicle : TrackVehicle
 {
 	/// <summary>
 	/// Horizontal resolution of the real vehicle.
@@ -67,7 +60,7 @@ public class SimulatedKinectVehicle : SimulatedVehicle
 	/// </summary>
 	/// <param name="that">Copied simulated vehicle.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
-	public SimulatedKinectVehicle(SimulatedKinectVehicle that, bool copytrajectory = false)
+	public KinectTrackVehicle(KinectTrackVehicle that, bool copytrajectory = false)
 		: base(that, copytrajectory)
 	{
 		this.resx     = that.resx;
@@ -85,7 +78,7 @@ public class SimulatedKinectVehicle : SimulatedVehicle
 	/// <param name="pdetection">Probability of detection.</param>
 	/// <param name="clutter">Clutter density.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
-	public SimulatedKinectVehicle(KinectVehicle that, double motioncovmultiplier, double measurecovmultiplier, double pdetection, double clutter, bool copytrajectory = false)
+	public KinectTrackVehicle(KinectVehicle that, double motioncovmultiplier, double measurecovmultiplier, double pdetection, double clutter, bool copytrajectory = false)
 		: base(that, motioncovmultiplier, measurecovmultiplier, pdetection, clutter, copytrajectory)
 	{
 		this.resx = that.ResX;

@@ -719,14 +719,14 @@ public class KinectVehicle : Vehicle
 	/// <param name="vehicle">Vehicle to clone.</param>
 	/// <param name="copytrajectory">If true, copy the whole trajectory history.</param>
 	/// <returns>The clone.</returns>
-	public override SimulatedVehicle TrackClone(SimulatedVehicle vehicle,
-	                                            bool             copytrajectory = false)
+	public override TrackVehicle TrackClone(TrackVehicle vehicle,
+	                                        bool         copytrajectory = false)
 	{
-		if (vehicle is SimulatedKinectVehicle) {
-			return new SimulatedKinectVehicle((SimulatedKinectVehicle) vehicle, copytrajectory);
+		if (vehicle is KinectTrackVehicle) {
+			return new KinectTrackVehicle((KinectTrackVehicle) vehicle, copytrajectory);
 		}
 		else {
-			throw new ArgumentException("A Kinect vehicle should be tracked with SimulatedKinectVehicles");
+			throw new ArgumentException("A Kinect vehicle should be tracked with KinectTrackVehicles");
 		}
 	}
 
@@ -742,14 +742,14 @@ public class KinectVehicle : Vehicle
 	/// <param name="clutter">Clutter density.</param>
 	/// <param name="copytrajectory">If true, copy the whole trajectory history.</param>
 	/// <returns>The clone.</returns>
-	public override SimulatedVehicle TrackClone(double  motioncovmultiplier,
-	                                            double  measurecovmultiplier,
-	                                            double  pdetection,
-	                                            double  clutter,
-	                                            bool    copytrajectory = false)
+	public override TrackVehicle TrackClone(double  motioncovmultiplier,
+	                                        double  measurecovmultiplier,
+	                                        double  pdetection,
+	                                        double  clutter,
+	                                        bool    copytrajectory = false)
 	{
-		return new SimulatedKinectVehicle(this, motioncovmultiplier, measurecovmultiplier,
-		                                  pdetection, clutter, copytrajectory);
+		return new KinectTrackVehicle(this, motioncovmultiplier, measurecovmultiplier,
+		                              pdetection, clutter, copytrajectory);
 	}
 
 	/// <summary>

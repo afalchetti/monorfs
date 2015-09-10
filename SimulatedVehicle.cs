@@ -185,8 +185,8 @@ public class SimulatedVehicle : Vehicle
 	/// Apply the motion model to the vehicle. It corresponds to a
 	/// 3D odometry model following the equation:
 	/// 
-	/// x = x + q dx q* + N(0, Q)
-	/// o = dq o dq* + N(0, Q')
+	/// x = x + q dx q*
+	/// o = dq o dq*
 	/// 
 	/// where q is the midrotation quaternion (halfway between the old and new orientations) and N(a, b) is a normal function
 	/// with mean 'a' and covariance matrix 'b'.
@@ -206,12 +206,6 @@ public class SimulatedVehicle : Vehicle
 		}
 
 		base.Update(time, dx, dy, dz, dyaw, dpitch, droll);
-
-		State       = State.Add(time.ElapsedGameTime.TotalSeconds.Multiply(
-		                            U.RandomGaussianVector(new double[7] {0, 0, 0, 0, 0, 0, 0}, MotionCovarianceQ)));
-		Orientation = Quaternion.Normalize(Orientation);
-
-		WayPoints[WayPoints.Count - 1] = Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(State));
 	}
 	
 	/// <summary>

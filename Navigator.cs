@@ -78,7 +78,7 @@ public abstract class Navigator : IDisposable
 	/// <summary>
 	/// Most accurate estimate of the current vehicle pose.
 	/// </summary>
-	public abstract SimulatedVehicle BestEstimate { get; set; }
+	public abstract TrackVehicle BestEstimate { get; set; }
 
 	/// <summary>
 	/// Most accurate estimate model of the map.

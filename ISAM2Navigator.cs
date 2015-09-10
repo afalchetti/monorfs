@@ -81,7 +81,7 @@ public class ISAM2Navigator : Navigator
 	/// <summary>
 	/// Most accurate estimate of the current vehicle pose.
 	/// </summary>
-	public override SimulatedVehicle BestEstimate { get; set; }
+	public override TrackVehicle BestEstimate { get; set; }
 
 	/// <summary>
 	/// Most accurate estimate model of the map.
@@ -101,7 +101,7 @@ public class ISAM2Navigator : Navigator
 	/// <summary>
 	/// Previous SLAM step vehicle pose estimate.
 	/// </summary>
-	public SimulatedVehicle PreviousEstimate { get; set; }
+	public TrackVehicle PreviousEstimate { get; set; }
 
 	/// <summary>
 	/// Next unused label id.
@@ -140,9 +140,9 @@ public class ISAM2Navigator : Navigator
 			motionnoise[i] = Math.Sqrt(vehicle.MotionCovariance[i][i]);
 		}
 
-		BestEstimate          = new SimulatedVehicle();
-		PreviousEstimate      = new SimulatedVehicle();
-		BestMapModel          = new List<Gaussian>();
+		BestEstimate      = new TrackVehicle();
+		PreviousEstimate  = new TrackVehicle();
+		BestMapModel      = new List<Gaussian>();
 		plmodel           = new List<Gaussian>();
 		CandidateMapModel = new List<Gaussian>();
 

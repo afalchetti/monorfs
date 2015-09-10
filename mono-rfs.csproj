@@ -141,7 +141,8 @@
     <Compile Include="Config.cs" />
     <Compile Include="RecordVehicle.cs" />
     <Compile Include="FileParser.cs" />
-    <Compile Include="SimulatedKinectVehicle.cs" />
+    <Compile Include="TrackVehicle.cs" />
+    <Compile Include="KinectTrackVehicle.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

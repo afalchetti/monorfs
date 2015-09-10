@@ -36,6 +36,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
 
 using TimedState = System.Collections.Generic.List<System.Tuple<double, double[]>>;
+using U          = monorfs.Util;
 
 namespace monorfs
 {
@@ -200,6 +201,17 @@ public abstract class Vehicle : IDisposable
 	}
 
 	/// <summary>
+	/// State using the (noisy) odometry data.
+	/// </summary>
+	private double[] odometrystate;
+
+	/// <summary>
+	/// Odometry reference state; state at which the odometry started accumulating.
+	/// Every time the system reads the odometry it resets to the correct state.
+	/// </summary>
+	private double[] refodometrystate;
+
+	/// <summary>
 	/// Vision camera focal length.
 	/// </summary>
 	public double VisionFocal { get; private set; }
@@ -302,6 +314,9 @@ public abstract class Vehicle : IDisposable
 		VisionFocal = focal;
 		FilmArea    = film;
 		RangeClip   = clip;
+		
+		odometrystate    = (double[]) State.Clone();
+		refodometrystate = (double[]) State.Clone();
 
 		HasDataAssociation = false;
 		DataAssociation    = new List<int>();
@@ -355,10 +370,10 @@ public abstract class Vehicle : IDisposable
 	/// <param name="vehicle">Vehicle to clone.</param>
 	/// <param name="copytrajectory">If true, copy the whole trajectory history.</param>
 	/// <returns>The clone.</returns>
-	public virtual SimulatedVehicle TrackClone(SimulatedVehicle vehicle,
-	                                           bool             copytrajectory = false)
+	public virtual TrackVehicle TrackClone(TrackVehicle vehicle,
+	                                       bool         copytrajectory = false)
 	{
-		return new SimulatedVehicle(vehicle, copytrajectory);
+		return new TrackVehicle(vehicle, copytrajectory);
 	}
 
 	/// <summary>
@@ -373,14 +388,14 @@ public abstract class Vehicle : IDisposable
 	/// <param name="clutter">Clutter density.</param>
 	/// <param name="copytrajectory">If true, copy the whole trajectory history.</param>
 	/// <returns>The clone.</returns>
-	public virtual SimulatedVehicle TrackClone(double  motioncovmultiplier,
-	                                           double  measurecovmultiplier,
-	                                           double  pdetection,
-	                                           double  clutter,
-	                                           bool    copytrajectory = false)
+	public virtual TrackVehicle TrackClone(double  motioncovmultiplier,
+	                                       double  measurecovmultiplier,
+	                                       double  pdetection,
+	                                       double  clutter,
+	                                       bool    copytrajectory = false)
 	{
-		return new SimulatedVehicle(this, motioncovmultiplier, measurecovmultiplier,
-		                            pdetection, clutter, copytrajectory);
+		return new TrackVehicle(this, motioncovmultiplier, measurecovmultiplier,
+		                        pdetection, clutter, copytrajectory);
 	}
 
 	/// <summary>
@@ -412,7 +427,32 @@ public abstract class Vehicle : IDisposable
 		Location    = new double[3] {X + dlocation.X, Y + dlocation.Y, Z + dlocation.Z};
 		Orientation = Quaternion.Normalize(neworientation);
 
+		// add noise to the odometry readings
+		odometrystate = State.Add(time.ElapsedGameTime.TotalSeconds.Multiply(
+		                              U.RandomGaussianVector(new double[7] {0, 0, 0, 0, 0, 0, 0}, MotionCovarianceQ)));
+		// normalize orientation
+		double[] orientation = new double[4] {odometrystate[3], odometrystate[4], odometrystate[5], odometrystate[6]};
+		orientation.Normalize(true);
+		odometrystate[3] = orientation[0];
+		odometrystate[4] = orientation[1];
+		odometrystate[5] = orientation[2];
+		odometrystate[6] = orientation[3];
+
 		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(State)));
+	}
+
+	/// <summary>
+	/// Obtain the cumulative odometry reading since the last call to this function.
+	/// </summary>
+	/// <returns>State diff.</returns>
+	public double[] ReadOdometry()
+	{
+		double[] odometry = Vehicle.StateDiff(odometrystate, refodometrystate);
+
+		odometrystate     = (double[]) State.Clone();
+		refodometrystate  = (double[]) State.Clone();
+
+		return odometry;
 	}
 
 	/// <summary>
@@ -454,15 +494,20 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// Compute the difference between the state of two vehicles.
 	/// </summary>
+	/// <param name="a">Final vehicle state.</param>
+	/// <param name="b">Start vehicle state.</param>
 	/// <returns>State difference in local coordinates: (dx, dy, dz, dyaw, dpitch, droll),
 	/// such that b + ds = a.</returns>
-	/// <param name="a">Final vehicle.</param>
-	/// <param name="b">Start vehicle.</param>
-	public static double[] StateDiff(Vehicle a, Vehicle b)
+	private static double[] StateDiff(double[] a, double[] b)
 	{
-		Quaternion dq          = Quaternion.Conjugate(b.Orientation) * a.Orientation;
-		Quaternion midrotation = Quaternion.Slerp(a.Orientation, b.Orientation, 0.5f);
-		double[]   dxglobal    = a.Location.Subtract(b.Location);
+		double[] aloc = new double[3] {a[0], a[1], a[2]};
+		double[] bloc = new double[3] {b[0], b[1], b[2]};
+		Quaternion arot = new Quaternion((float) a[4], (float) a[5], (float) a[6], (float) a[3]);
+		Quaternion brot = new Quaternion((float) b[4], (float) b[5], (float) b[6], (float) b[3]);
+
+		Quaternion dq          = Quaternion.Conjugate(brot) * arot;
+		Quaternion midrotation = Quaternion.Slerp(arot, brot, 0.5f);
+		double[]   dxglobal    = aloc.Subtract(bloc);
 		Quaternion dx          = Quaternion.Conjugate(midrotation) *
 		                             new Quaternion((float) dxglobal[0], (float) dxglobal[1], (float) dxglobal[2], 0) *
 		                             midrotation;
@@ -477,6 +522,18 @@ public abstract class Vehicle : IDisposable
 		double droll  = Math.Atan2(2 * (w * z + y * x), 1 - 2 * (x * x + z * z));
 
 		return new double[6] {dx.X, dx.Y, dx.Z, dyaw, dpitch, droll};
+	}
+
+	/// <summary>
+	/// Compute the difference between the state of two vehicles.
+	/// </summary>
+	/// <returns>State difference in local coordinates: (dx, dy, dz, dyaw, dpitch, droll),
+	/// such that b + ds = a.</returns>
+	/// <param name="a">Final vehicle.</param>
+	/// <param name="b">Start vehicle.</param>
+	public static double[] StateDiff(Vehicle a, Vehicle b)
+	{
+		return StateDiff(a.State, b.State);
 	}
 
 	/// <summary>

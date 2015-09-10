@@ -219,14 +219,14 @@ class SimulationTest
 	[Test]
 	public void resample()
 	{
-		SimulatedVehicle   refvehicle = new SimulatedVehicle(new double[3] {0, 0, 0}, 0, new double[] {0, 0, 0}, new List<double[]>());
-		SimulatedVehicle[] particles  = new SimulatedVehicle[5];
+		TrackVehicle   refvehicle = new TrackVehicle();
+		TrackVehicle[] particles  = new TrackVehicle[5];
 		
-		particles[0] = new SimulatedVehicle(refvehicle); particles[0].State = new double[7] {0, 0, 0, 0, 0, 0, 0};
-		particles[1] = new SimulatedVehicle(refvehicle); particles[1].State = new double[7] {1, 1, 1, 1, 1, 1, 1};
-		particles[2] = new SimulatedVehicle(refvehicle); particles[2].State = new double[7] {2, 2, 2, 2, 2, 2, 2};
-		particles[3] = new SimulatedVehicle(refvehicle); particles[3].State = new double[7] {3, 3, 3, 3, 3, 3, 3};
-		particles[4] = new SimulatedVehicle(refvehicle); particles[4].State = new double[7] {4, 4, 4, 4, 4, 4, 4};
+		particles[0] = new TrackVehicle(refvehicle); particles[0].State = new double[7] {0, 0, 0, 0, 0, 0, 0};
+		particles[1] = new TrackVehicle(refvehicle); particles[1].State = new double[7] {1, 1, 1, 1, 1, 1, 1};
+		particles[2] = new TrackVehicle(refvehicle); particles[2].State = new double[7] {2, 2, 2, 2, 2, 2, 2};
+		particles[3] = new TrackVehicle(refvehicle); particles[3].State = new double[7] {3, 3, 3, 3, 3, 3, 3};
+		particles[4] = new TrackVehicle(refvehicle); particles[4].State = new double[7] {4, 4, 4, 4, 4, 4, 4};
 
 		int iterations = 10000;
 		int count0     = 0;

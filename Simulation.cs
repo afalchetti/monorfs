@@ -280,12 +280,12 @@ public class Simulation : Manipulator
 			return;
 		}
 
-		double dlocx     = 0;
-		double dlocy     = 0;
-		double dlocz     = 0;
-		double dyaw      = 0;
-		double dpitch    = 0;
-		double droll     = 0;
+		double dlocx  = 0;
+		double dlocy  = 0;
+		double dlocz  = 0;
+		double dyaw   = 0;
+		double dpitch = 0;
+		double droll  = 0;
 
 		bool forceslam         = false;
 		bool forcemapping      = false;
@@ -352,7 +352,8 @@ public class Simulation : Manipulator
 			Explorer.Update(time, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
 
 			if (UseOdometry) {
-				Navigator.Update(time, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
+				double[] odm = Explorer.ReadOdometry();
+				Navigator.Update(time, odm[0], odm[1], odm[2], odm[3], odm[4], odm[5]);
 			}
 			else {
 				Navigator.Update(time, 0, 0, 0, 0, 0, 0);

@@ -115,7 +115,7 @@ public class PHDNavigator : Navigator
 	/// <summary>
 	/// Particle filter representation of the vehicle pose.
 	/// </summary>
-	public SimulatedVehicle[] VehicleParticles { get; private set; }
+	public TrackVehicle[] VehicleParticles { get; private set; }
 
 	/// <summary>
 	/// Weight associated to each vehicle particle.
@@ -136,7 +136,7 @@ public class PHDNavigator : Navigator
 	/// <summary>
 	/// Most accurate estimate of the current vehicle pose.
 	/// </summary>
-	public override SimulatedVehicle BestEstimate
+	public override TrackVehicle BestEstimate
 	{
 		get
 		{
@@ -251,10 +251,10 @@ public class PHDNavigator : Navigator
 		// into the navigator, only estimates, in SLAM
 		// (this avoid bugs where the user unknowingly uses
 		// the groundtruth to estimate the groundtruth itself)
-		VehicleParticles = new SimulatedVehicle[particlecount];
-		MapModels        = new List<Gaussian>  [particlecount];
-		VehicleWeights   = new double          [particlecount];
-		toexplore        = new List<double[]>  [particlecount];
+		VehicleParticles = new TrackVehicle  [particlecount];
+		MapModels        = new List<Gaussian>[particlecount];
+		VehicleWeights   = new double        [particlecount];
+		toexplore        = new List<double[]>[particlecount];
 
 		for (int i = 0; i < particlecount; i++) {
 			VehicleParticles[i] = RefVehicle.TrackClone(MotionCovarianceMultiplier,
@@ -309,7 +309,7 @@ public class PHDNavigator : Navigator
 		}
 		else {
 			for (int i = 0; i < VehicleParticles.Length; i++) {
-				VehicleParticles[i].Update(time, dx, dy, dz, dyaw, dpitch, droll);
+				VehicleParticles[i].UpdateNoisy(time, dx, dy, dz, dyaw, dpitch, droll);
 			}
 
 			// debug: force the correct particle into the mix (it should always win)
@@ -484,11 +484,11 @@ public class PHDNavigator : Navigator
 	/// </summary>
 	public void ResampleParticles()
 	{
-		double             random    = (double) Util.Uniform.Next() / VehicleWeights.Length;
-		double[]           weights   = new double[VehicleWeights.Length];
-		SimulatedVehicle[] particles = new SimulatedVehicle[VehicleParticles.Length];
-		List<Gaussian>[]   models    = new List<Gaussian>[MapModels.Length];
-		double             maxweight = 0;
+		double           random    = (double) Util.Uniform.Next() / VehicleWeights.Length;
+		double[]         weights   = new double[VehicleWeights.Length];
+		TrackVehicle[]   particles = new TrackVehicle[VehicleParticles.Length];
+		List<Gaussian>[] models    = new List<Gaussian>[MapModels.Length];
+		double           maxweight = 0;
 
 		for (int i = 0, k = 0; i < weights.Length; i++) {
 			// k should never be out of range, but because of floating point arithmetic,
