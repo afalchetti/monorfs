@@ -32,7 +32,7 @@
     </Libs>
     <Externalconsole>true</Externalconsole>
     <ExtraLinkerArguments>-Wl,-rpath='$ORIGIN'</ExtraLinkerArguments>
-    <ExtraCompilerArguments>-std=c++11</ExtraCompilerArguments>
+    <ExtraCompilerArguments>-std=c++11 -ggdb  -O0</ExtraCompilerArguments>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <OutputPath>bin\Release</OutputPath>
@@ -55,7 +55,7 @@
       </Libs>
     </Libs>
     <Externalconsole>true</Externalconsole>
-    <ExtraCompilerArguments>-std=c++11</ExtraCompilerArguments>
+    <ExtraCompilerArguments>-std=c++11 -O3</ExtraCompilerArguments>
     <ExtraLinkerArguments>-Wl,-rpath='$ORIGIN'</ExtraLinkerArguments>
   </PropertyGroup>
   <ItemGroup>
