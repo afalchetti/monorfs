@@ -320,7 +320,7 @@ public abstract class Vehicle : IDisposable
 	/// <param name="that">Copied general vehicle.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
 	protected Vehicle(Vehicle that, bool copytrajectory = false)
-		: this(that.Location, 0, new double[3] {0, 0, 0})
+		: this(that.Location, 0, new double[3] {1, 0, 0})
 	{
 		this.Orientation        = that.Orientation;
 		this.Graphics           = that.Graphics;
@@ -603,16 +603,13 @@ public abstract class Vehicle : IDisposable
 			Quaternion local = Orientation *
 			                       new Quaternion((float) frustum[i][0], (float) frustum[i][1], (float) frustum[i][2], 0) * Quaternion.Conjugate(Orientation);
 			frustum[i] = camera.TransformH(new double[3] {local.X, local.Y, local.Z}.Add(Location));
-			frustum[i][2] = -100;
 		}
-		
-		VertexPositionColor[] verticesA = new VertexPositionColor[8];
-		VertexPositionColor[] verticesB = new VertexPositionColor[8];
-		double[][]            wireA     = new double[4][];
-		double[][]            wireB     = new double[4][];
-		double[][]            wireC     = new double[4][];
-		double[][]            wireD     = new double[4][];
-		
+
+		double[][] wireA = new double[4][];
+		double[][] wireB = new double[4][];
+		double[][] wireC = new double[4][];
+		double[][] wireD = new double[4][];
+
 		wireA[0] = frustum[0];
 		wireA[1] = frustum[1];
 		wireA[2] = frustum[5];
@@ -632,6 +629,20 @@ public abstract class Vehicle : IDisposable
 		wireD[1] = frustum[0];
 		wireD[2] = frustum[4];
 		wireD[3] = frustum[5];
+		
+		Graphics.DrawUser2DPolygon(wireA, 0.02f, outcolor, false);
+		Graphics.DrawUser2DPolygon(wireB, 0.02f, outcolor, false);
+		Graphics.DrawUser2DPolygon(wireC, 0.02f, outcolor, false);
+		Graphics.DrawUser2DPolygon(wireD, 0.02f, outcolor, false);
+
+		// colored sides shouldn't get in the way of the visualization,
+		// so put it behind everything else
+		for (int i = 0; i < frustum.Length; i++) {
+			frustum[i][2] = -100;
+		}
+
+		VertexPositionColor[] verticesA = new VertexPositionColor[8];
+		VertexPositionColor[] verticesB = new VertexPositionColor[8];
 
 		verticesA[0] = new VertexPositionColor(frustum[0].ToVector3(), incolorA);
 		verticesA[1] = new VertexPositionColor(frustum[4].ToVector3(), incolorA);
@@ -655,11 +666,6 @@ public abstract class Vehicle : IDisposable
 		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, verticesA, 4, 2);
 		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, verticesB, 0, 2);
 		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, verticesB, 4, 2);
-		
-		Graphics.DrawUser2DPolygon(wireA, 0.02f, outcolor, false);
-		Graphics.DrawUser2DPolygon(wireB, 0.02f, outcolor, false);
-		Graphics.DrawUser2DPolygon(wireC, 0.02f, outcolor, false);
-		Graphics.DrawUser2DPolygon(wireD, 0.02f, outcolor, false);
 	}
 
 	/// <summary>

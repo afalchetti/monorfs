@@ -188,7 +188,7 @@ public class KinectVehicle : Vehicle
 	/// <param name="inputfile">Recorded data file.
 	/// If null or empty, an unspecified active hardware sensor is used.</param>
 	public KinectVehicle(string inputfile = null)
-		: base(new double[3] {0, 0, 0}, 0, new double[3] {1, 0, 0},
+		: base(new double[3] {0, 0, 0}, Math.PI, new double[3] {1, 0, 0},
 		       575.8156 / Delta,
 		       new Rectangle(-640 / Delta / 2, -480 / Delta / 2,
 		                      640 / Delta,      480 / Delta),
@@ -609,6 +609,49 @@ public class KinectVehicle : Vehicle
 		float y = yzalpha * ny * z;
 		
 		return (float) Math.Sqrt(x * x + y * y + z * z);
+	}
+
+	/// <summary>
+	/// Render the vehicle on the graphics device.
+	/// The graphics device must be ready, otherwise
+	/// the method will throw an exception.
+	/// </summary>
+	/// <param name="camera">Camera 4d transform matrix.</param>
+	public override void Render(double[][] camera)
+	{
+		base.Render(camera);
+		RenderDepth(camera);
+	}
+
+	/// <summary>
+	/// Render the depth as a surface onto the scene.
+	/// </summary>
+	/// <param name="camera">Camera 4d transform matrix.</param>
+	public void RenderDepth(double[][] camera)
+	{
+		Vector3[][] vertices = new Vector3[(int) ResX][];
+		Color color  = Color.White;
+
+		for (int i = 0; i < DepthFrame.Length; i++) {
+			vertices[i] = new Vector3[(int) ResY];
+		}
+
+		float m = 0;
+
+		for (int k = 0; k < DepthFrame[0].Length; k++) {
+		for (int i = 0; i < DepthFrame   .Length; i++) {
+			float range = GetRange(i, k, DepthFrame[i][k]);
+				m = Math.Max(m, DepthFrame[i][k]);
+			if (range == 0) {
+				range = float.NaN;
+			}
+			
+			double[] local = MeasureToMap(new double[3] {i - ResX / 2, k - ResY / 2, range});
+			vertices[i][k] = camera.TransformH(local).ToVector3();
+		}
+		}
+
+		Graphics.DrawGrid(vertices, color, false);
 	}
 
 	/// <summary>

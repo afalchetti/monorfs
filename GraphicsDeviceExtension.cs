@@ -28,6 +28,7 @@
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using System;
 
 namespace monorfs
 {
@@ -71,7 +72,7 @@ public static class GraphicsDeviceExtension
 	}
 
 	/// <summary>
-	/// Draws a 2D thick line polygon on the specified GraphicsDevice.
+	/// Draw a 2D thick line polygon on the specified GraphicsDevice.
 	/// </summary>
 	/// <param name="graphics">Rendering device.</param>
 	/// <param name="vertices">Thin polygon description.</param>
@@ -120,6 +121,78 @@ public static class GraphicsDeviceExtension
 		}
 
 		graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, outline, 0, outline.Length - 2);
+	}
+
+	/// <summary>
+	/// Draw a rectangular grid of vertices as a mesh.
+	/// </summary>
+	/// <param name="graphics">Rendering device.</param>
+	/// <param name="grid">Grid locations.</param>
+	/// <param name="color">Mesh color.</param>
+	/// <param name="wireframe">If true, instead of rendering a closed surface, render
+	/// the edges of all the triangles involved.</param>
+	public static void DrawGrid(this GraphicsDevice graphics, Vector3[][] grid,
+	                            Color color, bool wireframe = false)
+	{
+		if (grid.Length == 0 || grid[0].Length == 0) {
+			return;
+		}
+
+		var vertices = new VertexPositionColor[grid.Length * grid[0].Length];
+
+		float zmin = float.MaxValue;
+		float zmax = float.MinValue;
+			
+		for (int k = 0; k < grid[0].Length; k++) {
+		for (int i = 0; i < grid   .Length; i++) {
+			if (zmin > grid[i][k].Z) {
+				zmin = grid[i][k].Z;
+			}
+			if (zmax < grid[i][k].Z) {
+				zmax = grid[i][k].Z;
+			}
+		}
+		}
+
+		float zrange = zmax - zmin;
+
+		// expand the range a little, so nothing is completely opaque or transparent
+		zmin = zmin - 0.1f * zrange;
+		zmax = zmax + 0.1f * zrange;
+
+		float zalpha = (zmin == zmax) ? 1 : 1 / (zmax - zmin);
+
+		int h = 0;
+		for (int k = 0; k < grid[0].Length; k++) {
+		for (int i = 0; i < grid   .Length; i++) {
+			vertices[h++] =
+				new VertexPositionColor(grid[i][k], Color.Multiply(color, zalpha * (grid[i][k].Z - zmin)));
+		}
+		}
+
+		int   stride  = grid.Length;
+		int   current = 0;
+		int[] indices = new int[2 * grid.Length * (grid[0].Length - 1)];
+
+		// set indices
+		h = 0;
+		for (int k = 0; k < grid[0].Length - 1; k++) {
+			int revstride = (k % 2 == 0) ? stride - 1: stride + 1;
+
+			for (int i = 0; i < grid.Length; i++) {
+				indices[h++] = current;
+				current     += stride;
+
+				indices[h++] = current;
+				current     -= revstride;
+			}
+
+			current += revstride;
+		}
+
+		graphics.DrawUserIndexedPrimitives((wireframe) ? PrimitiveType.LineStrip : PrimitiveType.TriangleStrip,
+		                                   vertices, 0, vertices.Length,
+			indices,  0, (wireframe) ? indices.Length - 1 : indices.Length - 2);
 	}
 }
 }

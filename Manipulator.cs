@@ -361,11 +361,11 @@ public abstract class Manipulator : Game
 		}
 
 		if (keyboard.IsKeyDown(Keys.Up) && !alt) {
-			dcamphi -= 0.06 * multiplier;
+			dcamphi += 0.06 * multiplier;
 		}
 
 		if (keyboard.IsKeyDown(Keys.Down) && !alt) {
-			dcamphi += 0.06 * multiplier;
+			dcamphi -= 0.06 * multiplier;
 		}
 
 		if (keyboard.IsKeyDown(Keys.Right) && !alt) {
