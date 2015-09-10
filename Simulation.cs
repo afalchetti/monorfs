@@ -227,17 +227,24 @@ public class Simulation : Manipulator
 		Vehicle        explorer;
 		List<double[]> commands;
 
-		switch (input) {
-		case VehicleType.Kinect:
-			explorer = FP.VehicleFromSensor(scenefile);
-			break;
-		case VehicleType.Record:
-			explorer = FP.VehicleFromRecord(scenefile);
-			break;
-		case VehicleType.Simulation:
-		default:
-			explorer = FP.VehicleFromSimFile(File.ReadAllText(scenefile));
-			break;
+
+		try {
+			switch (input) {
+			case VehicleType.Kinect:
+				explorer = FP.VehicleFromSensor(scenefile);
+				break;
+			case VehicleType.Record:
+				explorer = FP.VehicleFromRecord(scenefile);
+				break;
+			case VehicleType.Simulation:
+			default:
+				explorer = FP.VehicleFromSimFile(File.ReadAllText(scenefile));
+				break;
+			}
+		}
+		catch (IOException) {
+			Console.WriteLine("Couldn't open vehicle file/device: " + scenefile);
+			explorer = new SimulatedVehicle();
 		}
 
 		try {
