@@ -227,7 +227,7 @@ public class SimulatedVehicle : Vehicle
 		Quaternion local = Quaternion.Conjugate(Orientation) *
 			                    new Quaternion((float) diff[0], (float) diff[1], (float) diff[2], 0) * Orientation;
 
-		double range  = diff.Euclidean();
+		double range  = Math.Sign(local.Z) * diff.Euclidean();
 		double px     = VisionFocal * local.X / local.Z;
 		double py     = VisionFocal * local.Y / local.Z;
 
