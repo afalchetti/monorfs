@@ -302,13 +302,14 @@ public abstract class Navigator : IDisposable
 
 		double[]   camloc     = camera.TransformH(gaussian.Mean);
 		double[][] camrot     = camera.Submatrix(0, 2, 0, 2);
+		double     camzoom    = 1.0 / camera[3][3];
 		double[][] covariance = camrot.Multiply(gaussian.Covariance).MultiplyByTranspose(camrot).Submatrix(0, 1, 0, 1);
 
 		var        decomp = new EigenvalueDecomposition(covariance.ToMatrix());
 		double[,]  stddev = decomp.DiagonalMatrix;
 
 		for (int i = 0; i < stddev.GetLength(0); i++) {
-			stddev[i, i] = (stddev[i, i] > 0) ? Math.Sqrt(stddev[i, i]) : 0;
+			stddev[i, i] = (stddev[i, i] > 0) ? camzoom * Math.Sqrt(stddev[i, i]) : 0;
 		}
 
 		double[,]  rotation = decomp.Eigenvectors;
