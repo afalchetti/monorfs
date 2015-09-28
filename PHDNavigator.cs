@@ -30,7 +30,6 @@ using System;
 using System.Collections.Generic;
 
 using Accord.Math;
-using AForge;
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
