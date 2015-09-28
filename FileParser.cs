@@ -37,6 +37,7 @@ using Accord.Math;
 using Microsoft.Xna.Framework;
 
 using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
+using TimedArray        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedTrajectory   = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<System.Tuple<double, double[]>>>>;
 using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
@@ -77,7 +78,7 @@ public static class FileParser
 				throw new FormatException("bad trajectory format: missing time");
 			}
 
-			TimedState trajectory = TrajectoryFromDescriptor(lines.Submatrix(1, lines.Length - 1), dim);
+			TimedState trajectory = TimedArrayFromDescriptor(lines.Submatrix(1, lines.Length - 1), dim);
 
 
 			// filtering, disregard history updates (i.e. future affecting the past)
@@ -94,15 +95,15 @@ public static class FileParser
 	}
 
 	/// <summary>
-	/// Get a trajectory from a formatted string descriptor.
+	/// Get a timed array structure (e.g. the trajectory) from a formatted string descriptor.
 	/// </summary>
-	/// <param name="lines">Array of formatted state vectors moving through time.</param>
-	/// <param name="dim">Expected state dimension.</param>
-	/// <returns>The trajectory, list of vectors representing state as a function of discrete time
+	/// <param name="lines">Array of formatted arrays moving through time.</param>
+	/// <param name="dim">Expected array dimension.</param>
+	/// <returns>The trajectory, list of arrays as a function of discrete time
 	/// (time is delivered as the first entry of each tuple).</returns>
-	public static TimedState TrajectoryFromDescriptor(string[] lines, int dim = 7)
+	public static TimedArray TimedArrayFromDescriptor(string[] lines, int dim = 7)
 	{
-		TimedState trajectory = new TimedState();
+		TimedArray array = new TimedArray();
 
 		foreach (string line in lines) {
 			double[] values = ParseDoubleList(line);
@@ -111,10 +112,10 @@ public static class FileParser
 				throw new FormatException("wrong state dimension");
 			}
 
-			trajectory.Add(Tuple.Create(values[0], values.Submatrix(1, values.Length - 1)));
+			array.Add(Tuple.Create(values[0], values.Submatrix(1, values.Length - 1)));
 		}
 
-		return trajectory;
+		return array;
 	}
 
 	/// <summary>
@@ -347,6 +348,7 @@ public static class FileParser
 
 		string scenefile      = Path.Combine(datadir, "scene.world");
 		string trajectoryfile = Path.Combine(datadir, "trajectory.out");
+		string odometryfile   = Path.Combine(datadir, "odometry.out");
 		string measurefile    = Path.Combine(datadir, "measurements.out");
 
 		if (!File.Exists(scenefile)) {
@@ -357,19 +359,29 @@ public static class FileParser
 			throw new ArgumentException("Missing trajectory file");
 		}
 
+		if (!File.Exists(odometryfile)) {
+			throw new ArgumentException("Missing odometry file");
+		}
+
 		if (!File.Exists(measurefile)) {
 			throw new ArgumentException("Missing measurement file");
 		}
 
 		RecordVehicle     explorer;
 		TimedState        trajectory;
+		TimedArray        odometry;
 		TimedMeasurements measurements;
 
 		SimulatedVehicle template = VehicleFromSimFile(File.ReadAllText(scenefile));
 
-		trajectory   = TrajectoryFromDescriptor  (File.ReadAllLines(trajectoryfile),  7);
+		trajectory   = TimedArrayFromDescriptor  (File.ReadAllLines(trajectoryfile), 7);
+		odometry     = TimedArrayFromDescriptor  (File.ReadAllLines(odometryfile), 6);
 		measurements = MeasurementsFromDescriptor(File.ReadAllText(measurefile));
-		explorer     = new RecordVehicle(trajectory, measurements, template.Landmarks);
+
+		// insert a dummy frame to simplify indexing
+		odometry.Insert(0, Tuple.Create(0.0, new double[6]));
+
+		explorer = new RecordVehicle(trajectory, odometry, measurements, template.Landmarks);
 
 		Directory.Delete(tmpdir, true);
 

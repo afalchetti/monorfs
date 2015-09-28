@@ -211,7 +211,7 @@ public class Viewer : Manipulator
 		TimedMapModel     map;
 		TimedMeasurements measurements;
 
-		trajectory   = FP.TrajectoryFromDescriptor       (File.ReadAllLines(vehiclefile),  7);
+		trajectory   = FP.TimedArrayFromDescriptor       (File.ReadAllLines(vehiclefile),  7);
 		estimate     = FP.TrajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), 7, filterhistory);
 		map          = FP.MapHistoryFromDescriptor       (File.ReadAllText(mapfile));
 

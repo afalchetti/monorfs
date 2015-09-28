@@ -35,6 +35,7 @@ using U  = monorfs.Util;
 using ME = monorfs.MatrixExtensions;
 
 using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
+using TimedArray        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedTrajectory   = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<System.Tuple<double, double[]>>>>;
 using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
@@ -46,12 +47,28 @@ namespace monorfs
 /// It uses a 3d odometry motion model (yaw-pitch-roll) and
 /// a pixel-range measurement model.
 /// </summary>
+/// <remarks>This class is not completely conformant
+/// with the rest of the hierarchy, since it requires that
+/// methods are called in the precise order that were used
+/// when they were recorded and this order should alternate
+/// between updating, odometry readings and measuring
+/// (otherwise the behavior is undefined).
+/// This is to simplify its design and diminish the required
+/// recorded data size and shouldn't be a problem anyway, since
+/// comparing different algorithms should always be performed
+/// on exactly the same input anyway if any bias is to be avoided.</remarks>
 public class RecordVehicle : Vehicle
 {
 	/// <summary>
 	/// Prerecorded trajectory.
 	/// </summary>
 	public TimedState Trajectory { get; private set; }
+
+	/// <summary>
+	/// Prerecorded odometry.
+	/// </summary>
+	/// <value>The odometry.</value>
+	public TimedArray Odometry { get; private set; }
 
 	/// <summary>
 	/// Prerecorded measurements.
@@ -72,16 +89,22 @@ public class RecordVehicle : Vehicle
 	/// Construct a RecordVehicle from prerecorded data.
 	/// </summary>
 	/// <param name="trajectory">Prerecorded trajectory.</param>
+	/// <param name="odometry">Prerecorded odometry.</param>
 	/// <param name="measurements">Prerecorded measurements.</param>
 	/// <param name="landmarks">Landmark 3d locations against which the measurements were performed.</param>
-	public RecordVehicle(TimedState trajectory, TimedMeasurements measurements,
-	                     List<double[]> landmarks)
+	public RecordVehicle(TimedState trajectory, TimedArray odometry,
+	                     TimedMeasurements measurements, List<double[]> landmarks)
 	{
 		Trajectory   = trajectory;
+		Odometry     = odometry;
 		Measurements = measurements;
 
 		if (Trajectory.Count != Measurements.Count) {
-			throw new ArgumentException("Trajectory and measurement data must have the same size");
+			throw new ArgumentException("Trajectory and measurement data must be have the same length.");
+		}
+
+		if (Trajectory.Count != Odometry.Count) {
+			throw new ArgumentException("Trajectory and odometry data must be have the same length.");
 		}
 
 		if (Trajectory.Count < 1) {
@@ -112,6 +135,23 @@ public class RecordVehicle : Vehicle
 	{
 		State = Trajectory[FrameIndex].Item2;
 		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(State)));
+	}
+
+	/// <summary>
+	/// Obtain the cumulative odometry reading since the last call to this function.
+	/// Note that this version doesn't actually "reset" the odometry
+	/// and gives the discrete recorded points in the odometry file.
+	/// Calling multiple times this function would give the same result, even
+	/// if the base behavior would be to return zero after the first time.
+	/// </summary>
+	/// <returns>State diff.</returns>
+	public override double[] ReadOdometry(GameTime time)
+	{
+		double[] odometry = Odometry[FrameIndex].Item2;
+
+		WayOdometry.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(odometry)));
+
+		return odometry;
 	}
 
 	/// <summary>
