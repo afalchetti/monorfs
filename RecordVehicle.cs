@@ -88,15 +88,14 @@ public class RecordVehicle : Vehicle
 			throw new ArgumentException("Trajectory length must be nonzero");
 		}
 
-		// duplicate last frame, with no measurements (freeze frame)
-		Trajectory.Add(Tuple.Create(double.MaxValue, Trajectory[Trajectory.Count - 1].Item2));
-		Measurements.Add(Tuple.Create(double.MaxValue, new List<double[]>()));
-
 		RecLength  = Trajectory.Count;
-		FrameIndex = 0;
+		FrameIndex = 1;
 
 		Landmarks = landmarks;
 		State     = Trajectory[0].Item2;
+
+		WayPoints.Clear();
+		WayPoints.Add(Tuple.Create(0.0, Util.SClone(State)));
 	}
 
 	/// <summary>
@@ -124,7 +123,12 @@ public class RecordVehicle : Vehicle
 	{
 		List<double[]> measurements = Measurements[FrameIndex].Item2;
 
-		FrameIndex = Math.Min(FrameIndex + 1, RecLength - 1);
+		if (FrameIndex < RecLength - 1) {
+			FrameIndex++;
+		}
+		else {
+			WantsToStop = true;
+		}
 
 		MappedMeasurements.Clear();
 		foreach (double[] z in measurements) {

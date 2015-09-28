@@ -275,7 +275,7 @@ public class Simulation : Manipulator
 	/// <param name="multiplier">Movement scale multiplier.</param>
 	protected override void Update(GameTime time, KeyboardState keyboard, KeyboardState prevkeyboard, double multiplier)
 	{
-		if (commanddepleted) {
+		if (commanddepleted || Explorer.WantsToStop) {
 			Exit();
 			return;
 		}

@@ -279,6 +279,12 @@ public abstract class Vehicle : IDisposable
 	public bool HasSidebar { get; protected set; }
 
 	/// <summary>
+	/// Whether the vehicle is done with its movement and would like
+	/// to be stopped.
+	/// </summary>
+	public bool WantsToStop { get; protected set; }
+
+	/// <summary>
 	/// Construct a vehicle with default constants.
 	/// </summary>
 	protected Vehicle() : this(new double[3] {0, 0, 0}, 0, new double[3] {1, 0, 0}) {}
@@ -326,7 +332,8 @@ public abstract class Vehicle : IDisposable
 		WayPoints = new TimedState();
 		WayPoints.Add(Tuple.Create(0.0, Util.SClone(state)));
 
-		HasSidebar = false;
+		HasSidebar  = false;
+		WantsToStop = false;
 	}
 
 	/// <summary>
