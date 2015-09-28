@@ -51,13 +51,8 @@ public static class Config
 	                                                              new double[6] {0, 0, 0, 0, 2e-4, 0},
 	                                                              new double[6] {0, 0, 0, 0, 0, 2e-4} };
 	
-	public static double[][] MotionCovarianceQ = new double[7][] { new double[7] {5e-3, 0, 0, 0, 0, 0, 0},
-	                                                               new double[7] {0, 5e-3, 0, 0, 0, 0, 0},
-	                                                               new double[7] {0, 0, 5e-3, 0, 0, 0, 0},
-	                                                               new double[7] {0, 0, 0, 1e-9, 0, 0, 0},
-	                                                               new double[7] {0, 0, 0, 0, 5e-5, 0, 0},
-	                                                               new double[7] {0, 0, 0, 0, 0, 5e-5, 0},
-	                                                               new double[7] {0, 0, 0, 0, 0, 0, 5e-5} };
+	public static double[][] MotionCovarianceQ;
+	public static double[][] MotionCovarianceL;
 	
 	public static double[][] MeasurementCovariance = new double[3][] { new double[3] {2e-0, 0, 0},
 	                                                                   new double[3] {0, 2e-0, 0},
@@ -98,6 +93,13 @@ public static class Config
 
 	// OdometryNavigator
 	public static double OdometryMergeThreshold = 1e-2;
+
+	/// <summary>
+	/// Static constructor. Fill missing fields.
+	/// </summary>
+	static Config() {
+		Util.GetMotionCovariances(MotionCovariance, out MotionCovarianceQ, out MotionCovarianceL);
+	}
 
 	/// <summary>
 	/// Read configuration instructions from file.
@@ -153,11 +155,8 @@ public static class Config
 			}
 		}
 
-		// dummy knows how to transform from YPR to quaternion covariance
-		SimulatedVehicle dummy = new SimulatedVehicle();
-
-		dummy.MotionCovariance = MotionCovariance;
-		MotionCovarianceQ      = dummy.MotionCovarianceQ;
+		// fill missing fields
+		Util.GetMotionCovariances(MotionCovariance, out MotionCovarianceQ, out MotionCovarianceL);
 	}
 }
 }

@@ -170,7 +170,9 @@ public class SimulatedVehicle : Vehicle
 		this.ClutterDensity       = clutter;
 		this.ClutterCount         = this.ClutterDensity * this.FilmArea.Height * this.FilmArea.Width * this.RangeClip.Length;
 
-		this.MotionCovariance      = motioncovmultiplier.Multiply(that.MotionCovariance);
+		this.motionCovariance      = motioncovmultiplier.Multiply(that.MotionCovariance);
+		this.motionCovarianceQ     = motioncovmultiplier.Multiply(that.MotionCovarianceQ);
+		this.motionCovarianceL     = motioncovmultiplier.Multiply(that.MotionCovarianceL);
 		this.MeasurementCovariance = measurecovmultiplier.Multiply(that.MeasurementCovariance);
 
 		if (this.ClutterCount > 0) {

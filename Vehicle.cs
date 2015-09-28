@@ -49,12 +49,17 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// Internal motion model covariance matrix. Yaw-pitch-roll representation.
 	/// </summary>
-	private double[][] motionCovariance = Config.MotionCovariance;
+	protected double[][] motionCovariance = Config.MotionCovariance;
 
 	/// <summary>
 	/// Internal motion model covariance matrix. Quaternion representation.
 	/// </summary>
-	private double[][] motionCovarianceQ = Config.MotionCovarianceQ;
+	protected double[][] motionCovarianceQ = Config.MotionCovarianceQ;
+
+	/// <summary>
+	/// Internal motion model covariance matrix. Lie algebra representation.
+	/// </summary>
+	protected double[][] motionCovarianceL = Config.MotionCovarianceL;
 
 	/// <summary>
 	/// Motion model covariance matrix. Yaw-pitch-roll representation.
@@ -66,38 +71,20 @@ public abstract class Vehicle : IDisposable
 		}
 
 		set {
-			motionCovariance    = value;
-
-			double[][] r        = Util.YPR2QJacobian(0, 0, 0);
-			double[][] jacobian = new double[7][] { new double[6] {1, 0, 0, 0,       0,      0},
-			                                        new double[6] {0, 1, 0, 0,       0,      0},
-			                                        new double[6] {0, 0, 1, 0,       0,      0},
-			                                        new double[6] {0, 0, 0, r[0][0], r[0][1], r[0][2]},
-			                                        new double[6] {0, 0, 0, r[1][0], r[1][1], r[1][2]},
-			                                        new double[6] {0, 0, 0, r[2][0], r[2][1], r[2][2]},
-			                                        new double[6] {0, 0, 0, r[3][0], r[3][1], r[3][2]} };
-
-			motionCovarianceQ = jacobian.Multiply(motionCovariance).MultiplyByTranspose(jacobian);
-
-			// regularization: if variance is zero in some component the matrix probably will be
-			// semi-definite instead of definite positive and some algorithms will not work properly;
-			// add a tiny amount of variance in such case
-			for (int i = 0; i < motionCovarianceQ.Length; i++) {
-				if (motionCovarianceQ[i][i] < 1e-9) {
-					motionCovarianceQ[i][i] = 1e-9;
-				}
-			}
+			motionCovariance = value;
+			Util.GetMotionCovariances(motionCovariance, out motionCovarianceQ, out motionCovarianceL);
 		}
 	}
 
 	/// <summary>
 	/// Motion model covariance matrix. Quaternion representation.
 	/// </summary>
-	public double[][] MotionCovarianceQ
-	{
-		get         { return motionCovarianceQ;  }
-		private set { motionCovarianceQ = value; }
-	}
+	public double[][] MotionCovarianceQ { get { return motionCovarianceQ; } }
+
+	/// <summary>
+	/// Motion model covariance matrix. Lie algebra representation.
+	/// </summary>
+	public double[][] MotionCovarianceL { get { return motionCovarianceL; } }
 
 	/// <summary>
 	/// Measurement model covariance matrix.
@@ -363,7 +350,8 @@ public abstract class Vehicle : IDisposable
 		this.RangeClip    = that.RangeClip;
 
 		this.motionCovariance      = that.motionCovariance.MemberwiseClone();
-		this.MotionCovarianceQ     = that.MotionCovarianceQ.MemberwiseClone();
+		this.motionCovarianceQ     = that.motionCovarianceQ.MemberwiseClone();
+		this.motionCovarianceL     = that.motionCovarianceL.MemberwiseClone();
 		this.MeasurementCovariance = that.MeasurementCovariance.MemberwiseClone();
 
 		if (copytrajectory) {
