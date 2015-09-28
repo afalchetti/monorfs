@@ -24,7 +24,7 @@
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Externalconsole>true</Externalconsole>
-    <Commandlineparameters>-i=kinect -f=room.oni -c=movroom.in -p=20</Commandlineparameters>
+    <Commandlineparameters>-i=simulation -f=map.world -c=movroom.in -p=20 -a=phd</Commandlineparameters>
     <CustomCommands>
       <CustomCommands>
         <Command type="AfterBuild" command="cp -ru ${ProjectDir}/additional/* ${ProjectDir}/isam2/bin/Debug/libisam2.so ${TargetDir}" workingdir="${ProjectDir}" externalConsole="True" />
@@ -40,7 +40,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ConsolePause>false</ConsolePause>
     <Externalconsole>true</Externalconsole>
-    <Commandlineparameters>-i=kinect -f=room.oni -c=movroom.in -p=20</Commandlineparameters>
+    <Commandlineparameters>-i=kinect -f=room.oni -c=movroom.in -p=200 -a=isam2</Commandlineparameters>
     <CustomCommands>
       <CustomCommands>
         <Command type="AfterBuild" command="cp -ru ${ProjectDir}/additional/* ${ProjectDir}/isam2/bin/Release/libisam2.so ${TargetDir}" workingdir="${ProjectDir}" externalConsole="True" />
@@ -143,6 +143,7 @@
     <Compile Include="FileParser.cs" />
     <Compile Include="TrackVehicle.cs" />
     <Compile Include="KinectTrackVehicle.cs" />
+    <Compile Include="OdometryNavigator.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

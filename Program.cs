@@ -122,7 +122,7 @@ public class Program
 			{ "r|recfile=",    "Recording file. Saves State and events for reviewing.",        r       => recfile       = r },
 			{ "c|command=",    "Auto-command file (simulates user input).",                    c       => commandfile   = c },
 			{ "g|config=",     "Configuration file. Contains global constants",                g       => configfile    = g },
-			{ "a|algorithm=",  "SLAM solver algorithm (phd or isam2)",                         a       => algorithm     = (a == "isam2") ? NavigationAlgorithm.ISAM2 : NavigationAlgorithm.PHD },
+			{ "a|algorithm=",  "SLAM solver algorithm ('odometry', 'phd' or 'isam2')",         a       => algorithm     = (a == "isam2") ? NavigationAlgorithm.ISAM2 : (a == "odometry") ? NavigationAlgorithm.Odometry : NavigationAlgorithm.PHD },
 			{ "p|particles=",  "Number of particles used for the RB-PHD",                      (int p) => particlecount = p },
 			{ "y|onlymap",     "Only do mapping, assuming known localization.",                y       => onlymapping   = y != null },
 			{ "i|input=",      "Vehicle input stream: 'kinect', 'simulation' or 'record'",     i       => input         = (i == "kinect") ? VehicleType.Kinect : (i == "record") ? VehicleType.Record : VehicleType.Simulation },

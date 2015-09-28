@@ -96,6 +96,9 @@ public static class Config
 	public static int    NewLandmarkThreshold = 3;
 	public static DataAssociationAlgorithm DAAlgorithm = DataAssociationAlgorithm.Mahalanobis;
 
+	// OdometryNavigator
+	public static double OdometryMergeThreshold = 1e-2;
+
 	/// <summary>
 	/// Read configuration instructions from file.
 	/// Any missing parameter will be left as is.

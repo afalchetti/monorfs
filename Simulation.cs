@@ -45,12 +45,12 @@ namespace monorfs
 /// <summary>
 /// Navigation algorithm.
 /// </summary>
-public enum NavigationAlgorithm { PHD, ISAM2 }
+public enum NavigationAlgorithm { Odometry, PHD, ISAM2 }
 
 /// <summary>
 /// Vehicle input type.
 /// </summary>
-public enum VehicleType { Kinect, Simulation, Record }
+public enum VehicleType { Simulation, Kinect, Record }
 
 /// <summary>
 /// Interactive manipulator for a simulation of vehicle navigation through a landmark map.
@@ -211,7 +211,9 @@ public class Simulation : Manipulator
 		: base(title, explorer,
 		       (algorithm == NavigationAlgorithm.PHD) ?
 		           (Navigator) new PHDNavigator(explorer, particlecount, onlymapping) :
-		           (Navigator) new ISAM2Navigator(explorer, onlymapping),
+		       (algorithm == NavigationAlgorithm.ISAM2) ?
+		           (Navigator) new ISAM2Navigator(explorer, onlymapping) :
+		           (Navigator) new OdometryNavigator(explorer),
 		        realtime)
 	{
 		Commands        = commands;
