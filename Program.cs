@@ -190,6 +190,8 @@ public class Program
 
 				Console.WriteLine("  -- writing trajectory history");
 				File.WriteAllText(Path.Combine(output, "trajectory.out"),   sim.SerializedTrajectory);
+				Console.WriteLine("  -- writing odometry history");
+				File.WriteAllText(Path.Combine(output, "odometry.out"),     sim.SerializedOdometry);
 				Console.WriteLine("  -- writing estimate history");
 				File.WriteAllText(Path.Combine(output, "estimate.out"),     sim.SerializedEstimate);
 				Console.WriteLine("  -- writing map model history");

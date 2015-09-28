@@ -111,6 +111,27 @@ public class Simulation : Manipulator
 			return SerializeWayPoints(Explorer.WayPoints);
 		}
 	}
+
+	/// <summary>
+	/// Get a string representation of the odometry history read by of the vehicle.
+	/// </summary>
+	public string SerializedOdometry
+	{
+		get
+		{
+			return string.Join("\n", Explorer.WayOdometry.ConvertAll(
+				s => {double time = s.Item1;
+			          double[] r  = s.Item2;
+				      return time.ToString("g6") + " " +
+				             r[0].ToString("g6") + " " +
+				             r[1].ToString("g6") + " " +
+				             r[2].ToString("g6") + " " +
+				             r[3].ToString("g6") + " " +
+				             r[4].ToString("g6") + " " +
+				             r[5].ToString("g6");}
+			));
+		}
+	}
 	
 	/// <summary>
 	/// Get a string representation of the trajectory of the most likely particle
@@ -352,7 +373,7 @@ public class Simulation : Manipulator
 			Explorer.Update(time, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
 
 			if (UseOdometry) {
-				double[] odm = Explorer.ReadOdometry();
+				double[] odm = Explorer.ReadOdometry(time);
 				Navigator.Update(time, odm[0], odm[1], odm[2], odm[3], odm[4], odm[5]);
 			}
 			else {

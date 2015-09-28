@@ -36,6 +36,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
 
 using TimedState = System.Collections.Generic.List<System.Tuple<double, double[]>>;
+using TimedArray = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using U          = monorfs.Util;
 
 namespace monorfs
@@ -252,6 +253,11 @@ public abstract class Vehicle : IDisposable
 	/// next three are 3D coordinates.
 	/// </summary>
 	public TimedState WayPoints { get; set; }
+
+	/// <summary>
+	/// Full odometry history.
+	/// </summary>
+	public TimedArray WayOdometry { get; private set; }
 	
 	/// <summary>
 	/// Cached measurements from the update process for rendering purposes.
@@ -329,7 +335,8 @@ public abstract class Vehicle : IDisposable
 		Landmarks          = new List<double[]>();
 		MappedMeasurements = new List<double[]>();
 
-		WayPoints = new TimedState();
+		WayOdometry = new TimedArray();
+		WayPoints   = new TimedState();
 		WayPoints.Add(Tuple.Create(0.0, Util.SClone(state)));
 
 		HasSidebar  = false;
@@ -360,9 +367,11 @@ public abstract class Vehicle : IDisposable
 		this.MeasurementCovariance = that.MeasurementCovariance.MemberwiseClone();
 
 		if (copytrajectory) {
-			this.WayPoints = new TimedState(that.WayPoints);
+			this.WayPoints   = new TimedState(that.WayPoints);
+			this.WayOdometry = new TimedArray(that.WayOdometry);
 		}
 		else {
+			this.WayOdometry = new TimedArray();
 			this.WayPoints = new TimedState();
 			this.WayPoints.Add(Tuple.Create(0.0, Util.SClone(that.state)));
 		}
@@ -452,12 +461,14 @@ public abstract class Vehicle : IDisposable
 	/// Obtain the cumulative odometry reading since the last call to this function.
 	/// </summary>
 	/// <returns>State diff.</returns>
-	public double[] ReadOdometry()
+	public virtual double[] ReadOdometry(GameTime time)
 	{
 		double[] odometry = Vehicle.StateDiff(odometrystate, refodometrystate);
 
-		odometrystate     = (double[]) State.Clone();
-		refodometrystate  = (double[]) State.Clone();
+		odometrystate     = Util.SClone(State);
+		refodometrystate  = Util.SClone(State);
+
+		WayOdometry.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(odometry)));
 
 		return odometry;
 	}
@@ -473,6 +484,7 @@ public abstract class Vehicle : IDisposable
 	/// </summary>
 	public void ResetHistory()
 	{
+		WayOdometry.Clear();
 		WayPoints.Clear();
 		WayPoints.Add(Tuple.Create(0.0, Util.SClone(state)));
 	}
