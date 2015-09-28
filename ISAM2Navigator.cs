@@ -137,7 +137,7 @@ public class ISAM2Navigator : Navigator
 		}
 
 		for (int i = 0; i < nmotion; ++i) {
-			motionnoise[i] = Math.Sqrt(vehicle.MotionCovariance[i][i]);
+			motionnoise[i] = MotionDt * Math.Sqrt(vehicle.MotionCovariance[i][i]);
 		}
 
 		BestEstimate      = new TrackVehicle();

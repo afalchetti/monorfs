@@ -53,6 +53,12 @@ public abstract class Navigator : IDisposable
 	public bool ShowVisible { get { return Config.ShowVisible; } }
 
 	/// <summary>
+	/// Time difference between iterations, important if the motion covariance is to be used.
+	/// This should scale the covariance as in dt * MotionCovariance.
+	/// </summary>
+	protected static double MotionDt { get { return Config.MeasureElapsed.TotalSeconds; } }
+
+	/// <summary>
 	/// Reference vehicle. Only used if mapping mode is enabled (no localization).
 	/// </summary>
 	public Vehicle RefVehicle { get; private set; }
@@ -130,9 +136,9 @@ public abstract class Navigator : IDisposable
 		const int segments = 32;
 		pinterval = new double[segments][];
 
-		// pinterval will be the 1-sigma ellipse
+		// pinterval will be the 5-sigma ellipse
 		for (int i = 0; i < segments; i++) {
-			pinterval[i] = new double[2] {1 * Math.Cos(2 * Math.PI * i / segments), 1 * Math.Sin(2 * Math.PI * i / segments)};
+			pinterval[i] = new double[2] {5 * Math.Cos(2 * Math.PI * i / segments), 5 * Math.Sin(2 * Math.PI * i / segments)};
 		}
 	}
 
