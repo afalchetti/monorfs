@@ -64,7 +64,8 @@ public static class Config
 	public static bool   PerfectStill         = false;
 
 	// KinectVehicle
-	public static int KinectDelta = 8;
+	public static int  KinectDelta    = 2;
+	public static bool KeypointFilter = false;
 
 	// Navigator
 	public static bool ShowVisible = true;

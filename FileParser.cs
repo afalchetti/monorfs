@@ -419,10 +419,11 @@ public static class FileParser
 	/// Create a vehicle from a real sensor device.
 	/// </summary>
 	/// <param name="sensor">Device (or recorded file) path.</param>
+	/// <param name="sidebar">True to show a sidebar with image processing details.</param>
 	/// <returns>Vehicle linked to sensor.</returns>
-	public static KinectVehicle VehicleFromSensor(string sensor)
+	public static KinectVehicle VehicleFromSensor(string sensor, bool sidebar)
 	{
-		return new KinectVehicle(sensor);
+		return new KinectVehicle(sensor, sidebar);
 	}
 
 	/// <summary>

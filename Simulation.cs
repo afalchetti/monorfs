@@ -241,11 +241,12 @@ public class Simulation : Manipulator
 	/// <param name="realtime">If true, the system works at the highest speed it can;
 	/// otherwise, the framerate is fixed and even if processing takes longer than the timestep, the simulation works
 	/// as it had taken exactly the nominal rate.</param>
+	/// <param name="sidebar">Allow a sidebar with extra details.</param>
 	/// <returns>Prepared simulation object.</returns>
 	public static Simulation FromFiles(string scenefile, string commandfile = "", int particlecount = 5,
 	                                   VehicleType input = VehicleType.Simulation,
 	                                   NavigationAlgorithm algorithm = NavigationAlgorithm.PHD,
-	                                   bool onlymapping = false, bool realtime = false)
+	                                   bool onlymapping = false, bool realtime = false, bool sidebar = true)
 	{
 		Vehicle        explorer;
 		List<double[]> commands;
@@ -254,7 +255,7 @@ public class Simulation : Manipulator
 		try {
 			switch (input) {
 			case VehicleType.Kinect:
-				explorer = FP.VehicleFromSensor(scenefile);
+				explorer = FP.VehicleFromSensor(scenefile, sidebar);
 				break;
 			case VehicleType.Record:
 				explorer = FP.VehicleFromRecord(scenefile);

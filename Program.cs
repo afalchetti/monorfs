@@ -186,7 +186,7 @@ public class Program
 			}
 		}
 		else {
-			using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, input, algorithm, onlymapping, realtime)) {
+			using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, input, algorithm, onlymapping, realtime, !headless)) {
 				SimulatedVehicle initPose = new SimulatedVehicle(sim.Explorer);
 
 				if (headless) {

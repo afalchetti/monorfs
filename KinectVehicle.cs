@@ -133,6 +133,22 @@ public class KinectVehicle : Vehicle
 	private List<SparseItem> interest;
 
 	/// <summary>
+	/// Interest points from the previous frame.
+	/// </summary>
+	private List<FastRetinaKeypoint> prevkeypoints;
+
+	/// <summary>
+	/// True makes the system perform a heavy keypoint
+	/// filtering step before delivering the measurements.
+	/// </summary>
+	private bool KeypointFilter { get { return Config.KeypointFilter; } }
+
+	/// <summary>
+	/// True if the sidebar should be rendered, even if its slows the process a bit.
+	/// </summary>
+	private bool ShowSidebar;
+
+	/// <summary>
 	/// Point texture to illustrate landmark positions.
 	/// </summary>
 	private Texture2D landmark;
@@ -187,7 +203,8 @@ public class KinectVehicle : Vehicle
 	/// </summary>
 	/// <param name="inputfile">Recorded data file.
 	/// If null or empty, an unspecified active hardware sensor is used.</param>
-	public KinectVehicle(string inputfile = null)
+	/// <param name="sidebar">True to show a sidebar with the image processing results.</param>
+	public KinectVehicle(string inputfile = null, bool sidebar = true)
 		: base(new double[3] {0, 0, 0}, Math.PI, new double[3] {1, 0, 0},
 		       575.8156 / Delta,
 		       new Rectangle(-640 / Delta / 2, -480 / Delta / 2,
@@ -207,10 +224,11 @@ public class KinectVehicle : Vehicle
 			DepthFrame = new float[0][];
 			ColorFrame = new Color[0];
 			
-			depthcache   = new Queue<float[][]>();
-			colorcache   = new Queue<Color[]>();
-			featurecache = new Queue<List<SparseItem>>();
-			interest     = new List<SparseItem>();
+			depthcache    = new Queue<float[][]>();
+			colorcache    = new Queue<Color[]>();
+			featurecache  = new Queue<List<SparseItem>>();
+			interest      = new List<SparseItem>();
+			prevkeypoints = new List<FastRetinaKeypoint>();
 			
 			if (device.IsFile) {
 				device.PlaybackControl.Speed = -1;
@@ -224,7 +242,9 @@ public class KinectVehicle : Vehicle
 				                                  Resolution      = new System.Drawing.Size(640, 480) };
 			}
 
-			HasSidebar    = true;
+			ShowSidebar = sidebar;
+			HasSidebar  = sidebar;
+
 			SidebarWidth  = (int) (depth.VideoMode.Resolution.Width  / Delta);
 			SidebarHeight = (int) (depth.VideoMode.Resolution.Height / Delta) * 2;
 
@@ -237,7 +257,7 @@ public class KinectVehicle : Vehicle
 			color.Start();
 
 			if (device.IsFile) {
-				Cache(30 * 12);
+				Cache(30 * 0);
 			}
 		}
 		catch (Exception) {
@@ -266,7 +286,7 @@ public class KinectVehicle : Vehicle
 			measurements.Add(new double[3] {interest[i].I - ResX / 2, interest[i].K - ResY / 2, range});
 		}
 		
-		if (depthsensed != null) {
+		if (ShowSidebar && depthsensed != null) {
 			DepthMatrixToTexture(depthsensed, DepthFrame);
 			ColorMatrixToTexture(colorsensed, ColorFrame);
 		}
@@ -350,7 +370,7 @@ public class KinectVehicle : Vehicle
 			colorframe = ColorFrameToArray(frameref);
 		}
 
-		interest = ExtractKeypoints(colorframe, depthframe, (int) ResX, (int) ResY, 100);
+		interest = ExtractKeypoints(colorframe, depthframe, (int) ResX, (int) ResY, 85);
 	}
 
 	/// <summary>
@@ -424,74 +444,6 @@ public class KinectVehicle : Vehicle
 	}
 
 	/// <summary>
-	/// Get a list of local maxima using the 8-neighborhood.
-	/// </summary>
-	/// <param name="image">Original image.</param>
-	/// <param name="threshold">Minimum fraction of the maximum value.</param>
-	/// <param name="maxcount">Maximum number of interest points. The highest values are chosen.</param>
-	/// <returns>Local maxima list.</returns>
-	private List<SparseItem> LocalMax(float[][] image, float threshold, int maxcount)
-	{
-		List<SparseItem> list = new List<SparseItem>();
-
-		float maxval = image.Max();
-
-		for (int i = 1; i < image   .Length - 1; i++) {
-		for (int k = 1; k < image[0].Length - 1; k++) {
-			bool localmax = image[i][k] > image[i - 1][k    ] &&
-			                image[i][k] > image[i + 1][k    ] &&
-			                image[i][k] > image[i    ][k - 1] &&
-			                image[i][k] > image[i    ][k + 1] &&
-			                image[i][k] > image[i + 1][k - 1] &&
-			                image[i][k] > image[i + 1][k + 1] &&
-			                image[i][k] > image[i - 1][k - 1] &&
-			                image[i][k] > image[i - 1][k + 1];
-
-			if ((image[i][k] > threshold * maxval) && localmax) {
-				list.Add(new SparseItem(i, k, image[i][k]));
-			}
-		}
-		}
-
-		list.Sort((a, b) => Math.Sign(a.Value - b.Value));
-
-		if (maxcount < list.Count) {
-			list.RemoveRange(maxcount, list.Count - maxcount);
-		}
-
-		return list;
-	}
-
-	/// <summary>
-	/// Calculate the intrinsic gaussian curvature of an image.
-	/// </summary>
-	/// <param name="image">Original image.</param>
-	/// <returns>Intrinsic gaussian curvature (k1 x k2).</returns>
-	private float[][] CalculateCurvature(float[][] image)
-	{
-		float[][] curvature = new float[image.Length][];
-		
-		for (int i = 0; i < curvature.Length; i++) {
-			curvature[i] = new float[image[0].Length];
-		}
-		
-		for (int i = 1; i < image   .Length - 1; i++) {
-		for (int k = 1; k < image[0].Length - 1; k++) {
-			float fx  = 0.5f * (image[i + 1][k] - image[i - 1][k]);
-			float fy  = 0.5f * (image[i][k + 1] - image[i][k - 1]);
-			float fxx = image[i + 1][k] - 2 * image[i][k] + image[i - 1][k];
-			float fyy = image[i][k + 1] - 2 * image[i][k] + image[i][k - 1];
-			float fxy = 0.25f * (image[i + 1][k + 1] + image[i - 1][k - 1] - image[i - 1][k + 1] - image[i + 1][k - 1]);
-
-			float denom     = (1 + fx * fx + fy * fy);
-			curvature[i][k] = (fxx * fyy - fxy * fxy) / (denom * denom);
-		}
-		}
-
-		return curvature;
-	}
-
-	/// <summary>
 	/// Straightforward reverse comparer (big goes before small).
 	/// </summary>
 	private class ReverseComparer : IComparer<int>
@@ -508,27 +460,56 @@ public class KinectVehicle : Vehicle
 	/// <param name="height">Input image height.</param>
 	/// <param name="threshold">Selection threshold value. Higher gives less keypoints.</param>
 	/// <returns>List of keypoints in measurement space.</returns>
-	private static List<SparseItem> ExtractKeypoints(Color[] image, float[][] depth, int width, int height, int threshold = 20)
+	private List<SparseItem> ExtractKeypoints(Color[] image, float[][] depth, int width, int height, int threshold)
 	{
 		var detector = new FastRetinaKeypointDetector(threshold);
 		int border   = Math.Min(50, (int) (width * 0.05));
 		List<SparseItem> keypoints = new List<SparseItem>();
 
-		detector.ComputeDescriptors = FastRetinaKeypointDescriptorType.None;
+		List<FastRetinaKeypoint> features = null;
+
+		detector.ComputeDescriptors = (KeypointFilter) ? FastRetinaKeypointDescriptorType.Standard :
+		                                                   FastRetinaKeypointDescriptorType.None;
 
 		using (UnmanagedImage bitmap = ColorMatrixToImage(image, width, height)) {
-			FastRetinaKeypoint[] features  = detector.ProcessImage(bitmap).ToArray();
+			features = detector.ProcessImage(bitmap);
 
-			for (int i = 0; i < features.Length; i++) {
-				FastRetinaKeypoint point = features[i];
+			IntPoint[] filtered = null;
 
-				int x = (int) point.X;
-				int y = (int) point.Y;
+			if (KeypointFilter && features.Count > 4 && prevkeypoints.Count > 4) {
+				var     matches = new KNearestNeighborMatching(5).Match(prevkeypoints, features);
+				var     ransac  = new RansacHomographyEstimator(0.001, 0.99);
+
+				ransac.Estimate(matches);
+				int[]   inliers = ransac.Inliers;
+
+				filtered = new IntPoint[inliers.Length];
+
+				for (int i = 0; i < inliers.Length; i++) {
+					filtered[i] = matches[1][inliers[i]];
+				}
+			}
+			else {
+				// do nothing, use all the keypoints as they are the only data available
+				filtered = new IntPoint[features.Count];
+
+				for (int i = 0; i < features.Count; i++) {
+					filtered[i] = new IntPoint((int) features[i].X, (int) features[i].Y);
+				}
+			}
+
+			for (int i = 0; i < filtered.Length; i++) {
+				IntPoint point = filtered[i];
+
+				int x = point.X;
+				int y = point.Y;
 
 				if (x >= border && x < bitmap.Width - border && y >= border && y < bitmap.Height - border && depth[x][y] != 0) {
 					keypoints.Add(new SparseItem(x, y, depth[x][y]));
 				}
 			}
+
+			prevkeypoints = features;
 		}
 
 		return keypoints;
