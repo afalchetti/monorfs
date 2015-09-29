@@ -363,6 +363,19 @@ public class Simulation : Manipulator
 				dpitch += autocmd[4];
 				droll  += autocmd[5];
 
+				// the 7th parameter, if any, can force slam or mapping
+				if (autocmd.Length > 6) {
+					if (autocmd[6] > 0) {
+						forceslam    = true;
+						forcemapping = false;
+					}
+					else if (autocmd[6] < 0) {
+						forceslam    = false;
+						forcemapping = true;
+					}
+					// else, autocmd[6] == 0, do nothing
+				}
+
 				commandindex++;
 			}
 			else if (Commands.Count != 0) {

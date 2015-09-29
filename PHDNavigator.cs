@@ -234,7 +234,7 @@ public class PHDNavigator : Navigator
 	/// <param name="particlecount">Number of particles for the Montecarlo filter.</param>
 	public void CollapseParticles(int particlecount)
 	{
-		reset(BestEstimate, BestMapModel, toexplore[BestParticle], particlecount);
+		reset(RefVehicle, BestMapModel, toexplore[BestParticle], particlecount);
 	}
 
 	/// <summary>
@@ -242,7 +242,7 @@ public class PHDNavigator : Navigator
 	/// </summary>
 	/// <param name="vehicle">New vehicle pose.</param>
 	/// <param name="model">New map model estimate.</param>
-	/// <param name="explore">New qeued measurements to explore.</param>
+	/// <param name="explore">New queued measurements to explore.</param>
 	/// <param name="particlecount">Number of particles for the Montecarlo filter.</param>
 	private void reset(Vehicle vehicle, List<Gaussian> model, List<double[]> explore, int particlecount)
 	{
@@ -256,9 +256,9 @@ public class PHDNavigator : Navigator
 		toexplore        = new List<double[]>[particlecount];
 
 		for (int i = 0; i < particlecount; i++) {
-			VehicleParticles[i] = RefVehicle.TrackClone(MotionCovarianceMultiplier,
-			                                            MeasurementCovarianceMultiplier,
-			                                            PD, ClutterDensity);
+			VehicleParticles[i] = vehicle.TrackClone(MotionCovarianceMultiplier,
+			                                         MeasurementCovarianceMultiplier,
+			                                         PD, ClutterDensity, true);
 			MapModels       [i] = new List<Gaussian>(model);
 			VehicleWeights  [i] = 1.0 / particlecount;
 			toexplore       [i] = new List<double[]>(explore);
