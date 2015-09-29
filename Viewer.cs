@@ -131,6 +131,11 @@ public class Viewer : Manipulator
 	private bool taggone;
 
 	/// <summary>
+	/// True if the user has added new tags, so the file should be rewritten.
+	/// </summary>
+	public bool TagChanged { get; private set; }
+
+	/// <summary>
 	/// Construct a visualization from its components.
 	/// </summary>
 	/// <param name="title">Window title.</param>
@@ -153,6 +158,7 @@ public class Viewer : Manipulator
 		Measurements = measurements;
 		Tags         = tags;
 		FrameIndex   = 0;
+		TagChanged   = false;
 
 		while (Measurements.Count < map.Count) {
 			Measurements.Add(Tuple.Create(map[Measurements.Count].Item1, new List<double[]>()));
@@ -371,6 +377,13 @@ public class Viewer : Manipulator
 		// normal speed, forward
 		if (keyboard.IsKeyDown(Keys.S)) {
 			Paused = false;
+		}
+
+		// add a new tag
+		if (keyboard.IsKeyDown(Keys.G) && !prevkeyboard.IsKeyDown(Keys.G)) {
+			Tags.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, "User tag"));
+			Tags.Sort();
+			TagChanged = true;
 		}
 
 		if (!Paused) {

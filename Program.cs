@@ -162,6 +162,26 @@ public class Program
 
 			using (Viewer sim = Viewer.FromFiles(recfile, filterhistory, out tmpdir)) {
 				sim.Run();
+
+				if (sim.TagChanged) {
+					string datadir = Path.Combine(tmpdir, "data");
+					string bkpfile = recfile + ".bk";
+
+					Console.WriteLine("  -- tags were modified, rewriting");
+					File.WriteAllText(Path.Combine(datadir, "tags.out"), sim.SerializedTags);
+
+					Console.WriteLine("  -- old file was moved to " + bkpfile);
+
+					if (File.Exists(bkpfile)) {
+						File.Delete(bkpfile);
+					}
+
+					File.Move(recfile, bkpfile);
+					
+					Console.WriteLine("  -- compressing");
+					ZipFile.CreateFromDirectory(datadir, recfile);
+				}
+
 				Directory.Delete(tmpdir, true);
 			}
 		}
