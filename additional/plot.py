@@ -72,12 +72,14 @@ def readtrajectory(descriptor):
 	return [{"time": p[0], "pos": np.array((p[1], p[2], p[3]))} for p in points]
 
 def readtrajectoryhistory(descriptor):
+	descriptor = normalizelinefeeds(descriptor)
 	history = descriptor.split("\n|\n")
 	return [readtrajectory(snapshot.split("\n", 1)[1]) for snapshot in history]
 
 # histfilter -> for every time, use the best estimate at that time, not at the end
 def readfinaltrajectory(descriptor, histfilter):
 	if histfilter:
+		descriptor = normalizelinefeeds(descriptor)
 		history  = descriptor.split("\n|\n")
 		filtered = ""
 		
@@ -95,6 +97,13 @@ def readmaps(descriptor):
 	
 	return [tuple((float(head), [parsegaussian(line) for line in tail.split("\n") if line != ""])) for (head, tail) in descriptors]
 
+def readtags(descriptor):
+	descriptor = normalizelinefeeds(descriptor)
+	tags       = (line.split(" ", 1) for line in descriptor.split("\n") if line)
+	
+	return [(float(entry[0]), entry[1]) for entry in tags if len(entry) > 1]
+	
+	
 def parsegaussian(descriptor):
 	descriptors = descriptor.split(";")
 	weight      = float(descriptor[0])
@@ -212,29 +221,69 @@ def addgraphs(a, b):
 	(tb, fb) = b
 	
 	t = ta if (max(ta) > max(tb)) else tb
-
+	
 	faproj = np.interp(t, ta, fa, right=float("inf"))
 	fbproj = np.interp(t, tb, fb, right=float("inf"))
 	
 	fadd   = [faproj[i] + fbproj[i] for i in xrange(len(t))]
-
+	
 	return (t, fadd)
 
-def plot(poseerror, maperror, posefile, mapfile):
+def addtags(a, b):
+	if a is None:
+		return b
+	elif b is None:
+		return a
+	
+	tags = a[:]
+	
+	# though it has bad complexity, there should be very few tags
+	# so this shouldn't be too bad
+	for entry in b:
+		close = [x[1] for x in a if abs(x[0] - entry[0]) < 1e-5]
+		
+		if (b[1] not in close):
+			tags.append(entry)
+	
+	return tags
+
+def plot(poseerror, maperror, tags, posefile, mapfile):
 	if poseerror is not None:
 		pplot = mp.figure(1)
+		
+		ymax = max(poseerror[1])
+		
+		if tags is not None:
+			for tag in tags:
+				color = "#ff2222" if tag[1].startswith("!") else "#bbbbbb"
+				mp.axvline(tag[0], color=color, linewidth=0.5)
+				mp.annotate(xy=(tag[0], ymax), s=tag[1], color=color, fontsize=5, family="sans-serif",
+					xycoords='data', xytext=(1, -2), textcoords='offset points', rotation="vertical", verticalalignment="top")
+		
 		mp.plot(*poseerror)
 		mp.xlabel("Time [s]")
 		mp.ylabel("Pose error [m]")
+		
 		mp.autoscale(tight=True)
 		pplot.subplots_adjust(bottom=0.15)
 		mp.savefig(posefile)
 	
 	if maperror is not None:
 		mplot = mp.figure(2)
+		
+		ymax = max(maperror[1])
+		
+		if tags is not None:
+			for tag in tags:
+				color = "#ff2222" if tag[1].startswith("!") else "#bbbbbb"
+				mp.axvline(tag[0], color=color, linewidth=0.5)
+				mp.annotate(xy=(tag[0], ymax), s=tag[1], color=color, fontsize=5, family="sans-serif",
+					xycoords='data', xytext=(1, -2), textcoords='offset points', rotation="vertical", verticalalignment="top")
+				
 		mp.plot(*maperror)
 		mp.xlabel("Time [s]")
 		mp.ylabel("OSPA Map error")
+		
 		mp.autoscale(tight=True)
 		mplot.subplots_adjust(bottom=0.15)
 		mp.savefig(mapfile)
@@ -272,6 +321,16 @@ def processdir(directory, histmode = HistMode.Smooth, verbose = False):
 		print "     [!] no map estimate found, skipping map error calculation"
 		maps = None
 	
+	if verbose:
+		print "  -- reading tags"
+	
+	try:
+		with open(os.path.join(directory, "tags.out")) as tfile:
+			tags = readtags(tfile.read())
+	except:
+		print "     [!] no tags found, skipping"
+		tags = None
+	
 	perror = None
 	merror = None
 	
@@ -287,7 +346,7 @@ def processdir(directory, histmode = HistMode.Smooth, verbose = False):
 			
 		merror = maperror(scene["map"], maps)
 
-	return (perror, merror)
+	return (perror, merror, tags)
 
 def processfile(datafile, histmode = HistMode.Smooth, verbose = False):
 	tmp     = tempfile.mkdtemp()
@@ -299,7 +358,7 @@ def processfile(datafile, histmode = HistMode.Smooth, verbose = False):
 		datazip.extractall(datadir)
 
 	print "processing", datafile
-	(perror, merror) = processdir(datadir, histmode, verbose)
+	(perror, merror, tags) = processdir(datadir, histmode, verbose)
 
 	shutil.rmtree(tmp)
 	
@@ -309,7 +368,7 @@ def processfile(datafile, histmode = HistMode.Smooth, verbose = False):
 	if merror is not None:
 		np.savetxt(datafile  + ".map.data", merror)
 
-	return (perror, merror)
+	return (perror, merror, tags)
 
 def processfile2(args):
 	try:
@@ -351,7 +410,7 @@ def main():
 		offset   = 3
 		histmode = HistMode.Smooth
 	
-	verbose = True
+	verbose = False
 	
 	pool   = multiprocessing.Pool()
 	errors = pool.map(processfile2, [(f, histmode, verbose) for f in sys.argv[offset:]])
@@ -359,12 +418,13 @@ def main():
 	pool.close()
 	pool.join()
 	
-	(totalp, totalm) = errors[0]
+	(totalp, totalm, totalt) = errors[0]
 	
 	for i in xrange(1, len(errors)):
-		perror, merror = errors[i]
+		perror, merror, tags = errors[i]
 		totalp = addgraphs(totalp, perror)
 		totalm = addgraphs(totalm, merror)
+		totalt = addtags(totalt, tags)
 	
 	if totalp is not None:
 		totalp = (np.array(totalp[0]), np.array(totalp[1]) / n)
@@ -375,7 +435,7 @@ def main():
 		np.savetxt(mapfile  + ".data", totalm)
 	
 	print "plotting"
-	plot(totalp, totalm, posefile, mapfile)
+	plot(totalp, totalm, totalt, posefile, mapfile)
 	
 
 if __name__ == '__main__':
