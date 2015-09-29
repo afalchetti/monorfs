@@ -43,7 +43,7 @@ using TimedState        = System.Collections.Generic.List<System.Tuple<double, d
 using TimedTrajectory   = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<System.Tuple<double, double[]>>>>;
 using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
-using monorfs;
+using TimedMessage      = System.Collections.Generic.List<System.Tuple<double, string>>;
 
 namespace monorfs
 {
@@ -121,6 +121,16 @@ public class Viewer : Manipulator
 	private int FrameIndex;
 
 	/// <summary>
+	/// Smooth tag color updater generator.
+	/// </summary>
+	private IEnumerator<Color> tagupdater;
+
+	/// <summary>
+	/// True if the tag is no longer being displayed onscreen.
+	/// </summary>
+	private bool taggone;
+
+	/// <summary>
 	/// Construct a visualization from its components.
 	/// </summary>
 	/// <param name="title">Window title.</param>
@@ -129,10 +139,11 @@ public class Viewer : Manipulator
 	/// <param name="estimate">Recorded estimated vehicle trajectory.</param>
 	/// <param name="map">Recorded maximum-a-posteriori estimate for the map.</param>
 	/// <param name="measurements">Recorded vehicle measurements.</param>
+	/// <param name="tags">Tags in the timeline.</param>
 	/// <param name="fps">Frame rate.</param>
 	/// <param name="sidebarfile">Sidebar video filename.</param>
 	public Viewer(string title, SimulatedVehicle explorer, TimedState trajectory, TimedTrajectory estimate,
-	              TimedMapModel map, TimedMeasurements measurements,
+	              TimedMapModel map, TimedMeasurements measurements, TimedMessage tags,
 	              double fps, string sidebarfile)
 		: base(title, explorer, new PHDNavigator(explorer, 1, false), false, fps)
 	{
@@ -140,6 +151,7 @@ public class Viewer : Manipulator
 		Estimate     = estimate;
 		Map          = map;
 		Measurements = measurements;
+		Tags         = tags;
 		FrameIndex   = 0;
 
 		while (Measurements.Count < map.Count) {
@@ -191,6 +203,7 @@ public class Viewer : Manipulator
 		string estimatefile = Path.Combine(datadir, "estimate.out");
 		string mapfile      = Path.Combine(datadir, "maps.out");
 		string measurefile  = Path.Combine(datadir, "measurements.out");
+		string tagfile      = Path.Combine(datadir, "tags.out");
 		string sidebarfile  = Path.Combine(datadir, "sidebar.avi");
 
 		if (!File.Exists(scenefile)) {
@@ -199,6 +212,10 @@ public class Viewer : Manipulator
 
 		if (!File.Exists(measurefile)) {
 			measurefile = "";
+		}
+
+		if (!File.Exists(tagfile)) {
+			tagfile = "";
 		}
 
 		if (!File.Exists(sidebarfile)) {
@@ -210,6 +227,7 @@ public class Viewer : Manipulator
 		TimedTrajectory   estimate;
 		TimedMapModel     map;
 		TimedMeasurements measurements;
+		TimedMessage      tags;
 
 		trajectory   = FP.TimedArrayFromDescriptor       (File.ReadAllLines(vehiclefile),  7);
 		estimate     = FP.TrajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), 7, filterhistory);
@@ -222,6 +240,13 @@ public class Viewer : Manipulator
 			measurements = new TimedMeasurements();
 		}
 
+		if (!string.IsNullOrEmpty(tagfile)) {
+			tags = FP.TimedMessageFromDescriptor(File.ReadAllLines(tagfile));
+		}
+		else {
+			tags = new TimedMessage();
+		}
+
 		if (!string.IsNullOrEmpty(scenefile)) {
 			explorer = FP.VehicleFromSimFile(File.ReadAllText(scenefile));
 		}
@@ -229,7 +254,19 @@ public class Viewer : Manipulator
 			explorer = new SimulatedVehicle(new double[3] {0, 0, 0}, 0, new double[3] {0, 0, 1}, new List<double[]>());
 		}
 
-		return new Viewer("monorfs - viewing " + datafile, explorer, trajectory, estimate, map, measurements, 30, sidebarfile);
+		return new Viewer("monorfs - viewing " + datafile, explorer, trajectory, estimate, map, measurements, tags, 30, sidebarfile);
+	}
+
+	/// <summary>
+	/// Allow the manipulator to perform any initialization it needs to do before it starts running.
+	/// </summary>
+	protected override void Initialize()
+	{
+		taggone     = true;
+		tagupdater  = System.Linq.Enumerable.Empty<Color>().GetEnumerator();
+		tagupdater.MoveNext();
+
+		base.Initialize();
 	}
 
 	/// <summary>
@@ -291,7 +328,27 @@ public class Viewer : Manipulator
 			Explorer.MappedMeasurements.Add(Explorer.MeasureToMap(z));
 		}
 
-		Message = string.Format("time = {0,12:N4}        frame = {1,5:N0}", Estimate[FrameIndex].Item1, FrameIndex);
+		if (!taggone) {
+			TagColor = tagupdater.Current;
+			taggone  = !tagupdater.MoveNext();
+		}
+
+		double viewtime = Estimate[FrameIndex].Item1;
+		int    tagindex = Tags.BinarySearch(Tuple.Create(viewtime, ""));
+
+		if (tagindex != ~Tags.Count) {
+			if (tagindex < 0) {
+				tagindex = ~tagindex;
+			}
+
+			if (Math.Abs(Tags[tagindex].Item1 - viewtime) < 1e-5) {
+				TagMessage = Tags[tagindex].Item2;
+				tagupdater = smoothFader(Color.White, Color.DimGray);
+				taggone    = !tagupdater.MoveNext();
+			}
+		}
+
+		Message = string.Format("time = {0,12:N4}        frame = {1,5:N0}", viewtime, FrameIndex);
 		
 		// frame-by-frame fine time lookup, reverse
 		if (keyboard.IsKeyDown(Keys.Q) && !prevkeyboard.IsKeyDown(Keys.Q)) {
@@ -337,6 +394,20 @@ public class Viewer : Manipulator
 		Flip.Draw(SideBuffer2, SideDest, SideBuffer2.Bounds, Color.White);
 		
 		Flip.End();
+	}
+
+	/// <summary>
+	/// Create a generator of smooth transition between colors.
+	/// </summary>
+	/// <param name="initial">Initial color.</param>
+	/// <param name="final">Final color.</param>
+	/// <returns>Color transition generator.</returns>
+	private IEnumerator<Color> smoothFader(Color initial, Color final)
+	{
+		for (int x = 0; x <= TransitionFrames; x++) {
+			double alpha = Util.SmoothTransition((double) x / TransitionFrames);
+			yield return Color.Lerp(initial, final, (float) alpha);
+		}
 	}
 
 	/// <summary>

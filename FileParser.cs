@@ -41,6 +41,7 @@ using TimedArray        = System.Collections.Generic.List<System.Tuple<double, d
 using TimedTrajectory   = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<System.Tuple<double, double[]>>>>;
 using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
+using TimedMessage      = System.Collections.Generic.List<System.Tuple<double, string>>;
 
 namespace monorfs
 {
@@ -231,6 +232,32 @@ public static class FileParser
 		}
 
 		return history;
+	}
+
+	/// <summary>
+	/// Get a timed message list from a formatted string descriptor.
+	/// </summary>
+	/// <param name="lines">Array of messages moving through time.</param>
+	/// <returns>Timed message list.</returns>
+	public static TimedMessage TimedMessageFromDescriptor(string[] lines)
+	{
+		TimedMessage array = new TimedMessage();
+
+		foreach (string line in lines) {
+			string[] values = line.Split(new char[] {' '}, 2);
+			double time = 0;
+
+			try {
+				time = double.Parse(values[0]);
+			}
+			catch (FormatException) {
+				throw new FormatException("the TimedMessage descriptor '" + line + "' is malformed");
+			}
+
+			array.Add(Tuple.Create(time, values[1]));
+		}
+
+		return array;
 	}
 
 	/// <summary>

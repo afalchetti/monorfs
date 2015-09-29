@@ -35,6 +35,8 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 
+using TimedMessage = System.Collections.Generic.List<System.Tuple<double, string>>;
+
 namespace monorfs
 {
 /// <summary>
@@ -202,12 +204,48 @@ public abstract class Manipulator : Game
 	private Vector2 messagepos;
 
 	/// <summary>
+	/// Tags in the timeline.
+	/// </summary>
+	public TimedMessage Tags { get; protected set; }
+
+	/// <summary>
+	/// Tag message displayed next to the rendered simulation. 
+	/// </summary>
+	public string TagMessage { get; protected set; }
+
+	/// <summary>
+	/// Tag color (should fade with time).
+	/// </summary>
+	public Color TagColor { get; protected set; }
+
+	/// <summary>
+	/// Tag message position.
+	/// </summary>
+	public Vector2 TagMessagePos { get; protected set; }
+
+	/// <summary>
+	/// Get a string representation of the tags in the timeline.
+	/// </summary>
+	public string SerializedTags
+	{
+		get
+		{
+			return string.Join("\n", Tags.ConvertAll(
+				s => {double time    = s.Item1;
+			          string message = s.Item2;
+				      return time.ToString("g6") + " " + message; }
+			));
+		}
+	}
+
+	/// <summary>
 	/// Construct a Manipulator from its components.
 	/// </summary>
 	/// <param name="title">Window title.</param>
 	/// <param name="explorer">Explorer vehicle.</param>
 	/// <param name="navigator">SLAM solver.</param>
 	/// <param name="realtime">Realtime data processing.</param>
+	/// <param name="tags">Tags in the timeline.</param>
 	/// <param name="fps">Frame per seconds.</param>
 	protected Manipulator(string title, Vehicle explorer, Navigator navigator, bool realtime, double fps = 30)
 	{
@@ -232,6 +270,11 @@ public abstract class Manipulator : Game
 		FrameElapsed = new TimeSpan((long) (10000000/fps));
 		Message      = "";
 		messagepos   = new Vector2(350, graphicsManager.PreferredBackBufferHeight - 30);
+
+		Tags          = new TimedMessage();
+		TagMessage    = "";
+		TagMessagePos = new Vector2(620, graphicsManager.PreferredBackBufferHeight - 30);
+		TagColor      = Color.Black;
 
 		IsFixedTimeStep   = false;
 		TargetElapsedTime = FrameElapsed;
@@ -457,7 +500,8 @@ public abstract class Manipulator : Game
 
 		Flip.Draw(SceneBuffer, SceneDest, SceneBuffer.Bounds, Color.White);
 		Flip.Draw(SideBuffer,  SideDest,  SideBuffer .Bounds, Color.White);
-		Flip.DrawString(font, Message, messagepos, Color.White);
+		Flip.DrawString(font, Message,    messagepos,    Color.White);
+		Flip.DrawString(font, TagMessage, TagMessagePos, TagColor);
 		
 		Flip.End();
 

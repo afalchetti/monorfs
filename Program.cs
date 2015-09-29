@@ -198,6 +198,8 @@ public class Program
 				File.WriteAllText(Path.Combine(output, "maps.out"),         sim.SerializedMaps);
 				Console.WriteLine("  -- writing measurements history");
 				File.WriteAllText(Path.Combine(output, "measurements.out"), sim.SerializedMeasurements);
+				Console.WriteLine("  -- writing tags");
+				File.WriteAllText(Path.Combine(output, "tags.out"), sim.SerializedTags);
 
 				if (sim.Explorer.HasSidebar) {
 					Console.WriteLine("  -- writing sidebar video");

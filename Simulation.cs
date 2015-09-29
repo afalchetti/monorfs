@@ -419,9 +419,11 @@ public class Simulation : Manipulator
 			}
 
 			if (forceslam) {
+				Tags.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, "SLAM mode on"));
 				Navigator.StartSlam();
 			}
 			else if (forcemapping) {
+				Tags.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, "Mapping mode on"));
 				Navigator.StartMapping();
 			}
 		}
