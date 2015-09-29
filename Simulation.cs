@@ -403,6 +403,7 @@ public class Simulation : Manipulator
 					Navigator.SlamUpdate(time, measurements);
 				}
 				catch (InvalidOperationException) {  // gtsam failure
+					Tags.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, "!gtsam failure"));
 					commanddepleted = true;  // force exit in next call
 				}
 
