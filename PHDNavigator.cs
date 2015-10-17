@@ -381,22 +381,60 @@ public class PHDNavigator : Navigator
 	/// <param name="predicted">Predicted map model.</param>
 	/// <param name="corrected">Corrected map model.</param>
 	/// <param name="pose">Vehicle pose.</param>
-	/// <returns>Total likelihood weight.</returns>
+	/// <returns>Total weight update factor.</returns>
 	public double WeightAlpha(List<double[]> measurements, List<Gaussian> predicted, List<Gaussian> corrected, SimulatedVehicle pose)
 	{
-		List<Gaussian> visible = corrected.FindAll(g => pose.Visible(g.Mean) && g.Weight > 0.8);
+		List<Gaussian> cvisible = corrected.FindAll(g => pose.Visible(g.Mean) && g.Weight > 0.8);
 
+		double plikelihood = 1;
+		double clikelihood = 1;
+
+		foreach (var component in cvisible) {
+			plikelihood *= EvaluateModel(predicted, component.Mean);
+			clikelihood *= EvaluateModel(corrected, component.Mean);
+		}
+
+		double pcount = 0;
+		double ccount = 0;
+
+		foreach (var component in predicted) {
+			pcount += component.Weight;
+		}
+
+		foreach (var component in corrected) {
+			ccount += component.Weight;
+		}
+
+		double setlikelihood = SetLikelihood(measurements, cvisible, pose);
+
+		double likelihoodratio = plikelihood / clikelihood;
+
+		if (pcount > 0 && ccount > 0) {
+			likelihoodratio *= ccount / pcount;
+		}
+
+		return setlikelihood * likelihoodratio;
+	}
+
+	/// <summary>
+	/// Calculate the set likelihood P(Z|X, M).
+	/// </summary>
+	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
+	/// <param name="map">Map model.</param>
+	/// <param name="pose">Vehicle pose.</param>
+	/// <returns>Set likelihood.</returns>
+	public double SetLikelihood(List<double[]> measurements, List<Gaussian> map, SimulatedVehicle pose)
+	{
 		// exact calculation if there are few components/measurements;
 		// use the most probable components approximation otherwise
-		SparseMatrix logprobs = new SparseMatrix(visible.Count + measurements.Count, visible.Count + measurements.Count, double.NegativeInfinity);
+		SparseMatrix logprobs = new SparseMatrix(map.Count + measurements.Count, map.Count + measurements.Count, double.NegativeInfinity);
 
 		double     logPD      = Math.Log(pose.PD);
 		double     logclutter = Math.Log(pose.ClutterDensity);
-		Gaussian[] zprobs     = new Gaussian[visible.Count];
+		Gaussian[] zprobs     = new Gaussian[map.Count];
 
-
-		for (int i = 0; i < visible.Count; i++) {
-			zprobs[i] = new Gaussian(pose.MeasurePerfect(visible[i].Mean), pose.MeasurementCovariance, 1); 
+		for (int i = 0; i < map.Count; i++) {
+			zprobs[i] = new Gaussian(pose.MeasurePerfect(map[i].Mean), pose.MeasurementCovariance, 1); 
 		}
 
 		for (int i = 0; i < zprobs.Length;      i++) {
@@ -410,12 +448,12 @@ public class PHDNavigator : Navigator
 		}
 		}
 		
-		for (int i = 0; i < visible.Count; i++) {
+		for (int i = 0; i < map.Count; i++) {
 			logprobs[i, measurements.Count + i] = logPD;
 		}
 
 		for (int i = 0; i < measurements.Count; i++) {
-			logprobs[visible.Count + i, i] = logclutter;
+			logprobs[map.Count + i, i] = logclutter;
 		}
 
 		List<SparseMatrix> connectedfull = GraphCombinatorics.ConnectedComponents(logprobs);
@@ -428,7 +466,7 @@ public class PHDNavigator : Navigator
 
 			// fill the (Misdetection x Clutter) quadrant of the matrix with zeros (don't contribute)
 			for (int k = 0; k < rows.Length; k++) {
-				if (rows[k] >= visible.Count) {
+				if (rows[k] >= map.Count) {
 					for (int h = 0; h < cols.Length; h++) {
 						if (cols[h] >= measurements.Count) {
 							component[k, h] = 0;
@@ -445,7 +483,7 @@ public class PHDNavigator : Navigator
 
 			IEnumerable<int[]> assignments;
 			if (component.Rows.Count <= 8) {
-				assignments = GraphCombinatorics.LexicographicalPairing(component, visible.Count);
+				assignments = GraphCombinatorics.LexicographicalPairing(component, map.Count);
 
 			}
 			else {
