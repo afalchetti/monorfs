@@ -377,6 +377,7 @@ public static class FileParser
 		string trajectoryfile = Path.Combine(datadir, "trajectory.out");
 		string odometryfile   = Path.Combine(datadir, "odometry.out");
 		string measurefile    = Path.Combine(datadir, "measurements.out");
+		string tagfile        = Path.Combine(datadir, "tags.out");
 
 		if (!File.Exists(scenefile)) {
 			throw new ArgumentException("Missing scene file");
@@ -394,10 +395,15 @@ public static class FileParser
 			throw new ArgumentException("Missing measurement file");
 		}
 
+		if (!File.Exists(tagfile)) {
+			tagfile = "";
+		}
+
 		RecordVehicle     explorer;
 		TimedState        trajectory;
 		TimedArray        odometry;
 		TimedMeasurements measurements;
+		TimedMessage      tags;
 
 		SimulatedVehicle template = VehicleFromSimFile(File.ReadAllText(scenefile));
 
@@ -405,10 +411,17 @@ public static class FileParser
 		odometry     = TimedArrayFromDescriptor  (File.ReadAllLines(odometryfile), 6);
 		measurements = MeasurementsFromDescriptor(File.ReadAllText(measurefile));
 
+		if (!string.IsNullOrEmpty(tagfile)) {
+			tags = TimedMessageFromDescriptor(File.ReadAllLines(tagfile));
+		}
+		else {
+			tags = new TimedMessage();
+		}
+
 		// insert a dummy frame to simplify indexing
 		odometry.Insert(0, Tuple.Create(0.0, new double[6]));
 
-		explorer = new RecordVehicle(trajectory, odometry, measurements, template.Landmarks);
+		explorer = new RecordVehicle(trajectory, odometry, measurements, tags, template.Landmarks);
 
 		Directory.Delete(tmpdir, true);
 

@@ -278,6 +278,16 @@ public abstract class Vehicle : IDisposable
 	public bool WantsToStop { get; protected set; }
 
 	/// <summary>
+	/// If true, suggest other actors to use SLAM instead of mapping.
+	/// </summary>
+	public bool WantsSLAM { get; protected set; }
+
+	/// <summary>
+	/// If true, suggest other actors to use mapping instead of SLAM.
+	/// </summary>
+	public bool WantsMapping { get; protected set; }
+
+	/// <summary>
 	/// Construct a vehicle with default constants.
 	/// </summary>
 	protected Vehicle() : this(new double[3] {0, 0, 0}, 0, new double[3] {1, 0, 0}) {}
@@ -326,8 +336,10 @@ public abstract class Vehicle : IDisposable
 		WayPoints   = new TimedState();
 		WayPoints.Add(Tuple.Create(0.0, Util.SClone(state)));
 
-		HasSidebar  = false;
-		WantsToStop = false;
+		HasSidebar   = false;
+		WantsToStop  = false;
+		WantsSLAM    = false;
+		WantsMapping = false;
 	}
 
 	/// <summary>

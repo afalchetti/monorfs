@@ -39,6 +39,7 @@ using TimedArray        = System.Collections.Generic.List<System.Tuple<double, d
 using TimedTrajectory   = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<System.Tuple<double, double[]>>>>;
 using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
+using TimedMessage      = System.Collections.Generic.List<System.Tuple<double, string>>;
 
 namespace monorfs
 {
@@ -76,6 +77,11 @@ public class RecordVehicle : Vehicle
 	public TimedMeasurements Measurements { get; private set; }
 
 	/// <summary>
+	/// Prerecorded tags. Used for the SLAM/Mapping events.
+	/// </summary>
+	public TimedMessage Tags { get; private set; }
+
+	/// <summary>
 	/// Current frame index.
 	/// </summary>
 	public int FrameIndex { get; private set; }
@@ -91,13 +97,16 @@ public class RecordVehicle : Vehicle
 	/// <param name="trajectory">Prerecorded trajectory.</param>
 	/// <param name="odometry">Prerecorded odometry.</param>
 	/// <param name="measurements">Prerecorded measurements.</param>
+	/// <param name="tags">Prerecorded tags.</param>
 	/// <param name="landmarks">Landmark 3d locations against which the measurements were performed.</param>
 	public RecordVehicle(TimedState trajectory, TimedArray odometry,
-	                     TimedMeasurements measurements, List<double[]> landmarks)
+	                     TimedMeasurements measurements, TimedMessage tags,
+	                     List<double[]> landmarks)
 	{
 		Trajectory   = trajectory;
 		Odometry     = odometry;
 		Measurements = measurements;
+		Tags         = tags;
 
 		if (Trajectory.Count != Measurements.Count) {
 			throw new ArgumentException("Trajectory and measurement data must be have the same length.");
@@ -135,6 +144,28 @@ public class RecordVehicle : Vehicle
 	{
 		State = Trajectory[FrameIndex].Item2;
 		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(State)));
+
+		// Updates SLAM/Mapping suggestions from tags
+		WantsSLAM    = false;
+		WantsMapping = false;
+
+		double viewtime = Trajectory[FrameIndex].Item1;
+		int    tagindex = Tags.BinarySearch(Tuple.Create(viewtime, ""));
+
+		if (tagindex != ~Tags.Count) {
+			if (tagindex < 0) {
+				tagindex = ~tagindex;
+			}
+
+			if (Math.Abs(Tags[tagindex].Item1 - viewtime) < 1e-5) {
+				if (Tags[tagindex].Item2 == "SLAM mode on") {
+					WantsSLAM = true;
+				}
+				else if (Tags[tagindex].Item2 == "Mapping mode on") {
+					WantsMapping = true;
+				}
+			}
+		}
 	}
 
 	/// <summary>

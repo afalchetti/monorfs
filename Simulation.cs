@@ -388,6 +388,14 @@ public class Simulation : Manipulator
 
 			Explorer.Update(time, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
 
+			if (Explorer.WantsSLAM) {
+				forceslam = true;
+			}
+
+			if (Explorer.WantsMapping) {
+				forcemapping = true;
+			}
+
 			if (UseOdometry) {
 				double[] odm = Explorer.ReadOdometry(time);
 				Navigator.Update(time, odm[0], odm[1], odm[2], odm[3], odm[4], odm[5]);
