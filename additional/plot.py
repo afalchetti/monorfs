@@ -203,12 +203,12 @@ def mapdistance(a, b, c, p):
 		b    = temp
 
 	if len(a) == 0:
-		return c**p
+		return c
 	
 	distances = [[landmarkdistance(ai, bk, c)**p for ai in a] + [c**p for i in xrange(len(b) - len(a))] for bk in b]
 	indices   = munkres.Munkres().compute(distances)
 	
-	return sum(distances[i][k] for i, k in indices) / max(len(a), len(b))
+	return (sum(distances[i][k] for i, k in indices) / len(b))**(1.0/p)
 
 def landmarkdistance(x, y, c):
 	return min(c, np.linalg.norm(x - y))
