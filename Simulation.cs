@@ -386,8 +386,6 @@ public class Simulation : Manipulator
 				// do not do it now, as the last frame still needs to be processed and rendered
 			}
 
-			Explorer.Update(time, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
-
 			if (Explorer.WantsSLAM) {
 				forceslam = true;
 			}
@@ -395,6 +393,17 @@ public class Simulation : Manipulator
 			if (Explorer.WantsMapping) {
 				forcemapping = true;
 			}
+
+			if (forceslam) {
+				Tags.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, "SLAM mode on"));
+				Navigator.StartSlam();
+			}
+			else if (forcemapping) {
+				Tags.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, "Mapping mode on"));
+				Navigator.StartMapping();
+			}
+
+			Explorer.Update(time, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
 
 			if (UseOdometry) {
 				double[] odm = Explorer.ReadOdometry(time);
@@ -431,15 +440,6 @@ public class Simulation : Manipulator
 
 			if (forcereset) {
 				Navigator.ResetMapModel();
-			}
-
-			if (forceslam) {
-				Tags.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, "SLAM mode on"));
-				Navigator.StartSlam();
-			}
-			else if (forcemapping) {
-				Tags.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, "Mapping mode on"));
-				Navigator.StartMapping();
 			}
 		}
 	}
