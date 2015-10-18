@@ -71,9 +71,12 @@ public class OdometryNavigator : Navigator
 	}
 	
 	/// <summary>
-	/// Reset the model of every particle to an empty map.
+	/// Reset the map model to an empty map.
 	/// </summary>
-	public override void ResetMapModel() {}
+	public override void ResetMapModel()
+	{
+		BestMapModel.Clear();
+	}
 
 	/// <summary>
 	/// Update the vehicle particles.
@@ -88,7 +91,14 @@ public class OdometryNavigator : Navigator
 	public override void Update(GameTime time, double dx, double dy, double dz,
 	                            double dyaw, double dpitch, double droll)
 	{
-		BestEstimate.Update(time, dx, dy, dz, dyaw, dpitch, droll);
+		if (OnlyMapping) {
+			BestEstimate.State     = RefVehicle.State;
+			BestEstimate.WayPoints = new TimedState(RefVehicle.WayPoints);
+		}
+		else {
+			BestEstimate.Update(time, dx, dy, dz, dyaw, dpitch, droll);
+		}
+
 		UpdateTrajectory(time);
 	}
 

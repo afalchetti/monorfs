@@ -172,7 +172,13 @@ public class ISAM2Navigator : Navigator
 	public override void Update(GameTime time, double dx, double dy, double dz,
 	                            double dyaw, double dpitch, double droll)
 	{
-		BestEstimate.Update(time, dx, dy, dz, dyaw, dpitch, droll);
+		if (OnlyMapping) {
+			BestEstimate.State     = RefVehicle.State;
+			BestEstimate.WayPoints = new TimedState(RefVehicle.WayPoints);
+		}
+		else {
+			BestEstimate.Update(time, dx, dy, dz, dyaw, dpitch, droll);
+		}
 	}
 
 	/// <summary>
@@ -473,7 +479,7 @@ public class ISAM2Navigator : Navigator
 		fixed(double* ptrOdometry     = odometry) {
 		fixed(double* ptrMeasurements = measurements) {
 		fixed(int*    ptrLabels       = labels) {
-			retvalue = update(handle, (IntPtr) ptrOdometry, (IntPtr) ptrMeasurements, (IntPtr) ptrLabels, nmeasurements);
+			retvalue = update(handle, (IntPtr) ptrOdometry, (IntPtr) ptrMeasurements, (IntPtr) ptrLabels, nmeasurements, OnlyMapping);
 		}
 		}
 		}
@@ -584,7 +590,7 @@ public class ISAM2Navigator : Navigator
 	private extern static void deletenavigator(HandleRef navigator);
 
 	[DllImport("libisam2.so")]
-	private extern static int update(HandleRef navigator, IntPtr odometry, IntPtr measurements, IntPtr labels, int nmeasurements);
+	private extern static int update(HandleRef navigator, IntPtr odometry, IntPtr measurements, IntPtr labels, int nmeasurements, bool onlymapping);
 
 	[DllImport("libisam2.so")]
 	private extern static IntPtr gettrajectory(HandleRef navigator, out int length);

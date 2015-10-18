@@ -46,6 +46,8 @@ using namespace monorfs;
 extern "C" {
 typedef boost::shared_ptr<noiseModel::Gaussian> Noise;
 
+noiseModel::Diagonal::shared_ptr nonoise;
+
 class ISAM2Navigator {
 public:
 	int            t;
@@ -152,8 +154,7 @@ ISAM2Navigator* newnavigator(double* initstate, double* measurementnoise, double
 	Pose3 initpose = Pose3(Rot3(Quaternion(initstate[3], initstate[4], initstate[5], initstate[6])),
 	                       Point3(initstate[0], initstate[1], initstate[2]));
 
-	noiseModel::Diagonal::shared_ptr posenoise =
-	    noiseModel::Diagonal::Sigmas((Vector(6) << Vector3::Constant(0), Vector3::Constant(0)));
+	nonoise = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3::Constant(1e-8), Vector3::Constant(1e-8)));
 
 	ISAM2Navigator* navigator = new ISAM2Navigator(focal,
 	                                               noiseModel::Diagonal::Sigmas(measurementsigma),
@@ -162,7 +163,7 @@ ISAM2Navigator* newnavigator(double* initstate, double* measurementnoise, double
 	navigator->estimate.insert(Symbol('x', 0), initpose);
 
 	NonlinearFactorGraph graph;
-	graph.push_back(PriorFactor<Pose3>(Symbol('x', 0), initpose, posenoise));
+	graph.push_back(PriorFactor<Pose3>(Symbol('x', 0), initpose, nonoise));
 
 	navigator->isam.update(graph, navigator->estimate);
 	++navigator->t;
@@ -189,125 +190,131 @@ Point3 landmarkestimate(double px, double py, double range, Pose3 pose, double f
 // update the navigator estimate using new information:
 // odometry and  measurement lists from the last step;
 // 'odometry' format is an array with [dx, dy, dz, dyaw, dpitch, droll]
-// in loca coordinates;
+// in local coordinates;
 // 'measurements' format must be a 3*n double array with the
 // x-y-z coordinates for each one of them;
 // each measurement must be associated to a labeled (int) landmark;
-int update(ISAM2Navigator* navigator, double* odometry, double* measurements, int* labels, int nmeasurements)
+// 'onlymapping' defines that the update is exact and the estimate should locked on its place
+int update(ISAM2Navigator* navigator, double* odometry, double* measurements,
+           int* labels, int nmeasurements, bool onlymapping)
 {
 	try {
-	NonlinearFactorGraph graph;
-	Values               newestimates;
-	int                  maxlabel = -1;
+		NonlinearFactorGraph graph;
+		Values               newestimates;
+		int                  maxlabel = -1;
 
-	// add new estimate for new pose (estimate using last pose)
-	Pose3 pestimate = navigator->estimate.at<Pose3>(Symbol('x', navigator->t - 1));
-
-	newestimates.insert(Symbol('x', navigator->t), pestimate);
-
-	// add new measurements
-	for (int i = 0, k = 0; i < nmeasurements; ++i, k += 3) {
-		int    l     = labels[i];
-		double px    = measurements[k + 0];
-		double py    = measurements[k + 1];
-		double range = measurements[k + 2];
-
-		graph.push_back(PixelRangeFactor(Symbol('x', navigator->t), Symbol('l', l),
-		                                 px, py, range,
-		                                 navigator->measurementnoise, navigator->focal));
-
-		if (!navigator->estimate.exists(Symbol('l', l))) {
-			newestimates.insert(Symbol('l', l),
-			                    landmarkestimate(px, py, range, pestimate, navigator->focal));
-		}
-
-		maxlabel = max(maxlabel, l);
-	}
-
-	if (odometry != nullptr) {
 		// note that dorientation is shifted since the coordinate
 		// system is not the same in this framework: roll doesn't
 		// really roll the vehicle, but changes the pitch, etc.
 		Pose3 delta(Rot3::ypr(odometry[5], odometry[3], odometry[4]),
 	                Point3(odometry[0], odometry[1], odometry[2]));
-	    
-		graph.push_back(BetweenFactor<Pose3>(Symbol('x', navigator->t - 1),
-		                                     Symbol('x', navigator->t),
-		                                     delta, navigator->motionnoise));
-	}
 
-	// isam2 magic bayes tree update
-	navigator->isam.update(graph, newestimates);
-	navigator->estimate = navigator->isam.calculateEstimate();
+		// add new estimate for new pose (estimate using last pose)
+		Pose3 pestimate = navigator->estimate.at<Pose3>(Symbol('x', navigator->t - 1)) * delta;
 
-	// update the public estimates (interop)
-	navigator->tlength = navigator->tlength + 1;
-	navigator->msize   = max(navigator->msize, maxlabel + 1);
+		newestimates.insert(Symbol('x', navigator->t), pestimate);
 
-	// interop data
-	navigator->trajectory    .resize(7 * navigator->tlength);
-	navigator->mapmodel      .resize(3 * navigator->msize, HUGE_VAL);
-	navigator->mapcovariances.resize((3 * 3) * navigator->msize);
-	navigator->plcovariances .resize((3 * 3) * navigator->msize);
+		// add new measurements
+		for (int i = 0, k = 0; i < nmeasurements; ++i, k += 3) {
+			int    l     = labels[i];
+			double px    = measurements[k + 0];
+			double py    = measurements[k + 1];
+			double range = measurements[k + 2];
 
-	Marginals marginals(navigator->isam.getFactorsUnsafe(), navigator->estimate);
-	Symbol    symlastpose('x', navigator->t);
-	Pose3     lastpose = navigator->estimate.at<Pose3>(symlastpose);
-	Matrix    covpose  = marginals.marginalCovariance(symlastpose);
+			graph.push_back(PixelRangeFactor(Symbol('x', navigator->t), Symbol('l', l),
+			                                 px, py, range,
+			                                 navigator->measurementnoise, navigator->focal));
 
-	// this objects exists only to be able to use its evaluateError function,
-	// that calculates the jacobian of the measurement function
-	// since the measurements are zero, the output is the measurement function itself
-	// (though the output is not used)
-	PixelRangeFactor jacobcalculator(Symbol(), Symbol(), 0, 0, 0,
-	                                 navigator->measurementnoise, navigator->focal);
-	
-	// put every landmark and pose estimate into the interop buffer
-	for (auto item = navigator->estimate.begin(); item != navigator->estimate.end(); ++item) {
-		Symbol key(item->key);
+			if (!navigator->estimate.exists(Symbol('l', l))) {
+				newestimates.insert(Symbol('l', l),
+				                    landmarkestimate(px, py, range, pestimate, navigator->focal));
+			}
 
-		if (key.chr() == 'x') {  // pose
-			marshalpose(&navigator->trajectory[0], static_cast<Pose3&>(item->value), key.index());
+			maxlabel = max(maxlabel, l);
 		}
-		else if (key.chr() == 'l') {  // landmark
-			Point3      landmarkposition = static_cast<Point3&>(item->value);
-			vector<Key> vars;
 
-			vars.push_back(key);
-			vars.push_back(symlastpose);
-
-			// there are two things that need to be sent:
-			// the landmark covariance for visualization and
-			// the pose-landmark covariance projection to do data association
-			JointMarginal jointcovariance = marginals.jointMarginalCovariance(vars);
-
-			Matrix covinter    = jointcovariance.at(symlastpose, key);
-			Matrix covlandmark = jointcovariance.at(key,         key);
-
-			// JointMarginal doesn't seem to enforce any order on its fullMatrix()
-			// so it is reconstructed from the blocks to make sure it's consistent
-			Matrix covfull(9, 9);
-			covfull << covpose, covinter, covinter.transpose(), covlandmark;
-
-			Matrix jacobian(3, 9);
-			Matrix jpose;
-			Matrix jlandmark;
-
-			jacobcalculator.evaluateError(lastpose, landmarkposition, jpose, jlandmark);
-			jacobian << jpose, jlandmark;
-
-			// pose-landmark covariance projection into the measurement space
-			// (with measurement noise)
-			Matrix plcovariance = jacobian * covfull * jacobian.transpose()
-			                    + getcovariance(navigator->measurementnoise);
-			
-			marshalpoint     (&navigator->mapmodel      [0], landmarkposition, key.index());
-			marshalcovariance(&navigator->mapcovariances[0], covlandmark,      key.index());
-			marshalcovariance(&navigator->plcovariances [0], plcovariance,     key.index());
+		if (odometry != nullptr) {
+			graph.push_back(BetweenFactor<Pose3>(Symbol('x', navigator->t - 1),
+			                                     Symbol('x', navigator->t),
+			                                     delta, navigator->motionnoise));
 		}
-	}
 
-	++navigator->t;
+		if (onlymapping) {
+			graph.push_back(PriorFactor<Pose3>(Symbol('x', navigator->t), pestimate, nonoise));
+		}
+
+		// isam2 magic bayes tree update
+		navigator->isam.update(graph, newestimates);
+		navigator->estimate = navigator->isam.calculateEstimate();
+
+		// update the public estimates (interop)
+		navigator->tlength = navigator->tlength + 1;
+		navigator->msize   = max(navigator->msize, maxlabel + 1);
+
+		// interop data
+		navigator->trajectory    .resize(7 * navigator->tlength);
+		navigator->mapmodel      .resize(3 * navigator->msize, HUGE_VAL);
+		navigator->mapcovariances.resize((3 * 3) * navigator->msize);
+		navigator->plcovariances .resize((3 * 3) * navigator->msize);
+
+		Marginals marginals(navigator->isam.getFactorsUnsafe(), navigator->estimate);
+		Symbol    symlastpose('x', navigator->t);
+		Pose3     lastpose = navigator->estimate.at<Pose3>(symlastpose);
+		Matrix    covpose  = marginals.marginalCovariance(symlastpose);
+
+		// this objects exists only to be able to use its evaluateError function,
+		// that calculates the jacobian of the measurement function
+		// since the measurements are zero, the output is the measurement function itself
+		// (though the output is not used)
+		PixelRangeFactor jacobcalculator(Symbol(), Symbol(), 0, 0, 0,
+		                                 navigator->measurementnoise, navigator->focal);
+		
+		// put every landmark and pose estimate into the interop buffer
+		for (auto item = navigator->estimate.begin(); item != navigator->estimate.end(); ++item) {
+			Symbol key(item->key);
+
+			if (key.chr() == 'x') {  // pose
+				marshalpose(&navigator->trajectory[0], static_cast<Pose3&>(item->value), key.index());
+			}
+			else if (key.chr() == 'l') {  // landmark
+				Point3      landmarkposition = static_cast<Point3&>(item->value);
+				vector<Key> vars;
+
+				vars.push_back(key);
+				vars.push_back(symlastpose);
+
+				// there are two things that need to be sent:
+				// the landmark covariance for visualization and
+				// the pose-landmark covariance projection to do data association
+				JointMarginal jointcovariance = marginals.jointMarginalCovariance(vars);
+
+				Matrix covinter    = jointcovariance.at(symlastpose, key);
+				Matrix covlandmark = jointcovariance.at(key,         key);
+
+				// JointMarginal doesn't seem to enforce any order on its fullMatrix()
+				// so it is reconstructed from the blocks to make sure it's consistent
+				Matrix covfull(9, 9);
+				covfull << covpose, covinter, covinter.transpose(), covlandmark;
+
+				Matrix jacobian(3, 9);
+				Matrix jpose;
+				Matrix jlandmark;
+
+				jacobcalculator.evaluateError(lastpose, landmarkposition, jpose, jlandmark);
+				jacobian << jpose, jlandmark;
+
+				// pose-landmark covariance projection into the measurement space
+				// (with measurement noise)
+				Matrix plcovariance = jacobian * covfull * jacobian.transpose()
+				                    + getcovariance(navigator->measurementnoise);
+				
+				marshalpoint     (&navigator->mapmodel      [0], landmarkposition, key.index());
+				marshalcovariance(&navigator->mapcovariances[0], covlandmark,      key.index());
+				marshalcovariance(&navigator->plcovariances [0], plcovariance,     key.index());
+			}
+		}
+
+		++navigator->t;
 	}
 	catch (const IndeterminantLinearSystemException& e) {
 		Symbol key = e.nearbyVariable();
