@@ -381,7 +381,7 @@ public class Viewer : Manipulator
 
 		// add a new tag
 		if (keyboard.IsKeyDown(Keys.G) && !prevkeyboard.IsKeyDown(Keys.G)) {
-			Tags.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, "User tag"));
+			Tags.Add(Tuple.Create(viewtime, "User tag"));
 			Tags.Sort();
 			TagChanged = true;
 		}
