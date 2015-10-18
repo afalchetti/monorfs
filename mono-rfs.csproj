@@ -144,6 +144,9 @@
     <Compile Include="TrackVehicle.cs" />
     <Compile Include="KinectTrackVehicle.cs" />
     <Compile Include="OdometryNavigator.cs" />
+    <Compile Include="Map.cs" />
+    <Compile Include="IndexedMap.cs" />
+    <Compile Include="IMap.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

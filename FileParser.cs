@@ -39,7 +39,7 @@ using Microsoft.Xna.Framework;
 using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedArray        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedTrajectory   = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<System.Tuple<double, double[]>>>>;
-using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
+using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, monorfs.Map>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
 using TimedMessage      = System.Collections.Generic.List<System.Tuple<double, string>>;
 
@@ -154,9 +154,9 @@ public static class FileParser
 	/// <param name="lines">Formatted map descriptor as an array of lines.</param>
 	/// <param name="dim">Expected world dimension.</param>
 	/// <returns>The map model as a vector of gaussian components.</returns>
-	public static List<Gaussian> MapFromDescriptor(string[] lines, int dim = 3)
+	public static Map MapFromDescriptor(string[] lines, int dim = 3)
 	{
-		List<Gaussian> map = new List<Gaussian>();
+		Map map = new Map();
 
 		for (int i = 0; i < lines.Length; i++) {
 			Gaussian component = ParseGaussianDescriptor(lines[i]);

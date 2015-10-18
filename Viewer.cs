@@ -41,7 +41,7 @@ using FP = monorfs.FileParser;
 
 using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedTrajectory   = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<System.Tuple<double, double[]>>>>;
-using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
+using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, monorfs.Map>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
 using TimedMessage      = System.Collections.Generic.List<System.Tuple<double, string>>;
 

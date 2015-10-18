@@ -37,7 +37,7 @@ using Microsoft.Xna.Framework.Graphics;
 
 using TimedState      = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedTrajectory = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<System.Tuple<double, double[]>>>>;
-using TimedMapModel   = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
+using TimedMapModel   = System.Collections.Generic.List<System.Tuple<double, monorfs.Map>>;
 
 namespace monorfs
 {
@@ -89,7 +89,7 @@ public abstract class Navigator : IDisposable
 	/// <summary>
 	/// Most accurate estimate model of the map.
 	/// </summary>
-	public abstract List<Gaussian> BestMapModel { get; set; }
+	public abstract Map BestMapModel { get; set; }
 
 	/// <summary>
 	/// True if the localization of the vehicle is perfectly known.
@@ -131,7 +131,7 @@ public abstract class Navigator : IDisposable
 		WayTrajectories.Add(Tuple.Create(0.0, new TimedState {Tuple.Create(0.0, Util.SClone(vehicle.State))}));
 
 		WayMaps = new TimedMapModel();
-		WayMaps.Add(Tuple.Create(0.0, new List<Gaussian>()));
+		WayMaps.Add(Tuple.Create(0.0, new Map()));
 
 		const int segments = 32;
 		pinterval = new double[segments][];
@@ -190,7 +190,7 @@ public abstract class Navigator : IDisposable
 		WayMaps        .Clear();
 
 		WayTrajectories.Add(Tuple.Create(0.0, new TimedState {Tuple.Create(0.0, Util.SClone(BestEstimate.State))}));
-		WayMaps        .Add(Tuple.Create(0.0, new List<Gaussian>()));
+		WayMaps        .Add(Tuple.Create(0.0, new Map()));
 	}
 
 	/// <summary>

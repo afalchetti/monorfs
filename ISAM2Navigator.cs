@@ -75,8 +75,7 @@ public class ISAM2Navigator : Navigator
 	/// Contains the covariances of the pose-landmark
 	/// pairs projected into the measurement space.
 	/// </summary>
-	private List<Gaussian> plmodel;
-
+	private IndexedMap plmodel;
 
 	/// <summary>
 	/// Most accurate estimate of the current vehicle pose.
@@ -86,7 +85,15 @@ public class ISAM2Navigator : Navigator
 	/// <summary>
 	/// Most accurate estimate model of the map.
 	/// </summary>
-	public override List<Gaussian> BestMapModel { get; set; }
+	public override Map BestMapModel {
+		get { return new Map(MapModel);         }
+		set { MapModel = new IndexedMap(value); }
+	}
+
+	/// <summary>
+	/// Internal indexed representation of the map estimate.
+	/// </summary>
+	public IndexedMap MapModel { get; set; }
 
 	/// <summary>
 	/// Not-associated measurements map model.
@@ -96,7 +103,7 @@ public class ISAM2Navigator : Navigator
 	/// </summary>
 	/// <remarks>In this list, the weights are used to indicate
 	/// in how many consecutive frames has the candidate been seen.</remarks>
-	public List<Gaussian> CandidateMapModel { get; private set; }
+	public IndexedMap CandidateMapModel { get; private set; }
 
 	/// <summary>
 	/// Previous SLAM step vehicle pose estimate.
@@ -142,9 +149,9 @@ public class ISAM2Navigator : Navigator
 
 		BestEstimate      = new TrackVehicle();
 		PreviousEstimate  = new TrackVehicle();
-		BestMapModel      = new List<Gaussian>();
-		plmodel           = new List<Gaussian>();
-		CandidateMapModel = new List<Gaussian>();
+		MapModel          = new IndexedMap();
+		plmodel           = new IndexedMap();
+		CandidateMapModel = new IndexedMap();
 
 		vehicle.State.CopyTo(BestEstimate    .State, 0);
 		vehicle.State.CopyTo(PreviousEstimate.State, 0);
@@ -215,7 +222,7 @@ public class ISAM2Navigator : Navigator
 		// updates the estimated complete path to show the batch nature of the algorithm
 		List<double[]> trajectory = GetTrajectory();
 		BestEstimate.State        = trajectory[trajectory.Count - 1];
-		BestMapModel              = GetMapModel(out plmodel);
+		MapModel                  = GetMapModel(out plmodel);
 
 		// copy the new estimated trajectory (given by iSAM2) into the BestEstimate
 		// variable, using the previous timestamps, as they do not change
@@ -272,12 +279,12 @@ public class ISAM2Navigator : Navigator
 		Gaussian[] qcandidate;
 
 		SimulatedVehicle pose             = BestEstimate;
-		List<Gaussian>   visible          = new List<Gaussian>();
+		IndexedMap       visible          = new IndexedMap();
 		List<int>        visibleLandmarks = new List<int>();
 
-		for (int i = 0; i < BestMapModel.Count; i++) {
-			if (pose.Visible(BestMapModel[i].Mean)) {
-				visible         .Add(BestMapModel[i]);
+		for (int i = 0; i < MapModel.Count; i++) {
+			if (pose.Visible(MapModel[i].Mean)) {
+				visible         .Add(MapModel[i]);
 				visibleLandmarks.Add(i);
 			}
 		}
@@ -532,13 +539,13 @@ public class ISAM2Navigator : Navigator
 	/// R is the measurement noise.
 	/// </param>
 	/// <returns>Map estimate as points with certain covariance (gaussians).</returns>
-	private unsafe List<Gaussian> GetMapModel(out List<Gaussian> plmodel)
+	private unsafe IndexedMap GetMapModel(out IndexedMap plmodel)
 	{
-		int            length;
-		Gaussian       component;
-		List<Gaussian> mapmodel = new List<Gaussian>();
+		int        length;
+		Gaussian   component;
+		IndexedMap mapmodel = new IndexedMap();
 
-		plmodel  = new List<Gaussian>();
+		plmodel  = new IndexedMap();
 
 		double* ptrmapmodel = (double*) getmapmodel      (handle, out length);
 		double* ptrmapcov   = (double*) getmapcovariances(handle, out length);

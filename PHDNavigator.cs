@@ -125,7 +125,7 @@ public class PHDNavigator : Navigator
 	/// PHD representation as a mixture-of-gaussians.
 	/// One per vehicle particle.
 	/// </summary>
-	public List<Gaussian>[] MapModels { get; private set; }
+	public Map[] MapModels { get; private set; }
 
 	/// <summary>
 	/// Index of the particle with the biggest weight.
@@ -150,7 +150,7 @@ public class PHDNavigator : Navigator
 	/// <summary>
 	/// Most accurate estimate model of the map.
 	/// </summary>
-	public override List<Gaussian> BestMapModel
+	public override Map BestMapModel
 	{
 		get
 		{
@@ -206,7 +206,7 @@ public class PHDNavigator : Navigator
 
 		// note that reset does deep cloning so no info flows in slam mode;
 		// in mapping mode, info flows only through RefVehicle
-		reset(RefVehicle, new List<Gaussian>(), new List<double[]>(), particlecount);
+		reset(RefVehicle, new Map(), new List<double[]>(), particlecount);
 	}
 
 	/// <summary>
@@ -244,14 +244,14 @@ public class PHDNavigator : Navigator
 	/// <param name="model">New map model estimate.</param>
 	/// <param name="explore">New queued measurements to explore.</param>
 	/// <param name="particlecount">Number of particles for the Montecarlo filter.</param>
-	private void reset(Vehicle vehicle, List<Gaussian> model, List<double[]> explore, int particlecount)
+	private void reset(Vehicle vehicle, Map model, List<double[]> explore, int particlecount)
 	{
 		// do a deep copy, so no real info flows
 		// into the navigator, only estimates, in SLAM
 		// (this avoid bugs where the user unknowingly uses
 		// the groundtruth to estimate the groundtruth itself)
 		VehicleParticles = new TrackVehicle  [particlecount];
-		MapModels        = new List<Gaussian>[particlecount];
+		MapModels        = new Map           [particlecount];
 		VehicleWeights   = new double        [particlecount];
 		toexplore        = new List<double[]>[particlecount];
 
@@ -259,7 +259,7 @@ public class PHDNavigator : Navigator
 			VehicleParticles[i] = vehicle.TrackClone(MotionCovarianceMultiplier,
 			                                         MeasurementCovarianceMultiplier,
 			                                         PD, ClutterDensity, true);
-			MapModels       [i] = new List<Gaussian>(model);
+			MapModels       [i] = new Map(model);
 			VehicleWeights  [i] = 1.0 / particlecount;
 			toexplore       [i] = new List<double[]>(explore);
 		}
@@ -331,8 +331,8 @@ public class PHDNavigator : Navigator
 	public override void SlamUpdate(GameTime time, List<double[]> measurements)
 	{
 		// map update
-		System.Threading.Tasks.Parallel.For (0, VehicleParticles.Length, i => {
-			List<Gaussian> predicted, corrected;
+		System.Threading.Tasks.Parallel.For(0, VehicleParticles.Length, i => {
+			Map predicted, corrected;
 
 			predicted = PredictConditional(measurements, VehicleParticles[i], MapModels[i], toexplore[i]);
 			corrected = CorrectConditional(measurements, VehicleParticles[i], predicted);
@@ -382,16 +382,16 @@ public class PHDNavigator : Navigator
 	/// <param name="corrected">Corrected map model.</param>
 	/// <param name="pose">Vehicle pose.</param>
 	/// <returns>Total weight update factor.</returns>
-	public double WeightAlpha(List<double[]> measurements, List<Gaussian> predicted, List<Gaussian> corrected, SimulatedVehicle pose)
+	public double WeightAlpha(List<double[]> measurements, Map predicted, Map corrected, SimulatedVehicle pose)
 	{
-		List<Gaussian> cvisible = corrected.FindAll(g => pose.Visible(g.Mean) && g.Weight > 0.8);
+		IMap cvisible = corrected.FindAll(g => pose.Visible(g.Mean) && g.Weight > 0.8);
 
 		double plikelihood = 1;
 		double clikelihood = 1;
 
 		foreach (var component in cvisible) {
-			plikelihood *= EvaluateModel(predicted, component.Mean);
-			clikelihood *= EvaluateModel(corrected, component.Mean);
+			plikelihood *= predicted.Evaluate(component.Mean);
+			clikelihood *= corrected.Evaluate(component.Mean);
 		}
 
 		double pcount = 0;
@@ -423,7 +423,7 @@ public class PHDNavigator : Navigator
 	/// <param name="map">Map model.</param>
 	/// <param name="pose">Vehicle pose.</param>
 	/// <returns>Set likelihood.</returns>
-	public double SetLikelihood(List<double[]> measurements, List<Gaussian> map, SimulatedVehicle pose)
+	public double SetLikelihood(List<double[]> measurements, IMap map, SimulatedVehicle pose)
 	{
 		// exact calculation if there are few components/measurements;
 		// use the most probable components approximation otherwise
@@ -433,8 +433,10 @@ public class PHDNavigator : Navigator
 		double     logclutter = Math.Log(pose.ClutterDensity);
 		Gaussian[] zprobs     = new Gaussian[map.Count];
 
-		for (int i = 0; i < map.Count; i++) {
-			zprobs[i] = new Gaussian(pose.MeasurePerfect(map[i].Mean), pose.MeasurementCovariance, 1); 
+		int n = 0;
+		foreach (Gaussian landmark in map) {
+			zprobs[n] = new Gaussian(pose.MeasurePerfect(landmark.Mean), pose.MeasurementCovariance, 1);
+			n++;
 		}
 
 		for (int i = 0; i < zprobs.Length;      i++) {
@@ -521,11 +523,11 @@ public class PHDNavigator : Navigator
 	/// </summary>
 	public void ResampleParticles()
 	{
-		double           random    = (double) Util.Uniform.Next() / VehicleWeights.Length;
-		double[]         weights   = new double[VehicleWeights.Length];
-		TrackVehicle[]   particles = new TrackVehicle[VehicleParticles.Length];
-		List<Gaussian>[] models    = new List<Gaussian>[MapModels.Length];
-		double           maxweight = 0;
+		double         random    = (double) Util.Uniform.Next() / VehicleWeights.Length;
+		double[]       weights   = new double[VehicleWeights.Length];
+		TrackVehicle[] particles = new TrackVehicle[VehicleParticles.Length];
+		Map[]          models    = new Map[MapModels.Length];
+		double         maxweight = 0;
 
 		for (int i = 0, k = 0; i < weights.Length; i++) {
 			// k should never be out of range, but because of floating point arithmetic,
@@ -536,7 +538,7 @@ public class PHDNavigator : Navigator
 			}
 			
 			particles[i] = RefVehicle.TrackClone(VehicleParticles[k - 1], true);
-			models   [i] = new List<Gaussian>(MapModels[k - 1]);
+			models   [i] = new Map(MapModels[k - 1]);
 			weights  [i] = 1.0 / weights.Length;
 			random      += 1.0 / weights.Length;
 
@@ -588,14 +590,14 @@ public class PHDNavigator : Navigator
 	/// To diminish the computational time, only the areas near the new measurements are
 	/// used (i.e. the same measurements). This is equivalent to artificially increasing
 	/// belief on the new measurements (when in a new area).</remarks>
-	public List<Gaussian> PredictConditional(List<double[]> measurements, SimulatedVehicle pose, List<Gaussian> model, List<double[]> unexplored)
+	public Map PredictConditional(List<double[]> measurements, SimulatedVehicle pose, Map model, List<double[]> unexplored)
 	{
 		// gaussian are born on any unexplored areas,
 		// as something is expected to be there,
 		// but this is too resource-intensive so
 		// here's a little cheat: only do it on areas
 		// there has been a new measurement lately
-		List<Gaussian> predicted = new List<Gaussian>(model);
+		Map predicted = new Map(model);
 		
 		// birth RFS
 		foreach (double[] candidate in unexplored) {
@@ -622,9 +624,9 @@ public class PHDNavigator : Navigator
 	/// <param name="pose">Vehicle pose that conditions the mapping.</param>
 	/// <param name="model">Associated map model.</param>
 	/// <returns>Corrected map model.</returns>
-	public List<Gaussian> CorrectConditional(List<double[]> measurements, SimulatedVehicle pose, List<Gaussian> model)
+	public Map CorrectConditional(List<double[]> measurements, SimulatedVehicle pose, Map model)
 	{
-		List<Gaussian> corrected = new List<Gaussian>();
+		Map corrected = new Map();
 
 		// reduce predicted weight to acocunt for misdetection
 		// v += (1-PD) v
@@ -644,14 +646,15 @@ public class PHDNavigator : Navigator
 		double[][][] S  = new double  [model.Count][][];
 		Gaussian[]   q  = new Gaussian[model.Count];
 
-		for (int i = 0; i < q.Length; i++) {
-			Gaussian component = model[i];
-			m [i] = component.Mean;
-			H [i] = pose.MeasurementJacobian(m[i]);
-			P [i] = component.Covariance;
-			PH[i] = P[i].MultiplyByTranspose(H[i]);
-			S [i] = H[i].Multiply(P[i].MultiplyByTranspose(H[i])).Add(R);
-			q [i] = new Gaussian(pose.MeasurePerfect(m[i]), S[i], component.Weight);
+		int n = 0;
+		foreach (Gaussian component in model) {
+			m [n] = component.Mean;
+			H [n] = pose.MeasurementJacobian(m[n]);
+			P [n] = component.Covariance;
+			PH[n] = P[n].MultiplyByTranspose(H[n]);
+			S [n] = H[n].Multiply(P[n].MultiplyByTranspose(H[n])).Add(R);
+			q [n] = new Gaussian(pose.MeasurePerfect(m[n]), S[n], component.Weight);
+			n++;
 		}
 
 		// for each measurement z and a priori map component,
@@ -694,26 +697,27 @@ public class PHDNavigator : Navigator
 	/// </summary>
 	/// <param name="model">Map model.</param>
 	/// <returns>Pruned model.</returns>
-	public List<Gaussian> PruneModel(List<Gaussian> model)
+	public Map PruneModel(Map model)
 	{
-		List<Gaussian> pruned = new List<Gaussian>();
-		Gaussian       candidate;
-		List<Gaussian> close;
+		Map      pruned = new Map();
+		Gaussian candidate;
+		Map      close;
 
-		model.Sort((a, b) => Math.Sign(b.Weight - a.Weight));
+		List<Gaussian> landmarks = model.ToList();
+		landmarks.Sort((a, b) => Math.Sign(b.Weight - a.Weight));
 
-		for (int i = 0; i < Math.Min(MaxQuantity, model.Count); i++) {
-			if (model[i].Weight < MinWeight) {
+		for (int i = 0; i < Math.Min(MaxQuantity, landmarks.Count); i++) {
+			if (landmarks[i].Weight < MinWeight) {
 				break;
 			}
 
-			candidate = model[i];
-			close     = new List<Gaussian>();
+			candidate = landmarks[i];
+			close     = new Map();
 
-			for (int k = i + 1; k < Math.Min(MaxQuantity, model.Count); k++) {
-				if (Gaussian.AreClose(model[i], model[k], MergeThreshold)) {
-					close.Add(model[k]);
-					model.RemoveAt(k--);
+			for (int k = i + 1; k < Math.Min(MaxQuantity, landmarks.Count); k++) {
+				if (Gaussian.AreClose(landmarks[i], landmarks[k], MergeThreshold)) {
+					close.Add(landmarks[k]);
+					landmarks.RemoveAt(k--);
 				}
 			}
 
@@ -735,7 +739,7 @@ public class PHDNavigator : Navigator
 	/// <param name="maincomponent">First gaussian component.</param>
 	/// <param name="components">List of the other gaussian components.</param>
 	/// <returns>Merged gaussian.</returns>
-	private static Gaussian Merge(Gaussian maincomponent, List<Gaussian> components)
+	private static Gaussian Merge(Gaussian maincomponent, Map components)
 	{
 		double     weight     = maincomponent.Weight;
 		double[]   mean       = maincomponent.Weight.Multiply(maincomponent.Mean);
@@ -764,26 +768,9 @@ public class PHDNavigator : Navigator
 	/// <param name="model">Map model.</param>
 	/// <param name="x">Location.</param>
 	/// <returns>True if the location has been explored.</returns>
-	public bool Explored(List<Gaussian> model, double[] x)
+	public bool Explored(Map model, double[] x)
 	{
-		return EvaluateModel(model, x) >= ExplorationThreshold;
-	}
-
-	/// <summary>
-	/// Evaluate the Gaussian Mixture model of the map on a specified location.
-	/// </summary>
-	/// <param name="model">Evaluated model.</param>
-	/// <param name="x">Location.</param>
-	/// <returns>PHD density on the specified location.</returns>
-	public double EvaluateModel(List<Gaussian> model, double[] x)
-	{
-		double value = 0;
-
-		foreach (Gaussian component in model) {
-			value += component.Weight * component.Evaluate(x);
-		}
-
-		return value;
+		return model.Evaluate(x) >= ExplorationThreshold;
 	}
 
 	/// <summary>
@@ -792,7 +779,7 @@ public class PHDNavigator : Navigator
 	/// </summary>
 	/// <param name="model">Map model.</param>
 	/// <returns>Expected number of landmarks.</returns>
-	public double ExpectedSize(List<Gaussian> model)
+	public double ExpectedSize(Map model)
 	{
 		double expected = 0;
 

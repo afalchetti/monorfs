@@ -57,7 +57,7 @@ public class OdometryNavigator : Navigator
 	/// <summary>
 	/// Most accurate estimate model of the map.
 	/// </summary>
-	public override List<Gaussian> BestMapModel { get; set; }
+	public override Map BestMapModel { get; set; }
 
 	/// <summary>
 	/// Construct a OdometryNavigator using the indicated vehicle as a reference.
@@ -67,7 +67,7 @@ public class OdometryNavigator : Navigator
 		: base(vehicle)
 	{
 		BestEstimate = new TrackVehicle(vehicle, 1, 1, 1, 0);
-		BestMapModel = new List<Gaussian>();
+		BestMapModel = new Map();
 	}
 	
 	/// <summary>
@@ -115,12 +115,14 @@ public class OdometryNavigator : Navigator
 		double MT2 = MergeThreshold * MergeThreshold;
 		double[][] dummycov = 0.001.Multiply(Accord.Math.Matrix.Identity(3).ToArray());
 
+		List<Gaussian> maplist = BestMapModel.ToList();
+
 		foreach (double[] landmark in landmarks) {
 			int    nearest   = int.MinValue;
 			double neardist2 = double.MaxValue;
 
-			for (int i = 0; i < BestMapModel.Count; i++) {
-				double dist2 = landmark.SquareEuclidean(BestMapModel[i].Mean);
+			for (int i = 0; i < maplist.Count; i++) {
+				double dist2 = landmark.SquareEuclidean(maplist[i].Mean);
 				if (neardist2 > dist2) {
 					neardist2 = dist2;
 					nearest   = i;
@@ -128,14 +130,20 @@ public class OdometryNavigator : Navigator
 			}
 
 			if (neardist2 > MT2) {
-				BestMapModel.Add(new Gaussian(landmark, dummycov, 1.0));
+				maplist.Add(new Gaussian(landmark, dummycov, 1.0));
 			}
 			else {
-				double   newweight = BestMapModel[nearest].Weight + 1;
-				double[] average   = ((newweight - 1).Multiply(BestMapModel[nearest].Mean)
+				double   newweight = maplist[nearest].Weight + 1;
+				double[] average   = ((newweight - 1).Multiply(maplist[nearest].Mean)
 				                         .Add(landmark)).Divide(newweight);
-				BestMapModel[nearest] = new Gaussian(average, dummycov, newweight);
+				maplist[nearest] = new Gaussian(average, dummycov, newweight);
 			}
+		}
+
+		BestMapModel.Clear();
+
+		foreach (Gaussian landmark in maplist) {
+			BestMapModel.Add(landmark);
 		}
 
 		UpdateMapHistory(time);
