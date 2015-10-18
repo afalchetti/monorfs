@@ -411,8 +411,13 @@ public class Simulation : Manipulator
 				try {
 					Navigator.SlamUpdate(time, measurements);
 				}
-				catch (InvalidOperationException) {  // gtsam failure
-					Tags.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, "!gtsam failure"));
+				catch (InvalidOperationException e) {
+					if (e.Data["module"].Equals("gtsam")) {
+						Tags.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, "!gtsam failure"));
+					}
+					else if (e.Data["module"].Equals("association")) {
+						Console.WriteLine("Tried to use perfect data association when none exists.");
+					}
 					commanddepleted = true;  // force exit in next call
 				}
 

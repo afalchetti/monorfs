@@ -239,7 +239,10 @@ public class ISAM2Navigator : Navigator
 			string message = (status == 1) ? "IndeterminateLinearSystemException" :
 			                 (status == 2) ? "ValuesKeyAlreadyExists":
 			                                 "gtsam exception";
-			throw new InvalidOperationException(message);
+			var exception = new InvalidOperationException(message);
+			exception.Data["module"] = "gtsam";
+
+			throw exception;
 		}
 	}
 
@@ -253,7 +256,10 @@ public class ISAM2Navigator : Navigator
 	{
 		if (DAAlgorithm == DataAssociationAlgorithm.Perfect) {
 			if (!RefVehicle.HasDataAssociation) {
-				throw new InvalidOperationException("Tried to use perfect data association when none exists.");
+				var exception = new InvalidOperationException("Tried to use perfect data association when none exists.");
+				exception.Data["module"] = "association";
+
+				throw exception;
 			}
 
 			return RefVehicle.DataAssociation;
