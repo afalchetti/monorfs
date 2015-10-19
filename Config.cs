@@ -67,6 +67,9 @@ public static class Config
 	public static int  KinectDelta    = 2;
 	public static bool KeypointFilter = false;
 
+	// Map
+	public static double DensityDistanceThreshold = 1;//10*Math.Sqrt(BirthCovariance[0][0]);
+
 	// Navigator
 	public static bool ShowVisible = true;
 

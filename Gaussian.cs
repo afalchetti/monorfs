@@ -62,12 +62,12 @@ public class Gaussian
 	/// <summary>
 	/// Cached covariance inverse.
 	/// </summary>
-	public double[][] CovarianceInverse;
+	public double[][] CovarianceInverse { get; private set; }
 
 	/// <summary>
 	/// Cached coefficient from the function definition.
 	/// </summary>
-	public double Multiplier;
+	public double Multiplier { get; private set; }
 
 	// Tabular constants
 

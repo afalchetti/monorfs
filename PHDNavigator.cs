@@ -644,7 +644,9 @@ public class PHDNavigator : Navigator
 		double[][][] P  = new double  [model.Count][][];
 		double[][][] PH = new double  [model.Count][][];
 		double[][][] S  = new double  [model.Count][][];
-		Gaussian[]   q  = new Gaussian[model.Count];
+		Map          q  = new Map();
+
+		var qindex = new Dictionary<Gaussian, int>();
 
 		int n = 0;
 		foreach (Gaussian component in model) {
@@ -653,7 +655,11 @@ public class PHDNavigator : Navigator
 			P [n] = component.Covariance;
 			PH[n] = P[n].MultiplyByTranspose(H[n]);
 			S [n] = H[n].Multiply(P[n].MultiplyByTranspose(H[n])).Add(R);
-			q [n] = new Gaussian(pose.MeasurePerfect(m[n]), S[n], component.Weight);
+
+			Gaussian mcomponent = new Gaussian(pose.MeasurePerfect(m[n]), S[n], component.Weight);
+			qindex.Add(mcomponent, n);
+			q.Add(mcomponent);
+
 			n++;
 		}
 
@@ -667,23 +673,19 @@ public class PHDNavigator : Navigator
 		// R is the measurement covariance
 		// H is the measurement linear operator (jacobian) from the model
 		foreach (double[] measurement in measurements) {
-			double PD        = pose.DetectionProbabilityM(measurement);	
-			double weightsum = 0;
+			double PD = pose.DetectionProbabilityM(measurement);
 
-			for (int i = 0; i < q.Length; i++) {
-				weightsum += q[i].Weight * q[i].Evaluate(measurement);
-			}
+			Map    near      = q.Near(measurement, 3);
+			double weightsum = near.Evaluate(measurement);
 
-			for (int i = 0; i < q.Length; i++) {
-				if (q[i].Mahalanobis(measurement) > 3) {
-					continue;
-				}
+			foreach (var landmark in near) {
+				int i = qindex[landmark];
 
 				double[][] gain       = PH[i].Multiply(S[i].Inverse());
 				double[]   mean       = m[i].Add(gain.Multiply(measurement.Subtract(pose.MeasurePerfect(m[i]))));
 				double[][] covariance = I.Subtract(gain.Multiply(H[i])).Multiply(P[i]);
 
-				double weight = PD * q[i].Weight * q[i].Evaluate(measurement) / (pose.ClutterDensity + PD * weightsum);
+				double weight = PD * landmark.Weight * landmark.Evaluate(measurement) / (pose.ClutterDensity + PD * weightsum);
 
 				corrected.Add(new Gaussian(mean, covariance, weight));
 			}
@@ -771,23 +773,6 @@ public class PHDNavigator : Navigator
 	public bool Explored(Map model, double[] x)
 	{
 		return model.Evaluate(x) >= ExplorationThreshold;
-	}
-
-	/// <summary>
-	/// Calculates the expected number of landmarks of a certain model.
-	/// This turn out to be the sum of all the weights of the gaussians.
-	/// </summary>
-	/// <param name="model">Map model.</param>
-	/// <returns>Expected number of landmarks.</returns>
-	public double ExpectedSize(Map model)
-	{
-		double expected = 0;
-
-		foreach (Gaussian component in model) {
-			expected += component.Weight;
-		}
-
-		return expected;
 	}
 
 	/// <summary>

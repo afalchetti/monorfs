@@ -31,6 +31,7 @@ using System.Collections;
 using System.Collections.Generic;
 
 using Accord.Math;
+using Accord.MachineLearning.Structures;
 
 namespace monorfs
 {
@@ -40,9 +41,16 @@ namespace monorfs
 public class Map : IMap
 {
 	/// <summary>
+	/// Maximum euclidean distance for a gaussian to be deemed relevant when evaluating the density.
+	/// Note that ideally this would be Mahalanobis distance, but that is not scalable; a
+	/// conservative euclidean distance should work fine, e.g. the prior measurement 5-sigma distance.
+	/// </summary>
+	public static double DensityDistanceThreshold { get { return Config.DensityDistanceThreshold; } }
+
+	/// <summary>
 	/// Point landmarks and their covariances.
 	/// </summary>
-	private List<Gaussian> landmarks;
+	private KDTree<Gaussian> landmarks;
 
 	/// <summary>
 	/// The number of landmarks in the map.
@@ -50,20 +58,26 @@ public class Map : IMap
 	public int Count { get { return landmarks.Count; } }
 
 	/// <summary>
+	/// Expected number of landmarks in the complete map using the density.
+	/// </summary>
+	public double ExpectedSize {
+		get {
+			double expected = 0;
+
+			foreach (Gaussian component in this) {
+				expected += component.Weight;
+			}
+
+			return expected;
+		}
+	}
+
+	/// <summary>
 	/// Construct an empty map.
 	/// </summary>
 	public Map()
 	{
-		landmarks = new List<Gaussian>();
-	}
-
-	/// <summary>
-	/// Construct a empty map of a given capacity.
-	/// </summary>
-	/// <param name="capacity">Number of landmarks that may added without reallocation.</param>
-	public Map(int capacity)
-	{
-		landmarks = new List<Gaussian>(capacity);
+		landmarks = new KDTree<Gaussian>(3);
 	}
 
 	/// <summary>
@@ -71,10 +85,10 @@ public class Map : IMap
 	/// </summary>
 	public Map(IMap that)
 	{
-		landmarks = new List<Gaussian>();
+		landmarks = new KDTree<Gaussian>(3);
 
 		foreach (var landmark in that) {
-			landmarks.Add(landmark);
+			landmarks.Add(landmark.Mean, landmark);
 		}
 	}
 
@@ -92,7 +106,45 @@ public class Map : IMap
 	/// <param name="landmark">Landmark to be added.</param>
 	public void Add(Gaussian landmark)
 	{
-		landmarks.Add(landmark);
+		landmarks.Add(landmark.Mean, landmark);
+	}
+
+	/// <summary>
+	/// Find the landmarks that are near to a point in space
+	/// using DensityDistanceThreshold as the radius.
+	/// </summary>
+	/// <param name="point">Search point.</param>
+	public Map Near(double[] point)
+	{
+		return Near(point, DensityDistanceThreshold);
+	}
+
+	/// <summary>
+	/// Find the landmarks that are near to a point in space.
+	/// </summary>
+	/// <param name="point">Search point.</param>
+	/// <param name="radius">Maximum distance from point to be included in the submap.</param>
+	public Map Near(double[] point, double radius)
+	{
+		Map near = new Map();
+		var kdnear = landmarks.Nearest(point, radius);
+
+		foreach (var component in kdnear) {
+			near.Add(component.Node.Value);
+		}
+
+		return near;
+	}
+
+	/// <summary>
+	/// Evaluate the map model on a specified location
+	/// using DensityDistanceThreshold as the radius.
+	/// </summary>
+	/// <param name="point">Evaluation location.</param>
+	/// <returns>Density on the specified location.</returns>
+	public double Evaluate(double[] point)
+	{
+		return Evaluate(point, DensityDistanceThreshold);
 	}
 
 	/// <summary>
@@ -100,15 +152,46 @@ public class Map : IMap
 	/// </summary>
 	/// <param name="point">Evaluation location.</param>
 	/// <returns>Density on the specified location.</returns>
-	public double Evaluate(double[] point)
+	/// <param name="radius">Maximum distance from point to be included in the evaluation.</param>
+	public double Evaluate(double[] point, double radius)
 	{
 		double value = 0;
 
-		foreach (Gaussian component in this) {
-			value += component.Weight * component.Evaluate(point);
+		/*foreach (var component in Nearest(point, radius)) {
+			Gaussian landmark = component.Node.Value;
+			value += landmark.Weight * landmark.Evaluate(point);
+		}*/
+
+		foreach (var landmark in this) {
+			value += landmark.Weight * landmark.Evaluate(point);
 		}
 
 		return value;
+	}
+
+	/// <summary>
+	/// Generate an index for this map.
+	/// </summary>
+	/// <remarks>
+	/// The comparison shall be by reference so to use
+	/// this index, the gaussian must come from the same map.
+	/// This is important so different but equivalent components
+	/// can be distinguished, which may happen, for example, when
+	/// default-initializing several landmarks.
+	/// Since gaussian are immutable, submaps (e.g. FindAll)
+	/// work correctly with these indices.
+	/// </remarks>
+	public Dictionary<Gaussian, int> Indexify()
+	{
+		var index = new Dictionary<Gaussian, int>();
+		int i     = 0;
+
+		foreach (Gaussian landmark in this) {
+			index.Add(landmark, i);
+			i++;
+		}
+
+		return index;
 	}
 
 	/// <summary>
@@ -119,7 +202,12 @@ public class Map : IMap
 	public IMap FindAll(Predicate<Gaussian> match)
 	{
 		Map filtered = new Map();
-		filtered.landmarks = this.landmarks.FindAll(match);
+
+		foreach (var node in this.landmarks) {
+			if (match(node.Value)) {
+				filtered.landmarks.Add(node.Value.Mean, node.Value);
+			}
+		}
 
 		return filtered;
 	}
@@ -132,7 +220,13 @@ public class Map : IMap
 	/// <returns>Process results, one entry per landmark.</returns>
 	public List<TOutput> ConvertAll<TOutput>(Converter<Gaussian, TOutput> converter)
 	{
-		return landmarks.ConvertAll(converter);
+		List<TOutput> processed = new List<TOutput>();
+
+		foreach (var node in landmarks) {
+			processed.Add(converter(node.Value));
+		}
+
+		return processed;
 	}
 
 	/// <summary>
@@ -141,7 +235,13 @@ public class Map : IMap
 	/// <returns>Landmark list.</returns>
 	public List<Gaussian> ToList()
 	{
-		return new List<Gaussian>(landmarks);
+		List<Gaussian> list = new List<Gaussian>(landmarks.Count);
+
+		foreach (var node in landmarks) {
+			list.Add(node.Value);
+		}
+
+		return list;
 	}
 
 	/// <summary>
@@ -150,8 +250,8 @@ public class Map : IMap
 	/// <returns>Landmark iterator.</returns>
 	public IEnumerator<Gaussian> GetEnumerator()
 	{
-		foreach (var landmark in landmarks) {
-			yield return landmark;
+		foreach (var node in landmarks) {
+			yield return node.Value;
 		}
 	}
 
