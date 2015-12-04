@@ -322,7 +322,7 @@ public abstract class Manipulator : Game
 		effect.View       = Microsoft.Xna.Framework.Matrix.Identity;
 		effect.World      = Microsoft.Xna.Framework.Matrix.Identity;
 		effect.Projection = Microsoft.Xna.Framework.Matrix.CreateOrthographicOffCenter(MapClip[0], MapClip[1], MapClip[2], MapClip[3], -100, 100);
-
+		
 		effect.LightingEnabled    = false;
 		effect.VertexColorEnabled = true;
 
@@ -562,8 +562,6 @@ public abstract class Manipulator : Game
 				closedist2 = distance2;
 			}
 		}
-
-
 
 		if (closedist2 > 10 * 10) {
 			projected = null;

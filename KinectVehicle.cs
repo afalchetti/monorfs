@@ -138,6 +138,16 @@ public class KinectVehicle : Vehicle
 	private List<FastRetinaKeypoint> prevkeypoints;
 
 	/// <summary>
+	/// Interest points from the previous frame.
+	/// </summary>
+	private List<FastRetinaKeypoint> prevprevkeypoints;
+
+	/// <summary>
+	/// Keypoint matches against last frame.
+	/// </summary>
+	private IntPoint[][] matches = new IntPoint[0][];
+
+	/// <summary>
 	/// True makes the system perform a heavy keypoint
 	/// filtering step before delivering the measurements.
 	/// </summary>
@@ -229,6 +239,7 @@ public class KinectVehicle : Vehicle
 			featurecache  = new Queue<List<SparseItem>>();
 			interest      = new List<SparseItem>();
 			prevkeypoints = new List<FastRetinaKeypoint>();
+			prevprevkeypoints = new List<FastRetinaKeypoint>();
 			
 			if (device.IsFile) {
 				device.PlaybackControl.Speed = -1;
@@ -464,52 +475,75 @@ public class KinectVehicle : Vehicle
 	{
 		var detector = new FastRetinaKeypointDetector(threshold);
 		int border   = Math.Min(50, (int) (width * 0.05));
-		List<SparseItem> keypoints = new List<SparseItem>();
 
-		List<FastRetinaKeypoint> features = null;
+		List<FastRetinaKeypoint> keypointsF = new List<FastRetinaKeypoint>();
+		List<SparseItem>         keypoints  = new List<SparseItem>();
 
 		detector.ComputeDescriptors = (KeypointFilter) ? FastRetinaKeypointDescriptorType.Standard :
 		                                                   FastRetinaKeypointDescriptorType.None;
 
+		int bwidth  = 0;
+		int bheight = 0;
+
 		using (UnmanagedImage bitmap = ColorMatrixToImage(image, width, height)) {
-			features = detector.ProcessImage(bitmap);
+			keypointsF = detector.ProcessImage(bitmap);
+			bwidth     = bitmap.Width;
+			bheight    = bitmap.Height;
+		}
 
-			IntPoint[] filtered = null;
+		List<FastRetinaKeypoint> filtered = keypointsF;
 
-			if (KeypointFilter && features.Count > 4 && prevkeypoints.Count > 4) {
-				var     matches = new KNearestNeighborMatching(5).Match(prevkeypoints, features);
-				var     ransac  = new RansacHomographyEstimator(0.001, 0.99);
+		if (KeypointFilter && keypointsF.Count > 4 && prevkeypoints.Count > 4) {
+			var descriptors = new Dictionary<IntPoint, FastRetinaKeypoint>();
 
+			foreach (var point in keypointsF) {
+				descriptors[new IntPoint((int) point.X, (int) point.Y)] = point;
+			}
+
+			var matcher = new KNearestNeighborMatching(3);
+			matcher.Threshold = 0.1;
+
+			var matches = matcher.Match(prevkeypoints, keypointsF);
+			var ransac  = new RansacHomographyEstimator(0.1, 0.9999);
+
+			this.matches = new IntPoint[2][];
+			this.matches[0] = new IntPoint[0];
+
+			if (matches[0].Length > 4) {
 				ransac.Estimate(matches);
-				int[]   inliers = ransac.Inliers;
+				int[] inliers = ransac.Inliers;
 
-				filtered = new IntPoint[inliers.Length];
+				filtered = new List<FastRetinaKeypoint>();
+
+				this.matches = new IntPoint[2][];
+				this.matches[0] = new IntPoint[inliers.Length];
+				this.matches[1] = new IntPoint[inliers.Length];
 
 				for (int i = 0; i < inliers.Length; i++) {
-					filtered[i] = matches[1][inliers[i]];
+					int x = matches[1][inliers[i]].X;
+					int y = matches[1][inliers[i]].Y;
+
+					this.matches[0][i] = matches[0][inliers[i]];
+					this.matches[1][i] = matches[1][inliers[i]];
+
+					if (x >= border && x < bwidth  - border &&
+					    y >= border && y < bheight - border &&
+						depth[x][y] > 0) {
+
+						filtered.Add(descriptors[matches[1][inliers[i]]]);
+					}
 				}
 			}
-			else {
-				// do nothing, use all the keypoints as they are the only data available
-				filtered = new IntPoint[features.Count];
+		}
 
-				for (int i = 0; i < features.Count; i++) {
-					filtered[i] = new IntPoint((int) features[i].X, (int) features[i].Y);
-				}
-			}
+		this.prevprevkeypoints = this.prevkeypoints;
+		this.prevkeypoints = keypointsF;
 
-			for (int i = 0; i < filtered.Length; i++) {
-				IntPoint point = filtered[i];
+		foreach (var point in filtered) {
+			int x = (int) point.X;
+			int y = (int) point.Y;
 
-				int x = point.X;
-				int y = point.Y;
-
-				if (x >= border && x < bitmap.Width - border && y >= border && y < bitmap.Height - border && depth[x][y] != 0) {
-					keypoints.Add(new SparseItem(x, y, depth[x][y]));
-				}
-			}
-
-			prevkeypoints = features;
+			keypoints.Add(new SparseItem(x, y, depth[x][y]));
 		}
 
 		return keypoints;
@@ -657,6 +691,53 @@ public class KinectVehicle : Vehicle
 		foreach (var point in interest) {
 			Flip.Draw(landmark, new Vector2(point.I * ratio - landmark.Width / 2, point.K * ratio - landmark.Height / 2));
 			Flip.Draw(landmark, new Vector2(point.I * ratio - landmark.Width / 2, point.K * ratio - landmark.Height / 2 + gheight / 2));
+		}
+	}
+
+	public void RenderSideHUD()
+	{
+		int vidwidth  = depthsensed.Width;
+		int vidheight = depthsensed.Height;
+		int gwidth    = Graphics.Viewport.Width;
+		int gheight   = Graphics.Viewport.Height;
+
+		float ratio = (float) gwidth / vidwidth;
+
+		Console.WriteLine(matches.Length);
+
+		if (matches.Length > 0) {
+			for (int i = 0; i < matches[0].Length; i++) {
+				VertexPositionColor[] vertices = new VertexPositionColor[2];
+
+				vertices[0] = new VertexPositionColor(new Vector3(matches[0][i].X * ratio, matches[0][i].Y * ratio, 0), Color.Red);
+				vertices[1] = new VertexPositionColor(new Vector3(matches[1][i].X * ratio, matches[1][i].Y * ratio, 0), Color.Red);
+
+				Graphics.DrawUserPrimitives(PrimitiveType.LineList, vertices, 0, 1);
+			}
+		}
+
+		Console.WriteLine(interest.Count + " " + prevkeypoints.Count);
+
+		foreach (var point in prevprevkeypoints) {
+			double[][] vertices = new double[4][];
+
+			vertices[0] = new double[] {point.X * ratio + 2, point.Y * ratio - 2, 0};
+			vertices[1] = new double[] {point.X * ratio + 2, point.Y * ratio + 2, 0};
+			vertices[2] = new double[] {point.X * ratio - 2, point.Y * ratio + 2, 0};
+			vertices[3] = new double[] {point.X * ratio - 2, point.Y * ratio - 2, 0};
+
+			Graphics.DrawUser2DPolygon(vertices, 1.0f, Color.Blue, true);
+		}
+
+		foreach (var point in interest) {
+			double[][] vertices = new double[4][];
+
+			vertices[0] = new double[] {point.I * ratio + 2, point.K * ratio - 2, 0};
+			vertices[1] = new double[] {point.I * ratio + 2, point.K * ratio + 2, 0};
+			vertices[2] = new double[] {point.I * ratio - 2, point.K * ratio + 2, 0};
+			vertices[3] = new double[] {point.I * ratio - 2, point.K * ratio - 2, 0};
+
+			Graphics.DrawUser2DPolygon(vertices, 1.0f, Color.White, true);
 		}
 	}
 
