@@ -204,9 +204,8 @@ int update(ISAM2Navigator* navigator, double* odometry, double* measurements,
 		int                  maxlabel = -1;
 
 		// note that dorientation is shifted since the coordinate
-		// system is not the same in this framework: roll doesn't
-		// really roll the vehicle, but changes the pitch, etc.
-		Pose3 delta(Rot3::ypr(odometry[5], odometry[3], odometry[4]),
+		// system is not the same in this framework
+		Pose3 delta(Rot3::ypr(odometry[5], odometry[4], odometry[3]),
 	                Point3(odometry[0], odometry[1], odometry[2]));
 
 		// add new estimate for new pose (estimate using last pose)
