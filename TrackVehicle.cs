@@ -84,15 +84,10 @@ public class TrackVehicle : SimulatedVehicle
 	/// with mean 'a' and covariance matrix 'b'.
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
-	/// <param name="dx">Moved distance from odometry in the local vertical movement-perpendicular direction since last timestep.</param>
-	/// <param name="dy">Moved distance from odometry in the local horizontal movement-perpendicular direction since last timestep.</param>
-	/// <param name="dz">Moved distance from odometry in the local depth movement-parallel direction since last timestep.</param>
-	/// <param name="dyaw">Angle variation from odometry in the yaw coordinate since last timestep.</param>
-	/// <param name="dpitch">Angle variation from odometry in the pitch coordinate since last timestep.</param>
-	/// <param name="droll">Angle variation from odometry in the roll coordinate since last timestep.</param>
-	public void UpdateNoisy(GameTime time, double dx, double dy, double dz, double dyaw, double dpitch, double droll)
+	/// <param name="reading">Odometry reading (dx, dy, dz, dpitch, dyaw, droll).</param>
+	public void UpdateNoisy(GameTime time, double[] reading)
 	{
-		Update(time, dx, dy, dz, dyaw, dpitch, droll);
+		Update(time, reading);
 
 		State = State.Add(time.ElapsedGameTime.TotalSeconds.Multiply(
 		                      U.RandomGaussianVector(new double[7] {0, 0, 0, 0, 0, 0, 0}, MotionCovarianceQ)));

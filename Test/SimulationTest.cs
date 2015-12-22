@@ -114,8 +114,8 @@ class SimulationTest
 			commandindex = 0;
 		}
 
-		explorer .Update(time, 0, 0, ds, dyaw, dpitch, droll);
-		navigator.Update(time, 0, 0, ds, dyaw, dpitch, droll);
+		explorer .Update(time, new double[6] {0, 0, ds, dpitch, dyaw, droll});
+		navigator.Update(time, new double[6] {0, 0, ds, dpitch, dyaw, droll});
 		updatehook();
 
 		if (time.TotalGameTime - lastnavigationupdate.TotalGameTime >= Simulation.MeasureElapsed) {

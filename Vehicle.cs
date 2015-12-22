@@ -425,20 +425,15 @@ public abstract class Vehicle : IDisposable
 	/// with mean 'a' and covariance matrix 'b'.
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
-	/// <param name="dx">Moved distance from odometry in the local vertical movement-perpendicular direction since last timestep.</param>
-	/// <param name="dy">Moved distance from odometry in the local horizontal movement-perpendicular direction since last timestep.</param>
-	/// <param name="dz">Moved distance from odometry in the local depth movement-parallel direction since last timestep.</param>
-	/// <param name="dyaw">Angle variation from odometry in the yaw coordinate since last timestep.</param>
-	/// <param name="dpitch">Angle variation from odometry in the pitch coordinate since last timestep.</param>
-	/// <param name="droll">Angle variation from odometry in the roll coordinate since last timestep.</param>
-	public virtual void Update(GameTime time, double dx, double dy, double dz, double dyaw, double dpitch, double droll)
+	/// <param name="reading">Odometry reading (dx, dy, dz, dpitch, dyaw, droll).</param>
+	public virtual void Update(GameTime time, double[] reading)
 	{
 		// note that the framework uses Yaw = Y, Pitch = X, Roll = Z => YXZ Tait-Bryan parametrization
 		// this is equivalent to a plane pointing upwards with its wings on the X direction
-		Quaternion dorientation   = Quaternion.CreateFromYawPitchRoll((float) dyaw, (float) dpitch, (float) droll);
+		Quaternion dorientation   = Quaternion.CreateFromYawPitchRoll((float) reading[4], (float) reading[3], (float) reading[5]);
 		Quaternion neworientation = Orientation * dorientation;
 		Quaternion midrotation    = Quaternion.Slerp(Orientation, neworientation, 0.5f);
-		Quaternion dlocation      = midrotation * new Quaternion((float) dx, (float) dy, (float) dz, 0) * Quaternion.Conjugate(midrotation);
+		Quaternion dlocation      = midrotation * new Quaternion((float) reading[0], (float) reading[1], (float) reading[2], 0) * Quaternion.Conjugate(midrotation);
 
 		Location    = new double[3] {X + dlocation.X, Y + dlocation.Y, Z + dlocation.Z};
 		Orientation = Quaternion.Normalize(neworientation);

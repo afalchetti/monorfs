@@ -403,14 +403,14 @@ public class Simulation : Manipulator
 				Navigator.StartMapping();
 			}
 
-			Explorer.Update(time, dlocx, dlocy, dlocz, dyaw, dpitch, droll);
+			Explorer.Update(time, new double[6] {dlocx, dlocy, dlocz, dpitch, dyaw, droll});
 
 			if (UseOdometry) {
 				double[] odm = Explorer.ReadOdometry(time);
-				Navigator.Update(time, odm[0], odm[1], odm[2], odm[3], odm[4], odm[5]);
+				Navigator.Update(time, odm);
 			}
 			else {
-				Navigator.Update(time, 0, 0, 0, 0, 0, 0);
+				Navigator.Update(time, new double[6] {0, 0, 0, 0, 0, 0});
 			}
 
 			if (time.TotalGameTime - lastnavigationupdate.TotalGameTime >= MeasureElapsed) {

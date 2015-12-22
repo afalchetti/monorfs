@@ -134,13 +134,8 @@ public class RecordVehicle : Vehicle
 	/// Apply the motion model to the vehicle.
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
-	/// <param name="dx">Moved distance from odometry in the local vertical movement-perpendicular direction since last timestep.</param>
-	/// <param name="dy">Moved distance from odometry in the local horizontal movement-perpendicular direction since last timestep.</param>
-	/// <param name="dz">Moved distance from odometry in the local depth movement-parallel direction since last timestep.</param>
-	/// <param name="dyaw">Angle variation from odometry in the yaw coordinate since last timestep.</param>
-	/// <param name="dpitch">Angle variation from odometry in the pitch coordinate since last timestep.</param>
-	/// <param name="droll">Angle variation from odometry in the roll coordinate since last timestep.</param>
-	public override void Update(GameTime time, double dx, double dy, double dz, double dyaw, double dpitch, double droll)
+	/// <param name="reading">Odometry reading (dx, dy, dz, dpitch, dyaw, droll).</param>
+	public override void Update(GameTime time, double[] reading)
 	{
 		State = Trajectory[FrameIndex].Item2;
 		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(State)));

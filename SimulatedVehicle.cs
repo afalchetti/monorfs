@@ -194,20 +194,16 @@ public class SimulatedVehicle : Vehicle
 	/// with mean 'a' and covariance matrix 'b'.
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
-	/// <param name="dx">Moved distance from odometry in the local vertical movement-perpendicular direction since last timestep.</param>
-	/// <param name="dy">Moved distance from odometry in the local horizontal movement-perpendicular direction since last timestep.</param>
-	/// <param name="dz">Moved distance from odometry in the local depth movement-parallel direction since last timestep.</param>
-	/// <param name="dyaw">Angle variation from odometry in the yaw coordinate since last timestep.</param>
-	/// <param name="dpitch">Angle variation from odometry in the pitch coordinate since last timestep.</param>
-	/// <param name="droll">Angle variation from odometry in the roll coordinate since last timestep.</param>
-	public override void Update(GameTime time, double dx, double dy, double dz, double dyaw, double dpitch, double droll)
+	/// <param name="reading">Odometry reading (dx, dy, dz, dpitch, dyaw, droll).</param>
+	public override void Update(GameTime time, double[] reading)
 	{
 		// no input, static friction makes the robot stay put (if there is any static friction)
-		if (PerfectStill && dx == 0 && dy == 0 && dz == 0 && dyaw == 0 && dpitch == 0 && droll == 0) {
+		if (PerfectStill && reading[0] == 0 && reading[1] == 0 && reading[2] == 0 &&
+			                reading[3] == 0 && reading[4] == 0 && reading[5] == 0) {
 			return;
 		}
 
-		base.Update(time, dx, dy, dz, dyaw, dpitch, droll);
+		base.Update(time, reading);
 	}
 	
 	/// <summary>

@@ -293,14 +293,8 @@ public class PHDNavigator : Navigator
 	/// Update the vehicle particles.
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
-	/// <param name="dx">Moved distance from odometry in the local vertical movement-perpendicular direction since last timestep.</param>
-	/// <param name="dy">Moved distance from odometry in the local horizontal movement-perpendicular direction since last timestep.</param>
-	/// <param name="dz">Moved distance from odometry in the local depth movement-parallel direction since last timestep.</param>
-	/// <param name="dyaw">Angle variation from odometry in the yaw coordinate since last timestep.</param>
-	/// <param name="dpitch">Angle variation from odometry in the pitch coordinate since last timestep.</param>
-	/// <param name="droll">Angle variation from odometry in the roll coordinate since last timestep.</param>
-	public override void Update(GameTime time, double dx, double dy, double dz,
-	                            double dyaw, double dpitch, double droll)
+	/// <param name="reading">Odometry reading (dx, dy, dz, dpitch, dyaw, droll).</param>
+	public override void Update(GameTime time, double[] reading)
 	{
 		if (OnlyMapping) {
 			VehicleParticles[0].State = RefVehicle.State;
@@ -308,7 +302,7 @@ public class PHDNavigator : Navigator
 		}
 		else {
 			for (int i = 0; i < VehicleParticles.Length; i++) {
-				VehicleParticles[i].UpdateNoisy(time, dx, dy, dz, dyaw, dpitch, droll);
+				VehicleParticles[i].UpdateNoisy(time, reading);
 			}
 
 			// debug: force the correct particle into the mix (it should always win)
