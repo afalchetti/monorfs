@@ -37,6 +37,7 @@ using Microsoft.Xna.Framework.Input;
 using FP = monorfs.FileParser;
 
 using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
+using TimedArray        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
 
 namespace monorfs
@@ -44,7 +45,7 @@ namespace monorfs
 /// <summary>
 /// Navigation algorithm.
 /// </summary>
-public enum NavigationAlgorithm { Odometry, PHD, ISAM2 }
+public enum NavigationAlgorithm { Odometry, PHD, LoopyPHD, ISAM2 }
 
 /// <summary>
 /// Vehicle input type.
@@ -253,6 +254,10 @@ public class Simulation : Manipulator
 		Navigator      navigator;
 		List<double[]> commands;
 
+		// batch methods extra information
+		TimedState        estimate     = null;
+		TimedArray        odometry     = null;
+		TimedMeasurements measurements = null;
 
 		try {
 			switch (input) {
@@ -260,7 +265,13 @@ public class Simulation : Manipulator
 				explorer = FP.VehicleFromSensor(scenefile, sidebar);
 				break;
 			case VehicleType.Record:
-				explorer = FP.VehicleFromRecord(scenefile);
+				if (algorithm == NavigationAlgorithm.LoopyPHD) {
+					Console.WriteLine("reading Loopy PHD initialization data from file");
+					explorer = FP.VehicleFromRecord(scenefile, true, out estimate, out odometry, out measurements);
+				}
+				else {
+					explorer = FP.VehicleFromRecord(scenefile, false, out estimate, out odometry, out measurements);
+				}
 				break;
 			case VehicleType.Simulation:
 			default:
@@ -292,6 +303,18 @@ public class Simulation : Manipulator
 			break;
 		case NavigationAlgorithm.ISAM2:
 			navigator = new ISAM2Navigator(explorer, onlymapping);
+			break;
+		case NavigationAlgorithm.LoopyPHD:
+			Console.WriteLine("initializing Loopy PHD");
+			if (estimate != null) {
+				navigator = new LoopyPHDNavigator(explorer, estimate, odometry, measurements);
+			}
+			else {
+				navigator = new LoopyPHDNavigator(explorer, commands,
+				                                  new PHDNavigator(explorer, particlecount, onlymapping));
+			}
+			Console.WriteLine("Loopy PHD initialized");
+
 			break;
 		case NavigationAlgorithm.PHD:
 		default:

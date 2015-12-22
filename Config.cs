@@ -93,6 +93,9 @@ public static class Config
 	public static double NavigatorPD                     = DetectionProbability;
 	public static double NavigatorClutterDensity         = ClutterDensity;
 
+	// LoopyPHDNavigator
+	public static double GradientAscentRate = 0.03;
+
 	// ISAM2Navigator
 	public static double MatchThreshold       = 3.0;
 	public static int    NewLandmarkThreshold = 3;

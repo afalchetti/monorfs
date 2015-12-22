@@ -365,8 +365,14 @@ public static class FileParser
 	/// Create a vehicle from a record file.
 	/// </summary>
 	/// <param name="datafile">Vehicle descriptor file.</param>
+	/// <param name="extrainfo">If true, provide additional information through output parameters;
+	/// otherwise, they output null.</param>
+	/// <param name="estimate">Trajectory estimate.</param>
+	/// <param name="xodometry">Odometry readings.</param>
+	/// <param name="xmeasurements">Measurement readings.</param>
 	/// <returns>Prerecorded vehicle parsed from file.</returns>
-	public static RecordVehicle VehicleFromRecord(string datafile)
+	public static RecordVehicle VehicleFromRecord(string datafile, bool extrainfo, out TimedState estimate,
+	                                              out TimedArray xodometry, out TimedMeasurements xmeasurements)
 	{
 		string tmpdir  = Util.TemporaryDir();
 		string datadir = Path.Combine(tmpdir, "data");
@@ -375,12 +381,17 @@ public static class FileParser
 
 		string scenefile      = Path.Combine(datadir, "scene.world");
 		string trajectoryfile = Path.Combine(datadir, "trajectory.out");
+		string estimatefile   = Path.Combine(datadir, "estimate.out");
 		string odometryfile   = Path.Combine(datadir, "odometry.out");
 		string measurefile    = Path.Combine(datadir, "measurements.out");
 		string tagfile        = Path.Combine(datadir, "tags.out");
 
 		if (!File.Exists(scenefile)) {
 			throw new ArgumentException("Missing scene file");
+		}
+
+		if (extrainfo && !File.Exists(estimatefile)) {
+			throw new ArgumentException("Missing estimate file");
 		}
 
 		if (!File.Exists(trajectoryfile)) {
@@ -409,7 +420,7 @@ public static class FileParser
 
 		trajectory   = TimedArrayFromDescriptor  (File.ReadAllLines(trajectoryfile), 7);
 		odometry     = TimedArrayFromDescriptor  (File.ReadAllLines(odometryfile), 6);
-		measurements = MeasurementsFromDescriptor(File.ReadAllText(measurefile));
+		measurements = MeasurementsFromDescriptor(File.ReadAllText(measurefile), 3);
 
 		if (!string.IsNullOrEmpty(tagfile)) {
 			tags = TimedMessageFromDescriptor(File.ReadAllLines(tagfile));
@@ -422,6 +433,19 @@ public static class FileParser
 		odometry.Insert(0, Tuple.Create(0.0, new double[6]));
 
 		explorer = new RecordVehicle(trajectory, odometry, measurements, tags, template.Landmarks);
+
+		if (extrainfo) {
+			TimedTrajectory fullestimate = TrajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), 7, false);
+
+			estimate      = fullestimate[fullestimate.Count - 1].Item2;
+			xodometry     = odometry;
+			xmeasurements = measurements;
+		}
+		else {
+			estimate      = null;
+			xodometry     = null;
+			xmeasurements = null;
+		}
 
 		Directory.Delete(tmpdir, true);
 

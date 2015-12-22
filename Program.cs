@@ -120,20 +120,20 @@ public class Program
 		NavigationAlgorithm algorithm = NavigationAlgorithm.PHD;
 
 		OptionSet options = new OptionSet {
-			{ "f|scene=",      "Scene description file. Simulated, recorded or device id.",    f       => scenefile     = f },
-			{ "r|recfile=",    "Recording file. Saves State and events for reviewing.",        r       => recfile       = r },
-			{ "c|command=",    "Auto-command file (simulates user input).",                    c       => commandfile   = c },
-			{ "g|config=",     "Configuration file. Contains global constants",                g       => configfile    = g },
-			{ "a|algorithm=",  "SLAM solver algorithm ('odometry', 'phd' or 'isam2')",         a       => algorithm     = (a == "isam2") ? NavigationAlgorithm.ISAM2 : (a == "odometry") ? NavigationAlgorithm.Odometry : NavigationAlgorithm.PHD },
-			{ "p|particles=",  "Number of particles used for the RB-PHD",                      (int p) => particlecount = p },
-			{ "y|onlymap",     "Only do mapping, assuming known localization.",                y       => onlymapping   = y != null },
-			{ "i|input=",      "Vehicle input stream: 'kinect', 'simulation' or 'record'",     i       => input         = (i == "kinect") ? VehicleType.Kinect : (i == "record") ? VehicleType.Record : VehicleType.Simulation },
-			{ "R|realtime",    "Process the system in realtime, instead of a fixed step.",     R       => realtime      = R != null },
-			{ "v|view",        "View a precorded session.",                                    v       => viewer        = v != null },
-			{ "H|history=",    "Trajectory history mode: either 'filter' or 'smooth'",         h       => filterhistory = (h == "filter") },
-			{ "x|headless",    "Run headless, i.e. with no GUI",                               x       => headless      = x != null },
-			{ "t|noterminate", "Skip simulation termination due command depletion o similars", t       => noterminate   = t != null },
-			{ "h|help",        "Show this message and exit",                                   h       => showhelp      = h != null }
+			{ "f|scene=",      "Scene description file. Simulated, recorded or device id.",     f       => scenefile     = f },
+			{ "r|recfile=",    "Recording file. Saves State and events for reviewing.",         r       => recfile       = r },
+			{ "c|command=",    "Auto-command file (simulates user input).",                     c       => commandfile   = c },
+			{ "g|config=",     "Configuration file. Contains global constants",                 g       => configfile    = g },
+			{ "a|algorithm=",  "SLAM solver algorithm ('odometry', 'phd', 'loopy' or 'isam2')", a       => algorithm     = (a == "isam2") ? NavigationAlgorithm.ISAM2 : (a == "odometry") ? NavigationAlgorithm.Odometry : (a == "loopy") ? NavigationAlgorithm.LoopyPHD : NavigationAlgorithm.PHD },
+			{ "p|particles=",  "Number of particles used for the RB-PHD",                       (int p) => particlecount = p },
+			{ "y|onlymap",     "Only do mapping, assuming known localization.",                 y       => onlymapping   = y != null },
+			{ "i|input=",      "Vehicle input stream: 'kinect', 'simulation' or 'record'",      i       => input         = (i == "kinect") ? VehicleType.Kinect : (i == "record") ? VehicleType.Record : VehicleType.Simulation },
+			{ "R|realtime",    "Process the system in realtime, instead of a fixed step.",      R       => realtime      = R != null },
+			{ "v|view",        "View a precorded session.",                                     v       => viewer        = v != null },
+			{ "H|history=",    "Trajectory history mode: either 'filter' or 'smooth'",          h       => filterhistory = (h == "filter") },
+			{ "x|headless",    "Run headless, i.e. with no GUI",                                x       => headless      = x != null },
+			{ "t|noterminate", "Skip simulation termination due command depletion o similars",  t       => noterminate   = t != null },
+			{ "h|help",        "Show this message and exit",                                    h       => showhelp      = h != null }
 		};
 
 		try {

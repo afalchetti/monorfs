@@ -90,6 +90,96 @@ public static class Util
 	}
 
 	/// <summary>
+	/// Get the matrix representation of a rotation quaternion.
+	/// </summary>
+	/// <param name="q">Rtation quaternion.</param>
+	/// <returns>Matrix representation.</returns>
+	public static double[][] Quat2Matrix(Quaternion q)
+	{
+		return new double[3][]
+		{
+			new double[3] {q.W*q.W + q.X*q.X - q.Y*q.Y - q.Z*q.Z, 2 * (q.X*q.Y - q.W*q.Z),               2 * (q.W*q.Y + q.X*q.Z)},
+			new double[3] {2 * (q.X*q.Y + q.W*q.Z),               q.W*q.W - q.X*q.X + q.Y*q.Y - q.Z*q.Z, 2 * (q.Y*q.Z - q.W*q.X)},
+			new double[3] {2 * (q.X*q.Z - q.W*q.Y),               2 * (q.W*q.X + q.Y*q.Z),               q.W*q.W - q.X*q.X - q.Y*q.Y + q.Z*q.Z}
+		};
+	}
+
+	/// <summary>
+	/// Transform a quaternion-based pose into its Lie algebra representation around
+	/// the given linearization point, i.e. linearpoint's rotation becomes the identity.
+	/// </summary>
+	/// <param name="pose">Quaternion-based state with an associated covariance.</param>
+	/// <param name="linearpoint">Linearization point.</param>
+	/// <returns>Lie-based state with associated covariance.</returns>
+	public static Gaussian Quat2Lie(Gaussian pose, Pose3D linearpoint)
+	{
+		double[]   relpose      = new Pose3D(pose.Mean).Subtract(linearpoint);
+		Quaternion linrotation  = linearpoint.Orientation;
+		Quaternion poserotation = new Pose3D().FromLinear(relpose).Orientation;
+		double[][] rj           = Q2LieJacobian(linrotation);
+
+		double[][] jacobian = new double[6][] { new double[7] {1, 0, 0, 0,        0,        0,        0},
+		                                        new double[7] {0, 1, 0, 0,        0,        0,        0},
+		                                        new double[7] {0, 0, 1, 0,        0,        0,        0},
+		                                        new double[7] {0, 0, 0, rj[0][0], rj[0][1], rj[0][2], rj[0][3]},
+		                                        new double[7] {0, 0, 0, rj[1][0], rj[1][1], rj[1][2], rj[1][3]},
+		                                        new double[7] {0, 0, 0, rj[2][0], rj[2][1], rj[2][2], rj[2][3]}};
+
+		double[][] covariance = jacobian.Multiply(pose.Covariance).MultiplyByTranspose(jacobian);
+
+		return new Gaussian(relpose, covariance, 1.0);
+	}
+
+	/// <summary>
+	/// Transform a Lie-based pose into its quaternion representation around
+	/// the given linearization point, i.e. linearpoint's rotation becomes the identity.
+	/// </summary>
+	/// <param name="pose">Lie-based state with an associated covariance.</param>
+	/// <param name="linearpoint">Linearization point.</param>
+	/// <returns>Quaternion-based state with associated covariance.</returns>
+//	public static double[] Lie2Quat(Pose3D pose, Pose3D linearpoint)
+//	{
+//		return pose.Subtract(linearpoint);
+//
+//		Quaternion linrotation  = new Quaternion(linearpoint[3], linearpoint[4], linearpoint[5], linearpoint[6]);
+//		double[]   poserotation = new double[] {pose[3], pose[4], pose[5]};
+//		Quaternion quatmean     = linrotation.Add(poserotation);
+//
+//		return new double[7] {pose[0], pose[1], pose[2], quatmean.W, quatmean.X, quatmean.Y, quatmean.Z};
+//	}
+
+	/// <summary>
+	/// Transform a Lie-based pose into its quaternion representation around
+	/// the given linearization point, i.e. linearpoint's rotation becomes the identity.
+	/// </summary>
+	/// <param name="pose">Lie-based state with an associated covariance.</param>
+	/// <param name="linearpoint">Linearization point.</param>
+	/// <returns>Quaternion-based state with associated covariance.</returns>
+	public static Gaussian Lie2Quat(Gaussian pose, Pose3D linearpoint)
+	{
+		Pose3D     globpose    = linearpoint.Add(pose.Mean);
+		Quaternion linrotation = linearpoint.Orientation;
+//		double[]   poserotation = new double[] {pose.Mean[3], pose.Mean[4], pose.Mean[5]};
+//
+//		Quaternion quatmean = linrotation.Add(poserotation);
+//		double[]   mean     = new double[7] {pose.Mean[0], pose.Mean[1], pose.Mean[2], quatmean.W, quatmean.X, quatmean.Y, quatmean.Z};
+
+		double[][] rj      = Q2LieJacobian(linrotation).PseudoInverse();
+
+		double[][] jacobian = new double[7][] { new double[6] {1, 0, 0, 0,        0,        0},
+		                                        new double[6] {0, 1, 0, 0,        0,        0},
+		                                        new double[6] {0, 0, 1, 0,        0,        0},
+		                                        new double[6] {0, 0, 0, rj[0][0], rj[0][1], rj[0][2]},
+		                                        new double[6] {0, 0, 0, rj[1][0], rj[1][1], rj[1][2]},
+		                                        new double[6] {0, 0, 0, rj[2][0], rj[2][1], rj[2][2]},
+		                                        new double[6] {0, 0, 0, rj[3][0], rj[3][1], rj[3][2]}};
+
+		double[][] covariance = jacobian.Multiply(pose.Covariance).MultiplyByTranspose(jacobian);
+
+		return new Gaussian(globpose.State, covariance, 1.0);
+	}
+
+	/// <summary>
 	/// Calculate the jacobian of the yaw-pitch-roll to quaternion function.
 	/// </summary>
 	/// <param name="yaw">Yaw evaluation point.</param>
@@ -254,6 +344,55 @@ public static class Util
 				lie[i][i] = 1e-9;
 			}
 		}
+	}
+
+	/// <summary>
+	/// Get the cross-product matrix associated to a vector.
+	/// </summary>
+	/// <param name="vector">Associated vector.</param>
+	/// <returns>Cross-product matrix. Linear transfromation equivalent to
+	/// calculate the cross product with the vector</returns>
+	public static double[][] CrossProductMatrix(double[] vector)
+	{
+		return new double[3][] { new double[3] {         0, -vector[2],  vector[1]},
+		                         new double[3] { vector[2],          0, -vector[0]},
+		                         new double[3] {-vector[1],  vector[0],          0} };
+	}
+
+	/// <summary>
+	/// Generate a (quasi-)Dirac delta distribution.
+	/// A tiny covariance is used to avoid numerical errors.
+	/// </summary>
+	/// <param name="x0">Position for the delta.</param>
+	/// <returns>Dirac distribution.</returns>
+	public static Gaussian DiracDelta(double[] x0)
+	{
+		const double eps        = 1e-12;
+		double[][]   covariance = new double[x0.Length][];
+
+		for (int i = 0; i < covariance.Length; i++) {
+			covariance[i]    = new double[x0.Length];
+			covariance[i][i] = eps;
+		}
+
+		return new Gaussian(x0, covariance, 1.0);
+	}
+
+	/// <summary>
+	/// Generate an uninformative covariance.
+	/// </summary>
+	/// <param name="size">Space dimension.</param>
+	/// <returns>Covariance.</returns>
+	public static double[][] InfiniteCovariance(int size)
+	{
+		double[][] cov = new double[size][];
+
+		for (int i = 0; i < size; i++) {
+			cov[i]    = new double[size];
+			cov[i][i] = 1e20;
+		}
+
+		return cov;
 	}
 
 	/// <summary>

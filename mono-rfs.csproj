@@ -144,6 +144,7 @@
     <Compile Include="BasicStructures\Quaternion.cs" />
     <Compile Include="BasicStructures\Pose3D.cs" />
     <Compile Include="BasicStructures\IPose.cs" />
+    <Compile Include="LoopyPHDNavigator.cs" />
     <Compile Include="DrawUtils.cs" />
     <Compile Include="Test\QuaternionTest.cs" />
     <Compile Include="Test\Pose3DTest.cs" />
