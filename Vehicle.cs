@@ -175,6 +175,17 @@ public abstract class Vehicle : IDisposable
 	public bool HasDataAssociation { get; protected set; }
 
 	/// <summary>
+	/// Groundtruth trajectory.
+	/// </summary>
+	public TimedState Groundtruth { get; protected set; }
+
+	/// <summary>
+	/// If true, the Groundtruth property contains the real trajectory;
+	/// otherwise, it will be empty;
+	/// </summary>
+	public bool KnowsGroundtruth { get; protected set; }
+
+	/// <summary>
 	/// Whether the vehicle uses the sidebar or not.
 	/// </summary>
 	public bool HasSidebar { get; protected set; }
@@ -240,6 +251,9 @@ public abstract class Vehicle : IDisposable
 		DataAssociation    = new List<int>();
 		Landmarks          = new List<double[]>();
 		MappedMeasurements = new List<double[]>();
+
+		Groundtruth      = new TimedState();
+		KnowsGroundtruth = false;
 
 		WayOdometry = new TimedArray();
 		WayPoints   = new TimedState();

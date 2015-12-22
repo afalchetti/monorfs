@@ -63,7 +63,7 @@ public class RecordVehicle : Vehicle
 	/// <summary>
 	/// Prerecorded trajectory.
 	/// </summary>
-	public TimedState Trajectory { get; private set; }
+	public TimedState Trajectory { get { return Groundtruth; } }
 
 	/// <summary>
 	/// Prerecorded odometry.
@@ -103,7 +103,7 @@ public class RecordVehicle : Vehicle
 	                     TimedMeasurements measurements, TimedMessage tags,
 	                     List<double[]> landmarks)
 	{
-		Trajectory   = trajectory;
+		Groundtruth = trajectory;
 		Odometry     = odometry;
 		Measurements = measurements;
 		Tags         = tags;
