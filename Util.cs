@@ -172,15 +172,10 @@ public static class Util
 		double ny = 0;
 		double nz = 0;
 
-		if (mag < 1e-15) {
-			nx = 0;
-			ny = 0;
-			nz = 0;
-		}
-		else {
+		if (mag > 1e-15) {
 			nx = q.X / mag;
 			ny = q.Y / mag;
-			nz = q.X / mag;
+			nz = q.Z / mag;
 		}
 		
 
