@@ -113,6 +113,7 @@ public class Program
 		bool   viewer        = false;
 		bool   filterhistory = false;
 		bool   headless      = false;
+		bool   noterminate   = false;
 		bool   showhelp      = false;
 
 		VehicleType         input     = VehicleType.Simulation;
@@ -131,6 +132,7 @@ public class Program
 			{ "v|view",        "View a precorded session.",                                    v       => viewer        = v != null },
 			{ "H|history=",    "Trajectory history mode: either 'filter' or 'smooth'",         h       => filterhistory = (h == "filter") },
 			{ "x|headless",    "Run headless, i.e. with no GUI",                               x       => headless      = x != null },
+			{ "t|noterminate", "Skip simulation termination due command depletion o similars", t       => noterminate   = t != null },
 			{ "h|help",        "Show this message and exit",                                   h       => showhelp      = h != null }
 		};
 
@@ -187,7 +189,7 @@ public class Program
 			}
 		}
 		else {
-			using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, input, algorithm, onlymapping, realtime, !headless)) {
+			using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, input, algorithm, onlymapping, realtime, !headless, noterminate)) {
 				SimulatedVehicle initPose = new SimulatedVehicle(sim.Explorer);
 
 				if (headless) {

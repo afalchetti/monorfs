@@ -73,6 +73,12 @@ public class Simulation : Manipulator
 	private bool commanddepleted;
 
 	/// <summary>
+	/// If true, the simulation will remain active after cues
+	/// like command depletion or vehicle requirements ask to do so.
+	/// </summary>
+	private bool noterminate;
+
+	/// <summary>
 	/// Measure cycle period. Every this amount of
 	/// time the SLAM solver is invoked.
 	/// </summary>
@@ -195,29 +201,22 @@ public class Simulation : Manipulator
 	/// </summary>
 	/// <param name="title">Window title.</param>
 	/// <param name="explorer">Main vehicle in the simulation. This is the only entity the user directly controls.</param>
+	/// <param name="navigator">SLAM solver.</param>
 	/// <param name="commands">List of stored commands for the vehicle as odometry readings.</param>
-	/// <param name="particlecount">Number of particles for the RB-PHD algorithm.
-	/// If only mapping is done, it is irrelevant.</param>
-	/// <param name="onlymapping">If true, no localization is executed and the robot's position
-	/// is assumed perfectly known.</param>
 	/// <param name="realtime">If true, the system works at the highest speed it can;
 	/// otherwise, the framerate is fixed and even if processing takes longer than the timestep, the simulation works
 	/// as it had taken exactly the nominal rate.</param>
-	/// <param name="algorithm">SLAM navigation algorithm.</param>
-	public Simulation(string title, Vehicle explorer, List<double[]> commands, int particlecount,
-	                  bool onlymapping, bool realtime,
-	                  NavigationAlgorithm algorithm)
-		: base(title, explorer,
-		       (algorithm == NavigationAlgorithm.PHD) ?
-		           (Navigator) new PHDNavigator(explorer, particlecount, onlymapping) :
-		       (algorithm == NavigationAlgorithm.ISAM2) ?
-		           (Navigator) new ISAM2Navigator(explorer, onlymapping) :
-		           (Navigator) new OdometryNavigator(explorer),
-		        realtime)
+	/// <param name="noterminate"> If true, the simulation will remain active after cues
+	/// like command depletion or vehicle requirements ask to do so.</param>
+	public Simulation(string title, Vehicle explorer, Navigator navigator, List<double[]> commands,
+	                  bool realtime, bool noterminate)
+		: base(title, explorer, navigator, realtime)
 	{
 		Commands        = commands;
 		commandindex    = 0;
 		commanddepleted = false;
+
+		this.noterminate = noterminate;
 
 		SidebarHistory  = new List<Texture2D>();
 		WayMeasurements = new TimedMeasurements();
@@ -241,13 +240,17 @@ public class Simulation : Manipulator
 	/// otherwise, the framerate is fixed and even if processing takes longer than the timestep, the simulation works
 	/// as it had taken exactly the nominal rate.</param>
 	/// <param name="sidebar">Allow a sidebar with extra details.</param>
+	/// <param name="noterminate"> If true, the simulation will remain active after cues
+	/// like command depletion or vehicle requirements ask to do so.</param>
 	/// <returns>Prepared simulation object.</returns>
 	public static Simulation FromFiles(string scenefile, string commandfile = "", int particlecount = 5,
 	                                   VehicleType input = VehicleType.Simulation,
 	                                   NavigationAlgorithm algorithm = NavigationAlgorithm.PHD,
-	                                   bool onlymapping = false, bool realtime = false, bool sidebar = true)
+	                                   bool onlymapping = false, bool realtime = false,
+	                                   bool sidebar = true, bool noterminate = false)
 	{
 		Vehicle        explorer;
+		Navigator      navigator;
 		List<double[]> commands;
 
 
@@ -283,9 +286,22 @@ public class Simulation : Manipulator
 			commands = new List<double[]>();
 		}
 
+		switch (algorithm) {
+		case NavigationAlgorithm.Odometry:
+			navigator = new OdometryNavigator(explorer);
+			break;
+		case NavigationAlgorithm.ISAM2:
+			navigator = new ISAM2Navigator(explorer, onlymapping);
+			break;
+		case NavigationAlgorithm.PHD:
+		default:
+			navigator = new PHDNavigator(explorer, particlecount, onlymapping);
+			break;
+		}
+
 		string title = "monorfs - simulating " + scenefile + " [" + algorithm + "]";
 
-		return new Simulation(title, explorer, commands, particlecount, onlymapping, realtime, algorithm);
+		return new Simulation(title, explorer, navigator, commands, realtime, noterminate);
 	}
 
 	/// <summary>
@@ -298,7 +314,7 @@ public class Simulation : Manipulator
 	/// <param name="multiplier">Movement scale multiplier.</param>
 	protected override void Update(GameTime time, KeyboardState keyboard, KeyboardState prevkeyboard, double multiplier)
 	{
-		if (commanddepleted || Explorer.WantsToStop) {
+		if (!noterminate && (commanddepleted || Explorer.WantsToStop)) {
 			Exit();
 			return;
 		}
