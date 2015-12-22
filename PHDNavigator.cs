@@ -777,6 +777,8 @@ public class PHDNavigator : Navigator
 	/// <param name="camera">Camera 4d transform matrix.</param>
 	public override void Render(double[][] camera)
 	{
+		RefVehicle.Render(camera);
+
 		if (RenderAllParticles) {
 			foreach (var particle in VehicleParticles) {
 				particle.RenderTrajectory(camera, Color.Blue);

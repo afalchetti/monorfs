@@ -561,11 +561,27 @@ public abstract class Vehicle : IDisposable
 		RenderFOV(camera);
 		RenderTrajectory(camera);
 		RenderBody(camera);
+		RenderMeasurements(camera);
+		RenderLandmarks(camera);
+	}
 
+	/// <summary>
+	/// Render all the measurements.
+	/// </summary>
+	/// <param name="camera">Camera 4d transform matrix.</param>
+	public void RenderMeasurements(double[][] camera)
+	{
 		foreach (double[] measure in MappedMeasurements) {
 			RenderMeasure(measure, camera);
 		}
+	}
 
+	/// <summary>
+	/// Render all the landmarks.
+	/// </summary>
+	/// <param name="camera">Camera 4d transform matrix.</param>
+	public void RenderLandmarks(double[][] camera)
+	{
 		foreach (double[] landmark in Landmarks) {
 			RenderLandmark(landmark, camera);
 		}
@@ -755,14 +771,7 @@ public abstract class Vehicle : IDisposable
 	/// <param name="color">Trajectory color.</param>
 	public void RenderTrajectory(double[][] camera, Color color)
 	{
-		double[][] vertices = new double[WayPoints.Count][];
-
-		for (int i = 0; i < WayPoints.Count; i++) {
-			double[] w  = WayPoints[i].Item2;
-			vertices[i] = camera.TransformH(new double[3] {w[0], w[1], w[2]});
-		}
-
-		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, false);
+		DrawUtils.DrawTrajectory(Graphics, WayPoints, color, camera);
 	}
 
 	/// <summary>

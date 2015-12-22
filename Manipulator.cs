@@ -477,7 +477,6 @@ public abstract class Manipulator : Game
 		foreach (EffectPass pass in effect.CurrentTechnique.Passes) {
 			pass.Apply();
 			
-			Explorer .Render(camera);
 			Navigator.Render(camera);
 			RenderHUD();
 		}

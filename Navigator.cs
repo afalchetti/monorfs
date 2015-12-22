@@ -239,6 +239,8 @@ public abstract class Navigator : IDisposable
 	/// <param name="camera">Camera 4d transform matrix.</param>
 	public virtual void Render(double[][] camera)
 	{
+		RefVehicle.Render(camera);
+
 		RenderTrajectory(camera);
 		RenderMap(camera);
 	}
@@ -259,15 +261,7 @@ public abstract class Navigator : IDisposable
 	/// <param name="camera">Camera 4d transform matrix.</param>
 	public void RenderTrajectory(double[][] camera)
 	{
-		double[][] vertices = new double[WayPoints.Count][];
-		Color color = Color.Blue;
-
-		for (int i = 0; i < WayPoints.Count; i++) {
-			double[] w  = WayPoints[i].Item2;
-			vertices[i] = camera.TransformH(new double[3] {w[0], w[1], w[2]});
-		}
-
-		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, false);
+		DrawUtils.DrawTrajectory(Graphics, WayPoints, Color.Blue, camera);
 	}
 
 	/// <summary>
