@@ -75,6 +75,8 @@ public class SimulatedVehicle : Vehicle
 	/// </summary>
 	public static bool PerfectStill { get { return Config.PerfectStill; } }
 
+	public static double[] VisibilityRamp { get { return Config.VisibilityRamp; } }
+
 	/// <summary>
 	/// Poisson distributed random generator with parameter lambda = ClutterCount.
 	/// </summary>
@@ -372,6 +374,28 @@ public class SimulatedVehicle : Vehicle
 	}
 
 	/// <summary>
+	/// Find if a landmark is visible in measurement space and
+	/// return a fuzzy value for points near the border of the visible region.
+	/// </summary>
+	/// <param name="measurement">Queried landmark in pixel-range coordinates.</param>
+	/// <returns>True if the landmark is visible; false otherwise.</returns>
+	public virtual double FuzzyVisibleM(double[] measurement)
+	{
+		double minwdistance = double.PositiveInfinity;
+
+		minwdistance = Math.Min(minwdistance, (measurement[0] - FilmArea.Left)  / VisibilityRamp[0]);
+		minwdistance = Math.Min(minwdistance, (FilmArea.Right - measurement[0]) / VisibilityRamp[0]);
+
+		minwdistance = Math.Min(minwdistance, (measurement[1]  - FilmArea.Top)   / VisibilityRamp[1]);
+		minwdistance = Math.Min(minwdistance, (FilmArea.Bottom - measurement[1]) / VisibilityRamp[1]);
+
+		minwdistance = Math.Min(minwdistance, (measurement[2] - RangeClip.Min)  / VisibilityRamp[2]);
+		minwdistance = Math.Min(minwdistance, (RangeClip.Max  - measurement[2]) / VisibilityRamp[2]);
+
+		return Math.Max(0, Math.Min(1, minwdistance));
+	}
+
+	/// <summary>
 	/// Get the probability of detection of a particular landmark.
 	/// It is modelled as a constant if it's on the FOV and zero if not. 
 	/// </summary>
@@ -379,7 +403,7 @@ public class SimulatedVehicle : Vehicle
 	/// <returns></returns>
 	public double DetectionProbability(double[] landmark)
 	{
-		return Visible(landmark) ? detectionProbability : 0;
+		return FuzzyVisibleM(MeasurePerfect(landmark)) * detectionProbability;
 	}
 
 	/// <summary>
@@ -391,7 +415,7 @@ public class SimulatedVehicle : Vehicle
 	/// <returns></returns>
 	public double DetectionProbabilityM(double[] measurement)
 	{
-		return VisibleM(measurement) ? detectionProbability : 0;
+		return FuzzyVisibleM(measurement) * detectionProbability;
 	}
 }
 }

@@ -59,9 +59,12 @@ public static class Config
 	                                                                   new double[3] {0, 0, 1e-3} };
 	
 	// SimulatedVehicle
-	public static double DetectionProbability = 0.9;
-	public static double ClutterDensity       = 3e-7;
-	public static bool   PerfectStill         = false;
+	public static double   DetectionProbability = 0.9;
+	public static double   ClutterDensity       = 3e-7;
+	public static bool     PerfectStill         = false;
+	public static double[] VisibilityRamp       = new double[3] {3 * MeasurementCovariance[0][0], 
+	                                                             3 * MeasurementCovariance[1][1],
+	                                                             3 * MeasurementCovariance[2][2]};
 
 	// KinectVehicle
 	public static int  KinectDelta    = 2;
