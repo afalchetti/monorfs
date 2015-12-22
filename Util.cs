@@ -153,10 +153,9 @@ public static class Util
 		double alpha = 0;
 
 		if (mag < 1e-6) {
-			wjacobian = new double[3][] { new double[1] {double.NegativeInfinity},
-			                              new double[1] {double.NegativeInfinity},
-			                              new double[1] {double.NegativeInfinity}};
-
+			wjacobian = new double[3][] { new double[1] {0},
+			                              new double[1] {0},
+			                              new double[1] {0}};
 			alpha = 2;
 		}
 		else {
