@@ -55,7 +55,7 @@ class SimulationTest
 
 	private readonly Action nop = () => {};
 
-	[TestFixtureSetUp]
+	[OneTimeSetUp]
 	public void globalsetup()
 	{
 		if (!KinectVehicle.Initialize()) {
@@ -89,7 +89,7 @@ class SimulationTest
 		simulation.Dispose();
 	}
 
-	[TestFixtureTearDown]
+	[OneTimeTearDown]
 	public void globalteardown()
 	{
 		KinectVehicle.Shutdown();
