@@ -341,9 +341,9 @@ public static class FileParser
 		string descriptor = "";
 
 		descriptor += "pose\n\t"
-		            + string.Join(" ", vehicle.Location.Convert(x => x.ToString("g6"))) + " "
-		            + vehicle.Angle  .ToString("g6") + " "
-		            + string.Join(" ", vehicle.Axis.Convert(x => x.ToString("g6"))) + "\n";
+		            + string.Join(" ", vehicle.Pose.Location.Convert(x => x.ToString("g6"))) + " "
+		            + vehicle.Pose.Angle  .ToString("g6") + " "
+		            + string.Join(" ", vehicle.Pose.Axis.Convert(x => x.ToString("g6"))) + "\n";
 
 		descriptor += "focal\n\t"
 		            + vehicle.VisionFocal    .ToString("g6") + " "

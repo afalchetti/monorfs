@@ -163,7 +163,7 @@ class SimulationTest
 			UpdateLoop(nloops,
 			updatehook: () =>
 			{
-				navigator.VehicleParticles[iperfect].State     = explorer.State;
+				navigator.VehicleParticles[iperfect].Pose      = new Pose3D(explorer.Pose);
 				navigator.VehicleParticles[iperfect].WayPoints = new TimedState(explorer.WayPoints);
 				navigator.MapModels[iperfect]                  = goodmapmodel;
 			},
@@ -172,7 +172,7 @@ class SimulationTest
 			{
 				bool found = false;
 				for (int i = 0; i < nparticles; i++) {
-					if (navigator.VehicleParticles[i].State.SequenceEqual(explorer.State)) {
+					if (navigator.VehicleParticles[i].Pose.State.SequenceEqual(explorer.Pose.State)) {
 						goodmapmodel = navigator.MapModels[i];
 						found        = true;
 						break;
@@ -222,11 +222,11 @@ class SimulationTest
 		TrackVehicle   refvehicle = new TrackVehicle();
 		TrackVehicle[] particles  = new TrackVehicle[5];
 		
-		particles[0] = new TrackVehicle(refvehicle); particles[0].State = new double[7] {0, 0, 0, 0, 0, 0, 0};
-		particles[1] = new TrackVehicle(refvehicle); particles[1].State = new double[7] {1, 1, 1, 1, 1, 1, 1};
-		particles[2] = new TrackVehicle(refvehicle); particles[2].State = new double[7] {2, 2, 2, 2, 2, 2, 2};
-		particles[3] = new TrackVehicle(refvehicle); particles[3].State = new double[7] {3, 3, 3, 3, 3, 3, 3};
-		particles[4] = new TrackVehicle(refvehicle); particles[4].State = new double[7] {4, 4, 4, 4, 4, 4, 4};
+		particles[0] = new TrackVehicle(refvehicle); particles[0].Pose = new Pose3D(new double[7] {0, 0, 0, 0, 0, 0, 0});
+		particles[1] = new TrackVehicle(refvehicle); particles[1].Pose = new Pose3D(new double[7] {1, 1, 1, 1, 1, 1, 1});
+		particles[2] = new TrackVehicle(refvehicle); particles[2].Pose = new Pose3D(new double[7] {2, 2, 2, 2, 2, 2, 2});
+		particles[3] = new TrackVehicle(refvehicle); particles[3].Pose = new Pose3D(new double[7] {3, 3, 3, 3, 3, 3, 3});
+		particles[4] = new TrackVehicle(refvehicle); particles[4].Pose = new Pose3D(new double[7] {4, 4, 4, 4, 4, 4, 4});
 
 		int iterations = 10000;
 		int count0     = 0;
@@ -247,15 +247,15 @@ class SimulationTest
 			
 			navigator.ResampleParticles();
 
-			Assert.IsTrue(particles[2].State.SequenceEqual(navigator.BestEstimate.State));
+			Assert.IsTrue(particles[2].Pose.State.SequenceEqual(navigator.BestEstimate.Pose.State));
 
 			// these three have probabilities higher than 0.2 so they must always be in the resampled particles
-			Assert.IsTrue(navigator.VehicleParticles.Any(x => particles[1].State.SequenceEqual(x.State)));
-			Assert.IsTrue(navigator.VehicleParticles.Any(x => particles[2].State.SequenceEqual(x.State)));
-			Assert.IsTrue(navigator.VehicleParticles.Any(x => particles[4].State.SequenceEqual(x.State)));
+			Assert.IsTrue(navigator.VehicleParticles.Any(x => particles[1].Pose.State.SequenceEqual(x.Pose.State)));
+			Assert.IsTrue(navigator.VehicleParticles.Any(x => particles[2].Pose.State.SequenceEqual(x.Pose.State)));
+			Assert.IsTrue(navigator.VehicleParticles.Any(x => particles[4].Pose.State.SequenceEqual(x.Pose.State)));
 			
-			count0 += navigator.VehicleParticles.Any(x => particles[0].State.SequenceEqual(x.State)) ? 1 : 0;
-			count3 += navigator.VehicleParticles.Any(x => particles[3].State.SequenceEqual(x.State)) ? 1 : 0;
+			count0 += navigator.VehicleParticles.Any(x => particles[0].Pose.State.SequenceEqual(x.Pose.State)) ? 1 : 0;
+			count3 += navigator.VehicleParticles.Any(x => particles[3].Pose.State.SequenceEqual(x.Pose.State)) ? 1 : 0;
 		}
 
 		// these can't be in every resample; sometime they need to be missed

@@ -89,11 +89,12 @@ public class TrackVehicle : SimulatedVehicle
 	{
 		Update(time, reading);
 
-		State = State.Add(time.ElapsedGameTime.TotalSeconds.Multiply(
-		                      U.RandomGaussianVector(new double[7] {0, 0, 0, 0, 0, 0, 0}, MotionCovarianceQ)));
-		Orientation = Quaternion.Normalize(Orientation);
+		double[] noise = time.ElapsedGameTime.TotalSeconds.Multiply(
+		                     U.RandomGaussianVector(new double[6] {0, 0, 0, 0, 0, 0},
+		                                            MotionCovarianceL));
+		Pose = Pose.Add(noise);
 
-		WayPoints[WayPoints.Count - 1] = Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(State));
+		WayPoints[WayPoints.Count - 1] = Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(Pose.State));
 	}
 }
 }

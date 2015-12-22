@@ -215,9 +215,9 @@ public class SimulatedVehicle : Vehicle
 	/// <returns>Pixel-range measurements.</returns>
 	public double[] MeasurePerfect(double[] landmark)
 	{
-		double[]   diff  = landmark.Subtract(Location);
-		Quaternion local = Quaternion.Conjugate(Orientation) *
-			                    new Quaternion((float) diff[0], (float) diff[1], (float) diff[2], 0) * Orientation;
+		double[]   diff  = landmark.Subtract(Pose.Location);
+		Quaternion local = Pose.Orientation.Conjugate() *
+			                    new Quaternion(0, diff[0], diff[1], diff[2]) * Pose.Orientation;
 
 		double range  = Math.Sign(local.Z) * diff.Euclidean();
 		double px     = VisionFocal * local.X / local.Z;
@@ -312,6 +312,17 @@ public class SimulatedVehicle : Vehicle
 	}
 
 	/// <summary>
+	/// Obtain a linearization for the motion update equation.
+	/// It follows the form
+	/// f(x[k-1], u) - x[k] ~ F dx[k-1] + G dx[k] + a.
+	/// </summary>
+	/// <param name="odometry">Odometry.</param>
+	public double[][] MotionJacobian(double[] odometry)
+	{
+		return Pose.AddJacobian(odometry);
+	}
+
+	/// <summary>
 	/// Obtain the jacobian of the measurement model.
 	/// Designed to be used with EKF filters.
 	/// </summary>
@@ -319,9 +330,9 @@ public class SimulatedVehicle : Vehicle
 	/// <returns>Measurement model linearization jacobian.</returns>
 	public double[][] MeasurementJacobian(double[] landmark)
 	{
-		double[]   diff  = landmark.Subtract(Location);
-		Quaternion local = Quaternion.Conjugate(Orientation) *
-			                    new Quaternion((float) diff[0], (float) diff[1], (float) diff[2], 0) * Orientation;
+		double[]   diff  = landmark.Subtract(Pose.Location);
+		Quaternion local = Pose.Orientation.Conjugate() *
+			                    new Quaternion(0, diff[0], diff[1], diff[2]) * Pose.Orientation;
 
 		// the jacobian of the homography projection part is given by
 		// f/z I 0
@@ -332,7 +343,7 @@ public class SimulatedVehicle : Vehicle
 		                          new double[] {local.X / mag,         local.Y / mag,         local.Z /mag}};
 
 		// the jacobian of the change of coordinates part of the measurement process is the rotation matrix 
-		double[][] jrotation = ME.MatrixFromQuaternion(Orientation);
+		double[][] jrotation = ME.MatrixFromQuaternion(Pose.Orientation);
 
 		return jprojection.Multiply(jrotation);
 	}

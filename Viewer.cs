@@ -324,10 +324,10 @@ public class Viewer : Manipulator
 
 		SideBuffer2            = SidebarHistory[FrameIndex];
 		Explorer .WayPoints    = VehicleWaypoints;
-		Explorer .State        = Explorer.WayPoints[Explorer.WayPoints.Count - 1].Item2;
+		Explorer .Pose         = new Pose3D(Explorer.WayPoints[Explorer.WayPoints.Count - 1].Item2);
 		Navigator.BestMapModel = Map[mapindices[FrameIndex]].Item2;
 		Navigator.BestEstimate.WayPoints = Estimate[FrameIndex].Item2;
-		Navigator.BestEstimate.State     = Navigator.BestEstimate.WayPoints[Navigator.BestEstimate.WayPoints.Count - 1].Item2;
+		Navigator.BestEstimate.Pose      = new Pose3D(Navigator.BestEstimate.WayPoints[Navigator.BestEstimate.WayPoints.Count - 1].Item2);
 
 		Explorer.MappedMeasurements.Clear();
 		foreach (double[] z in Measurements[mapindices[FrameIndex]].Item2) {

@@ -128,7 +128,7 @@ public abstract class Navigator : IDisposable
 		RefVehicle = vehicle;
 
 		WayTrajectories = new TimedTrajectory();
-		WayTrajectories.Add(Tuple.Create(0.0, new TimedState {Tuple.Create(0.0, Util.SClone(vehicle.State))}));
+		WayTrajectories.Add(Tuple.Create(0.0, new TimedState {Tuple.Create(0.0, Util.SClone(vehicle.Pose.State))}));
 
 		WayMaps = new TimedMapModel();
 		WayMaps.Add(Tuple.Create(0.0, new Map()));
@@ -189,7 +189,7 @@ public abstract class Navigator : IDisposable
 		WayTrajectories.Clear();
 		WayMaps        .Clear();
 
-		WayTrajectories.Add(Tuple.Create(0.0, new TimedState {Tuple.Create(0.0, Util.SClone(BestEstimate.State))}));
+		WayTrajectories.Add(Tuple.Create(0.0, new TimedState {Tuple.Create(0.0, Util.SClone(BestEstimate.Pose.State))}));
 		WayMaps        .Add(Tuple.Create(0.0, new Map()));
 	}
 

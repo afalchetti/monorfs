@@ -124,10 +124,10 @@ public class RecordVehicle : Vehicle
 		FrameIndex = 1;
 
 		Landmarks = landmarks;
-		State     = Trajectory[0].Item2;
+		Pose      = new Pose3D(Trajectory[0].Item2);
 
 		WayPoints.Clear();
-		WayPoints.Add(Tuple.Create(0.0, Util.SClone(State)));
+		WayPoints.Add(Tuple.Create(0.0, Util.SClone(Pose.State)));
 	}
 
 	/// <summary>
@@ -137,8 +137,8 @@ public class RecordVehicle : Vehicle
 	/// <param name="reading">Odometry reading (dx, dy, dz, dpitch, dyaw, droll).</param>
 	public override void Update(GameTime time, double[] reading)
 	{
-		State = Trajectory[FrameIndex].Item2;
-		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(State)));
+		Pose = new Pose3D(Trajectory[FrameIndex].Item2);
+		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(Pose.State)));
 
 		// Updates SLAM/Mapping suggestions from tags
 		WantsSLAM    = false;

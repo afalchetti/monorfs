@@ -86,7 +86,7 @@ public class OdometryNavigator : Navigator
 	public override void Update(GameTime time, double[] reading)
 	{
 		if (OnlyMapping) {
-			BestEstimate.State     = RefVehicle.State;
+			BestEstimate.Pose      = new Pose3D(RefVehicle.Pose);
 			BestEstimate.WayPoints = new TimedState(RefVehicle.WayPoints);
 		}
 		else {

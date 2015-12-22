@@ -118,7 +118,6 @@
   <ItemGroup>
     <Compile Include="ArrayExtensions.cs" />
     <Compile Include="Manipulator.cs" />
-    <Compile Include="Gaussian.cs" />
     <Compile Include="Viewer.cs" />
     <Compile Include="External\Options.cs" />
     <Compile Include="GraphicsDeviceExtension.cs" />
@@ -129,7 +128,6 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Simulation.cs" />
     <Compile Include="GraphCombinatorics.cs" />
-    <Compile Include="SparseMatrix.cs" />
     <Compile Include="Test\GraphCombinatoricsTest.cs" />
     <Compile Include="Test\SimulationTest.cs" />
     <Compile Include="Util.cs" />
@@ -137,16 +135,24 @@
     <Compile Include="Vehicle.cs" />
     <Compile Include="PHDNavigator.cs" />
     <Compile Include="ISAM2Navigator.cs" />
-    <Compile Include="Test\UtilTest.cs" />
     <Compile Include="Config.cs" />
     <Compile Include="RecordVehicle.cs" />
     <Compile Include="FileParser.cs" />
     <Compile Include="TrackVehicle.cs" />
     <Compile Include="KinectTrackVehicle.cs" />
     <Compile Include="OdometryNavigator.cs" />
-    <Compile Include="Map.cs" />
-    <Compile Include="IndexedMap.cs" />
-    <Compile Include="IMap.cs" />
+    <Compile Include="BasicStructures\Map.cs" />
+    <Compile Include="BasicStructures\IndexedMap.cs" />
+    <Compile Include="BasicStructures\IMap.cs" />
+    <Compile Include="BasicStructures\SparseMatrix.cs" />
+    <Compile Include="BasicStructures\Gaussian.cs" />
+    <Compile Include="BasicStructures\Quaternion.cs" />
+    <Compile Include="BasicStructures\Pose3D.cs" />
+    <Compile Include="BasicStructures\IPose.cs" />
+    <Compile Include="DrawUtils.cs" />
+    <Compile Include="Test\QuaternionTest.cs" />
+    <Compile Include="Test\Pose3DTest.cs" />
+    <Compile Include="Test\UtilTest.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
@@ -174,5 +180,8 @@
       <Project>{55AB62F6-DA11-4F72-8D9F-FA95F677E3FD}</Project>
       <Name>isam2</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="BasicStructures\" />
   </ItemGroup>
 </Project>

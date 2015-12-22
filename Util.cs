@@ -35,7 +35,6 @@ using AForge;
 using Accord.Math;
 using AForge.Math.Random;
 using Accord.Math.Decompositions;
-using Microsoft.Xna.Framework;
 
 namespace monorfs
 {
@@ -145,7 +144,7 @@ public static class Util
 	/// <returns>Jacobian.</returns>
 	public static double[][] Q2LieJacobian(Quaternion q)
 	{
-		q.Normalize();
+		q = q.Normalize();
 
 		double mag  = Math.Sqrt(1-q.W*q.W);
 		double mag2 = mag * mag;

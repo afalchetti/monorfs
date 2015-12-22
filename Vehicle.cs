@@ -90,114 +90,22 @@ public abstract class Vehicle : IDisposable
 	/// Measurement model covariance matrix.
 	/// </summary>
 	public double[][] MeasurementCovariance = Config.MeasurementCovariance;
-	
+
 	/// <summary>
 	/// Internal vehicle pose state.
 	/// </summary>
-	private double[] state;
-
-	/// <summary>
-	/// Internal state as a vector.
-	/// </summary>
-	public double[] State {
-		get { return state; }
-		set { state = new double[value.Length]; Array.Copy(value, state,  value.Length); }
-	}
-
-	/// <summary>
-	/// Location x-axis coordinate.
-	/// </summary>
-	public double X
-	{
-		get { return  State[0]; }
-		set { State[0] = value; }
-	}
-
-	/// <summary>
-	/// Location y-axis coordinate.
-	/// </summary>
-	public double Y
-	{
-		get { return  State[1]; }
-		set { State[1] = value; }
-	}
-
-	/// <summary>
-	/// Location z-axis coordinate.
-	/// </summary>
-	public double Z
-	{
-		get { return  State[2]; }
-		set { State[2] = value; }
-	}
-
-	/// <summary>
-	/// Space location of the vehicle, i.e. its coordinates.
-	/// </summary>
-	public double[] Location
-	{
-		get { return new double[3] {State[0], State[1], State[2]}; }
-		set { State[0] = value[0]; State[1] = value[1]; State[2] = value[2]; }
-	}
-
-	/// <summary>
-	/// Rotation quaternion scalar component.
-	/// </summary>
-	public double W
-	{
-		get { return  State[3]; }
-		set { State[3] = value; }
-	}
-
-	/// <summary>
-	/// Rotation quaternion vector component.
-	/// </summary>
-	public double[] K
-	{
-		get { return new double[3] {State[4], State[5], State[6]}; }
-		set { State[4] = value[0]; State[5] = value[1]; State[6] = value[2]; }
-	}
-	
-
-	/// <summary>
-	/// Orientation of the vehicle.
-	/// </summary>
-	public Quaternion Orientation
-	{
-		get { return new Quaternion((float) State[4], (float) State[5], (float) State[6], (float) State[3]); }
-		set { State[3] = value.W; State[4] = value.X; State[5] = value.Y; State[6] = value.Z; }
-	}
-
-	/// <summary>
-	/// Angle in angle-axis representation.
-	/// </summary>
-	public double Angle
-	{
-		get { return 2 * Math.Acos(W); }
-	}
-
-	/// <summary>
-	/// Axis in angle-axis representation.
-	/// </summary>
-	public double[] Axis
-	{
-		get
-		{
-			double normalize = Math.Sqrt(1 - W * W);
-			return (normalize > 1e-8) ? K.Divide(normalize) : new double[3] {1, 0, 0};
-		}
-	}
+	public Pose3D Pose;
 
 	/// <summary>
 	/// State using the (noisy) odometry data.
 	/// </summary>
-	private double[] odometrystate;
+	private Pose3D odometry;
 
 	/// <summary>
 	/// Odometry reference state; state at which the odometry started accumulating.
 	/// Every time the system reads the odometry it resets to the correct state.
 	/// </summary>
-	private double[] refodometrystate;
+	private Pose3D refodometry;
 
 	/// <summary>
 	/// Vision camera focal length.
@@ -319,13 +227,14 @@ public abstract class Vehicle : IDisposable
 
 		axis.Divide(axis.Euclidean(), true);
 		
-		State       = new double[7] {location[0], location[1], location[2], w, d * axis[0], d * axis[1], d * axis[2]};
+		//State       = new double[7] {location[0], location[1], location[2], w, d * axis[0], d * axis[1], d * axis[2]};
+		Pose        = new Pose3D(new double[7] {location[0], location[1], location[2], w, d * axis[0], d * axis[1], d * axis[2]});
 		VisionFocal = focal;
 		FilmArea    = film;
 		RangeClip   = clip;
 		
-		odometrystate    = (double[]) State.Clone();
-		refodometrystate = (double[]) State.Clone();
+		odometry    = new Pose3D(Pose);
+		refodometry = new Pose3D(Pose);
 
 		HasDataAssociation = false;
 		DataAssociation    = new List<int>();
@@ -334,7 +243,7 @@ public abstract class Vehicle : IDisposable
 
 		WayOdometry = new TimedArray();
 		WayPoints   = new TimedState();
-		WayPoints.Add(Tuple.Create(0.0, Util.SClone(state)));
+		WayPoints.Add(Tuple.Create(0.0, Util.SClone(Pose.State)));
 
 		HasSidebar   = false;
 		WantsToStop  = false;
@@ -348,9 +257,9 @@ public abstract class Vehicle : IDisposable
 	/// <param name="that">Copied general vehicle.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
 	protected Vehicle(Vehicle that, bool copytrajectory = false)
-		: this(that.Location, 0, new double[3] {1, 0, 0})
+		: this(that.Pose.Location, 0, new double[3] {1, 0, 0})
 	{
-		this.Orientation        = that.Orientation;
+		this.Pose               = new Pose3D(that.Pose);
 		this.Graphics           = that.Graphics;
 		this.SidebarWidth       = that.SidebarWidth;
 		this.SidebarHeight      = that.SidebarHeight;
@@ -373,7 +282,7 @@ public abstract class Vehicle : IDisposable
 		else {
 			this.WayOdometry = new TimedArray();
 			this.WayPoints = new TimedState();
-			this.WayPoints.Add(Tuple.Create(0.0, Util.SClone(that.state)));
+			this.WayPoints.Add(Tuple.Create(0.0, Util.SClone(that.Pose.State)));
 		}
 	}
 
@@ -428,28 +337,15 @@ public abstract class Vehicle : IDisposable
 	/// <param name="reading">Odometry reading (dx, dy, dz, dpitch, dyaw, droll).</param>
 	public virtual void Update(GameTime time, double[] reading)
 	{
-		// note that the framework uses Yaw = Y, Pitch = X, Roll = Z => YXZ Tait-Bryan parametrization
-		// this is equivalent to a plane pointing upwards with its wings on the X direction
-		Quaternion dorientation   = Quaternion.CreateFromYawPitchRoll((float) reading[4], (float) reading[3], (float) reading[5]);
-		Quaternion neworientation = Orientation * dorientation;
-		Quaternion midrotation    = Quaternion.Slerp(Orientation, neworientation, 0.5f);
-		Quaternion dlocation      = midrotation * new Quaternion((float) reading[0], (float) reading[1], (float) reading[2], 0) * Quaternion.Conjugate(midrotation);
+		Pose     = Pose    .Add(reading);
+		odometry = odometry.Add(reading);
 
-		Location    = new double[3] {X + dlocation.X, Y + dlocation.Y, Z + dlocation.Z};
-		Orientation = Quaternion.Normalize(neworientation);
+		double[] noise = time.ElapsedGameTime.TotalSeconds.Multiply(
+		                     U.RandomGaussianVector(new double[6] {0, 0, 0, 0, 0, 0},
+		                                            MotionCovarianceL));
+		Pose = Pose.Add(noise);
 
-		// add noise to the odometry readings
-		odometrystate = State.Add(time.ElapsedGameTime.TotalSeconds.Multiply(
-		                              U.RandomGaussianVector(new double[7] {0, 0, 0, 0, 0, 0, 0}, MotionCovarianceQ)));
-		// normalize orientation
-		double[] orientation = new double[4] {odometrystate[3], odometrystate[4], odometrystate[5], odometrystate[6]};
-		orientation.Normalize(true);
-		odometrystate[3] = orientation[0];
-		odometrystate[4] = orientation[1];
-		odometrystate[5] = orientation[2];
-		odometrystate[6] = orientation[3];
-
-		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(State)));
+		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(Pose.State)));
 	}
 
 	/// <summary>
@@ -458,14 +354,14 @@ public abstract class Vehicle : IDisposable
 	/// <returns>State diff.</returns>
 	public virtual double[] ReadOdometry(GameTime time)
 	{
-		double[] odometry = Vehicle.StateDiff(odometrystate, refodometrystate);
+		double[] reading = odometry.Subtract(refodometry);
 
-		odometrystate     = Util.SClone(State);
-		refodometrystate  = Util.SClone(State);
+		odometry     = new Pose3D(Pose);
+		refodometry  = new Pose3D(Pose);
 
-		WayOdometry.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(odometry)));
+		WayOdometry.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(reading)));
 
-		return odometry;
+		return reading;
 	}
 
 	/// <summary>
@@ -481,7 +377,7 @@ public abstract class Vehicle : IDisposable
 	{
 		WayOdometry.Clear();
 		WayPoints.Clear();
-		WayPoints.Add(Tuple.Create(0.0, Util.SClone(state)));
+		WayPoints.Add(Tuple.Create(0.0, Util.SClone(Pose.State)));
 	}
 
 	/// <summary>
@@ -499,55 +395,10 @@ public abstract class Vehicle : IDisposable
 		double   alpha = range / Math.Sqrt(VisionFocal * VisionFocal + px * px + py * py);
 		double[] diff  = new double[3] {alpha * px, alpha * py, alpha * VisionFocal};
 
-		Quaternion rotated = Orientation *
-		                     new Quaternion((float) diff[0], (float) diff[1], (float) diff[2], 0) * Quaternion.Conjugate(Orientation);
+		Quaternion rotated = Pose.Orientation *
+		                     new Quaternion(0, diff[0], diff[1], diff[2]) * Pose.Orientation.Conjugate();
 
-		return new double[3] {X + rotated.X, Y + rotated.Y, Z + rotated.Z};
-	}
-
-	/// <summary>
-	/// Compute the difference between the state of two vehicles.
-	/// </summary>
-	/// <param name="a">Final vehicle state.</param>
-	/// <param name="b">Start vehicle state.</param>
-	/// <returns>State difference in local coordinates: (dx, dy, dz, dyaw, dpitch, droll),
-	/// such that b + ds = a.</returns>
-	private static double[] StateDiff(double[] a, double[] b)
-	{
-		double[] aloc = new double[3] {a[0], a[1], a[2]};
-		double[] bloc = new double[3] {b[0], b[1], b[2]};
-		Quaternion arot = new Quaternion((float) a[4], (float) a[5], (float) a[6], (float) a[3]);
-		Quaternion brot = new Quaternion((float) b[4], (float) b[5], (float) b[6], (float) b[3]);
-
-		Quaternion dq          = Quaternion.Conjugate(brot) * arot;
-		Quaternion midrotation = Quaternion.Slerp(arot, brot, 0.5f);
-		double[]   dxglobal    = aloc.Subtract(bloc);
-		Quaternion dx          = Quaternion.Conjugate(midrotation) *
-		                             new Quaternion((float) dxglobal[0], (float) dxglobal[1], (float) dxglobal[2], 0) *
-		                             midrotation;
-
-		double x = dq.X;
-		double y = dq.Y;
-		double z = dq.Z;
-		double w = dq.W;
-
-		double dyaw   = Math.Atan2(2 * (w * y + x * z), 1 - 2 * (y * y + x * x));
-		double dpitch = Math.Asin (2 * (w * x - z * y));
-		double droll  = Math.Atan2(2 * (w * z + y * x), 1 - 2 * (x * x + z * z));
-
-		return new double[6] {dx.X, dx.Y, dx.Z, dyaw, dpitch, droll};
-	}
-
-	/// <summary>
-	/// Compute the difference between the state of two vehicles.
-	/// </summary>
-	/// <returns>State difference in local coordinates: (dx, dy, dz, dyaw, dpitch, droll),
-	/// such that b + ds = a.</returns>
-	/// <param name="a">Final vehicle.</param>
-	/// <param name="b">Start vehicle.</param>
-	public static double[] StateDiff(Vehicle a, Vehicle b)
-	{
-		return StateDiff(a.State, b.State);
+		return new double[3] {Pose.X + rotated.X, Pose.Y + rotated.Y, Pose.Z + rotated.Z};
 	}
 
 	/// <summary>
@@ -598,7 +449,7 @@ public abstract class Vehicle : IDisposable
 		Color innercolor =  Color.LightBlue;
 		Color outercolor =  Color.Blue;
 
-		double[] pos = camera.TransformH(Location);
+		double[] pos = camera.TransformH(Pose.Location);
 		
 		VertexPositionColor[] invertices  = new VertexPositionColor[4];
 		double[][]            outvertices = new double[4][];
@@ -616,8 +467,8 @@ public abstract class Vehicle : IDisposable
 		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
 		Graphics.DrawUser2DPolygon(outvertices, 0.02f, outercolor, true);
 		
-		Quaternion x = Orientation * new Quaternion(0.2f, 0, 0, 0) * Quaternion.Conjugate(Orientation);
-		pos = camera.TransformH(new double[3] {X + x.X, Y + x.Y, Z + x.Z});
+		Quaternion x = Pose.Orientation * new Quaternion(0, 0.2f, 0, 0) * Pose.Orientation.Conjugate();
+		pos = camera.TransformH(new double[3] {Pose.X + x.X, Pose.Y + x.Y, Pose.Z + x.Z});
 
 		outvertices[0] = new double[] {pos[0] - 0.4*halflen, pos[1] - 0.4*halflen, pos[2]};
 		outvertices[1] = new double[] {pos[0] - 0.4*halflen, pos[1] + 0.4*halflen, pos[2]};
@@ -632,8 +483,8 @@ public abstract class Vehicle : IDisposable
 		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
 		Graphics.DrawUser2DPolygon(outvertices, 0.02f, Color.Blue, true);
 		
-		x   = Orientation * new Quaternion(0, 0.2f, 0, 0) * Quaternion.Conjugate(Orientation);
-		pos = camera.TransformH(new double[3] {X + x.X, Y + x.Y, Z + x.Z});
+		x   = Pose.Orientation * new Quaternion(0, 0, 0.2f, 0) * Pose.Orientation.Conjugate();
+		pos = camera.TransformH(new double[3] {Pose.X + x.X, Pose.Y + x.Y, Pose.Z + x.Z});
 
 		outvertices[0] = new double[] {pos[0] - 0.2*halflen, pos[1] - 0.2*halflen, pos[2]};
 		outvertices[1] = new double[] {pos[0] - 0.2*halflen, pos[1] + 0.2*halflen, pos[2]};
@@ -648,8 +499,8 @@ public abstract class Vehicle : IDisposable
 		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
 		Graphics.DrawUser2DPolygon(outvertices, 0.02f, Color.Yellow, true);
 		
-		x   = Orientation * new Quaternion(0, 0, 0.2f, 0) * Quaternion.Conjugate(Orientation);
-		pos = camera.TransformH(new double[3] {X + x.X, Y + x.Y, Z + x.Z});
+		x   = Pose.Orientation * new Quaternion(0, 0, 0, 0.2f) * Pose.Orientation.Conjugate();
+		pos = camera.TransformH(new double[3] {Pose.X + x.X, Pose.Y + x.Y, Pose.Z + x.Z});
 
 		outvertices[0] = new double[] {pos[0] - 0.8*halflen, pos[1] - 0.8*halflen, pos[2]};
 		outvertices[1] = new double[] {pos[0] - 0.8*halflen, pos[1] + 0.8*halflen, pos[2]};
@@ -687,9 +538,9 @@ public abstract class Vehicle : IDisposable
 		frustum[7] = new double[3] {RangeClip.Max * FilmArea.Left  / VisionFocal, RangeClip.Max * FilmArea.Bottom / VisionFocal, RangeClip.Max};
 
 		for (int i = 0; i < frustum.Length; i++) {
-			Quaternion local = Orientation *
-			                       new Quaternion((float) frustum[i][0], (float) frustum[i][1], (float) frustum[i][2], 0) * Quaternion.Conjugate(Orientation);
-			frustum[i] = camera.TransformH(new double[3] {local.X, local.Y, local.Z}.Add(Location));
+			Quaternion local = Pose.Orientation *
+			                       new Quaternion(0, frustum[i][0], frustum[i][1], frustum[i][2]) * Pose.Orientation.Conjugate();
+			frustum[i] = camera.TransformH(new double[3] {local.X, local.Y, local.Z}.Add(Pose.Location));
 		}
 
 		double[][] wireA = new double[4][];

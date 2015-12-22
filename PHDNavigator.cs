@@ -297,7 +297,7 @@ public class PHDNavigator : Navigator
 	public override void Update(GameTime time, double[] reading)
 	{
 		if (OnlyMapping) {
-			VehicleParticles[0].State = RefVehicle.State;
+			VehicleParticles[0].Pose = new Pose3D(RefVehicle.Pose);
 			VehicleParticles[0].WayPoints = new TimedState(RefVehicle.WayPoints);
 		}
 		else {

@@ -575,7 +575,7 @@ public abstract class Manipulator : Game
 	/// </summary>
 	private IEnumerable<double[]> mousetargets()
 	{
-		yield return Explorer.Location;
+		yield return Explorer.Pose.Location;
 
 		foreach (double[] landmark in Explorer.Landmarks) {
 			yield return landmark;

@@ -153,10 +153,10 @@ public class ISAM2Navigator : Navigator
 		plmodel           = new IndexedMap();
 		CandidateMapModel = new IndexedMap();
 
-		vehicle.State.CopyTo(BestEstimate    .State, 0);
-		vehicle.State.CopyTo(PreviousEstimate.State, 0);
+		BestEstimate.Pose     = new Pose3D(vehicle.Pose);
+		PreviousEstimate.Pose = new Pose3D(vehicle.Pose);
 
-		handle    = NewNavigator(vehicle.State, measurementnoise, motionnoise, focal);
+		handle    = NewNavigator(vehicle.Pose.State, measurementnoise, motionnoise, focal);
 		nextlabel = 0;
 	}
 
@@ -174,7 +174,7 @@ public class ISAM2Navigator : Navigator
 	public override void Update(GameTime time, double[] reading)
 	{
 		if (OnlyMapping) {
-			BestEstimate.State     = RefVehicle.State;
+			BestEstimate.Pose      = new Pose3D(RefVehicle.Pose);
 			BestEstimate.WayPoints = new TimedState(RefVehicle.WayPoints);
 		}
 		else {
@@ -191,7 +191,7 @@ public class ISAM2Navigator : Navigator
 	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
 	public override void SlamUpdate(GameTime time, List<double[]> measurements)
 	{
-		double[]  odometry = Vehicle.StateDiff(BestEstimate, PreviousEstimate);
+		double[]  odometry = BestEstimate.Pose.Subtract(PreviousEstimate.Pose);
 		List<int> labels   = FindLabels(measurements);
 
 		for (int i = labels.Count - 1; i >= 0; i--) {
@@ -215,7 +215,7 @@ public class ISAM2Navigator : Navigator
 
 		// updates the estimated complete path to show the batch nature of the algorithm
 		List<double[]> trajectory = GetTrajectory();
-		BestEstimate.State        = trajectory[trajectory.Count - 1];
+		BestEstimate.Pose         = new Pose3D(trajectory[trajectory.Count - 1]);
 		MapModel                  = GetMapModel(out plmodel);
 
 		// copy the new estimated trajectory (given by iSAM2) into the BestEstimate
@@ -232,7 +232,7 @@ public class ISAM2Navigator : Navigator
 		// this method, so it could contain a lot of unused data, remove it
 		BestEstimate.WayPoints = BestEstimate.WayPoints.GetRange(0, trajectory.Count);
 
-		BestEstimate.State.CopyTo(PreviousEstimate.State, 0);
+		PreviousEstimate.Pose = new Pose3D(BestEstimate.Pose);
 		UpdateTrajectory(time);
 		UpdateMapHistory(time);
 
