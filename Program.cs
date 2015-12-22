@@ -36,6 +36,7 @@ using Accord.Extensions.Imaging;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using NDesk.Options;
+using System.Diagnostics;
 
 namespace monorfs
 {
@@ -190,7 +191,15 @@ public class Program
 				SimulatedVehicle initPose = new SimulatedVehicle(sim.Explorer);
 
 				if (headless) {
+					Stopwatch timer = new Stopwatch();
+
+					Console.WriteLine("running headless");
+
+					timer.Start();
 					sim.RunHeadless();
+					timer.Stop();
+
+					Console.WriteLine("finished running (" + timer.Elapsed.TotalSeconds.ToString("F4") + " s)");
 				}
 				else {
 					sim.Run();

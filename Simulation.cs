@@ -29,7 +29,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Diagnostics;
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -472,24 +471,15 @@ public class Simulation : Manipulator
 		GameTime      time       = new GameTime();
 		TimeSpan      dt         = MeasureElapsed;
 		KeyboardState keyboard   = new KeyboardState();
-		Stopwatch     timer      = new Stopwatch();
-
-		Console.WriteLine("running headless");
 
 		if (Commands.Count == 0) {  // no infinite simulations, make it one command = one frame
 			Commands.Add(new double[6]);
 		}
 
-		timer.Start();
-
 		while (!commanddepleted) {
 			time = new GameTime(time.TotalGameTime.Add(dt), dt);
 			Update(time, keyboard, keyboard, 1.0);
 		}
-
-		timer.Stop();
-
-		Console.WriteLine("finished running (" + timer.Elapsed.TotalSeconds.ToString("F4") + " s)");
 	}
 }
 }
