@@ -65,6 +65,20 @@ public class Gaussian
 	public double[][] CovarianceInverse { get; private set; }
 
 	/// <summary>
+	/// Matrix from the canonical representation.
+	/// </summary>
+	public double[][] CanonicalMatrix
+	{
+		get         { return CovarianceInverse;  }
+		private set { CovarianceInverse = value; }
+	}
+
+	/// <summary>
+	/// Vector from the canonical representation.
+	/// </summary>
+	public double[] CanonicalVector { get; private set; }
+
+	/// <summary>
 	/// Cached coefficient from the function definition.
 	/// </summary>
 	public double Multiplier { get; private set; }
@@ -104,6 +118,11 @@ public class Gaussian
 	}
 
 	/// <summary>
+	/// Construct a default gaussian.
+	/// </summary>
+	private Gaussian() {}
+
+	/// <summary>
 	/// Construct a new Gaussian object given its parameters.
 	/// </summary>
 	/// <param name="mean">Gaussian mean value.</param>
@@ -115,7 +134,30 @@ public class Gaussian
 		Covariance        = covariance;
 		Weight            = (!double.IsNaN(weight)) ? weight : 0;
 		Multiplier        = Math.Pow(2 * Math.PI, -mean.Length / 2) / Math.Sqrt(covariance.Determinant());
-		CovarianceInverse = covariance.Inverse();
+		CovarianceInverse = covariance.PseudoInverse();
+		CanonicalVector   = CovarianceInverse.Multiply(Mean);
+	}
+
+	/// <summary>
+	/// Construct a new Gaussian object with alternative canonical parameters.
+	/// </summary>
+	/// <param name="vector">Canonical vector.</param>
+	/// <param name="matrix">Canonical matrix.</param>
+	/// <param name="weight">Gaussian coefficient in the mixture.</param>
+	public static Gaussian Canonical(double[] vector, double[][] matrix, double weight)
+	{
+		Gaussian gaussian = new Gaussian();
+
+		gaussian.CanonicalVector = vector;
+		gaussian.CanonicalMatrix = matrix;
+
+		gaussian.Covariance = matrix.PseudoInverse();
+		gaussian.Mean       = gaussian.Covariance.Multiply(vector);
+
+		gaussian.Weight     = (!double.IsNaN(weight)) ? weight : 0;
+		gaussian.Multiplier = Math.Pow(2 * Math.PI, -gaussian.Mean.Length / 2) / Math.Sqrt(gaussian.Covariance.Determinant());
+
+		return gaussian;
 	}
 
 	/// <summary>
@@ -159,6 +201,35 @@ public class Gaussian
 	public static bool AreClose(Gaussian a, Gaussian b, double threshold)
 	{
 		return a.SquareMahalanobis(b.Mean) < threshold * threshold;
+	}
+
+	/// <summary>
+	/// Fuse two gaussian by multiplication (Bayes).
+	/// </summary>
+	/// <param name="a">First gaussian.</param>
+	/// <param name="b">Second gaussian.</param>
+	public static Gaussian Fuse(Gaussian a, Gaussian b)
+	{
+		double[][] infomatrix = a.CanonicalMatrix.Add(b.CanonicalMatrix);
+		double[]   infovector = a.CanonicalVector.Add(b.CanonicalVector);
+
+		return Canonical(infovector, infomatrix, 1.0);
+
+	}
+
+	/// <summary>
+	/// Unfuse a gaussian component from a fused gaussian.
+	/// Inverse of of Fuse()
+	/// </summary>
+	/// <param name="a">Fused gaussian.</param>
+	/// <param name="b">Gaussian component to remove.</param>
+	public static Gaussian Unfuse(Gaussian a, Gaussian b)
+	{
+		double[][] infomatrix = a.CanonicalMatrix.Subtract(b.CanonicalMatrix);
+		double[]   infovector = a.CanonicalVector.Subtract(b.CanonicalVector);
+
+		return Canonical(infovector, infomatrix, 1.0);
+
 	}
 
 	/// <summary>

@@ -1,0 +1,340 @@
+﻿// Quaternion.cs
+// Quaternion structure
+// Part of MonoRFS
+//
+// Copyright (c) 2015, Angelo Falchetti
+// All rights reserved.
+// 
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+//     * Redistributions of source code must retain the above copyright
+//       notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above copyright
+//       notice, this list of conditions and the following disclaimer in the
+//       documentation and/or other materials provided with the distribution.
+//     * The names of its contributors may not be used to endorse or promote products
+//       derived from this software without specific prior written permission.
+// 
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL ANGELO FALCHETTI BE LIABLE FOR ANY
+// DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+// ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+using System;
+using System.Collections;
+using System.Collections.Generic;
+
+using Accord.Math;
+using Accord.MachineLearning.Structures;
+
+namespace monorfs
+{
+/// <summary>
+/// Quaternion structure.
+/// </summary>
+public class Quaternion
+{
+	/// <summary>
+	/// Scalar component.
+	/// </summary>
+	public double W { get; private set; }
+
+	/// <summary>
+	/// X coordinate.
+	/// </summary>
+	public double X { get; private set; }
+
+	/// <summary>
+	/// Y coordinate.
+	/// </summary>
+	public double Y { get; private set; }
+
+	/// <summary>
+	/// Z coordinate.
+	/// </summary>
+	public double Z { get; private set; }
+
+	/// <summary>
+	/// Get the magnitude (absolute value) of this quaternion.
+	/// </summary>
+	public double Magnitude
+	{
+		get { return Math.Sqrt(W * W + X * X + Y * Y + Z * Z); }
+	}
+
+	/// <summary>
+	/// Gets the identity.
+	/// </summary>
+	/// <value>The identity.</value>
+	public static Quaternion Identity { get; private set; }
+
+	static Quaternion()
+	{
+		Identity = new Quaternion(1, 0, 0, 0);
+	}
+
+	/// <summary>
+	/// Default constructor.
+	/// </summary>
+	private Quaternion() {}
+
+	/// <summary>
+	/// Construct a new quaternion from its components.
+	/// </summary>
+	/// <param name="w">Scalar component.</param>
+	/// <param name="x">X coordinate.</param>
+	/// <param name="y">Y coordinate.</param>
+	/// <param name="z">Z coordinate.</param>
+	public Quaternion(double w, double x, double y, double z)
+	{
+		W = w;
+		X = x;
+		Y = y;
+		Z = z;
+	}
+
+	/// <summary>
+	/// Construct a Quaternion copying its components from another.
+	/// </summary>
+	/// <param name="that">Copied quaternion.</param>
+	public Quaternion(Quaternion that)
+	{
+		this.W = that.W;
+		this.X = that.X;
+		this.Y = that.Y;
+		this.Z = that.Z;
+	}
+
+	/// <summary>
+	/// Obtain the conjugate of this quaternion.
+	/// </summary>
+	/// <returns>Conjugate.</returns>
+	public Quaternion Conjugate()
+	{
+		return new Quaternion(W, -X, -Y, -Z);
+	}
+
+	/// <summary>
+	/// Add a Lie delta element to this quaternion.
+	/// </summary>
+	/// <param name="b">Lie delta element.</param>
+	/// <returns>Sum.</returns>
+	public Quaternion Add(double[] b)
+	{
+		return this * Exp(0.5.Multiply(b));
+	}
+
+	/// <summary>
+	/// Subtract a quaternion to another quaternion to obtain a Lie delta element.
+	/// </summary>
+	/// <param name="a">First quaternion.</param>
+	/// <param name="b">Second quaternion.</param>
+	/// <returns>Lie delta element.</returns>
+	public double[] Subtract(Quaternion b)
+	{
+		return 2.Multiply(Log(b.Conjugate() * this));
+	}
+
+	/// <summary>
+	/// Exponential of a lie algebra element.
+	/// </summary>
+	/// <param name="lie">Lie element.</param>
+	/// <returns>Associated quaternion.</returns>
+	public static Quaternion Exp(double[] lie)
+	{
+		double phi = lie.Euclidean();
+
+		if (phi < 1e-12) {
+			return Identity;
+		}
+
+		double[] vector = Math.Sin(phi).Multiply(lie.Normalize());
+
+		return new Quaternion(Math.Cos(phi), vector[0], vector[1], vector[2]);
+	}
+
+	/// <summary>
+	/// Logarithm of a quaternion.
+	/// </summary>
+	/// <param name="q">Quaternion.</param>
+	/// <returns>Associated lie element.</returns>
+	public static double[] Log(Quaternion q)
+	{
+		q = q.Normalize();
+
+		double   phi    = Math.Acos(q.W);
+		double[] vector = new double[3] {q.X, q.Y, q.Z};
+		double   mag    = vector.Euclidean();
+
+		if (mag < 1e-12) {
+			return new double[] {0, 0, 0};
+		}
+
+		double[] unit = vector.Normalize();
+		return phi.Multiply(unit);
+	}
+
+	/// <summary>
+	/// Calculate the positive square root of a quaternion
+	/// distinct to the identity. If it is the identity,
+	/// the result is undefined.
+	/// </summary>
+	/// <returns>Square root.</returns>
+	public Quaternion Sqrt()
+	{
+		double rw    = Math.Sqrt(0.5 * (1 + W));
+		double alpha = 1 / (2 * rw);
+
+		return new Quaternion(rw, alpha * X, alpha * Y, alpha * Z);
+	}
+
+	/// <summary>
+	/// Get a normalized version of this quaternion.
+	/// </summary>
+	public Quaternion Normalize()
+	{
+		double alpha = 1 / Magnitude;
+
+		return alpha * this;
+	}
+
+	/// <summary>
+	/// Create a new quaternion from its yaw-pitch-roll representation.
+	/// </summary>
+	/// <returns>Equivalent quaternion.</returns>
+	/// <param name="yaw">Yaw coordinate.</param>
+	/// <param name="pitch">Pitch coordinate.</param>
+	/// <param name="roll">Roll coordinate.</param>
+	public static Quaternion CreateFromYawPitchRoll(double yaw, double pitch, double roll)
+	{
+		double y2 = 0.5 * yaw;
+		double p2 = 0.5 * pitch;
+		double r2 = 0.5 * roll;
+
+		double sy = Math.Sin(y2);
+		double cy = Math.Cos(y2);
+
+		double sp = Math.Sin(p2);
+		double cp = Math.Cos(p2);
+
+		double sr = Math.Sin(r2);
+		double cr = Math.Cos(r2);
+
+		return new Quaternion(cy * cp * cr + sy * sp * sr,
+		                      cy * sp * cr + sy * cp * sr,
+		                      sy * cp * cr - cy * sp * sr,
+		                      cy * cp * sr - sy * sp * cr);
+	}
+
+	/// <param name="a">First quaternion.</param>
+	/// <param name="b">Second quaternion.</param>
+	public static Quaternion operator +(Quaternion a, Quaternion b)
+	{
+		return new Quaternion(a.W + b.W, a.X + b.X, a.Y + b.Y, a.Z + b.Z);
+	}
+
+	/// <param name="a">First quaternion.</param>
+	/// <param name="b">Second quaternion.</param>
+	public static Quaternion operator *(Quaternion a, Quaternion b)
+	{
+		return new Quaternion(a.W * b.W - (a.X * b.X + a.Y * b.Y + a.Z * b.Z),
+		                      a.W * b.X + a.X * b.W + a.Y * b.Z - a.Z * b.Y,
+		                      a.W * b.Y + a.Y * b.W + a.Z * b.X - a.X * b.Z,
+		                      a.W * b.Z + a.Z * b.W + a.X * b.Y - a.Y * b.X);
+	}
+
+	/// <param name="alpha">Scalar value.</param>
+	/// <param name="q">First quaternion.</param>
+	public static Quaternion operator *(double alpha, Quaternion q)
+	{
+		return new Quaternion(alpha * q.W, alpha * q.X, alpha * q.Y, alpha * q.Z);
+	}
+
+	/// <param name="a">First quaternion.</param>
+	/// <param name="b">Second quaternion.</param>
+	public static Quaternion operator -(Quaternion a, Quaternion b)
+	{
+		return new Quaternion(a.W - b.W, a.X - b.X, a.Y - b.Y, a.Z - b.Z);
+	}
+
+	/// <param name="q">Quaternion.</param>
+	public static Quaternion operator -(Quaternion q)
+	{
+		return new Quaternion(-q.W, -q.X, -q.Y, -q.Z);
+	}
+
+	/// <param name="a">First quaternion.</param>
+	/// <param name="b">Second quaternion.</param>
+	public static bool operator ==(Quaternion a, Quaternion b)
+	{
+		return a.W == b.W && a.X == b.X && a.Y == b.Y && a.Z == b.Z;
+	}
+
+	/// <param name="a">First quaternion.</param>
+	/// <param name="b">Second quaternion.</param>
+	public static bool operator !=(Quaternion a, Quaternion b)
+	{
+		return !(a == b);
+	}
+
+	/// <summary>
+	/// Efficient equality comparer with another quaternion.
+	/// </summary>
+	/// <param name="that">Compared quaternion.</param>
+	/// <returns>True if both quaternion are exactly the same.</returns>
+	public bool Equals(Quaternion that)
+	{
+		return this.W == that.W && this.X == that.X && this.Y == that.Y && this.Z == that.Z;
+	}
+
+	/// <summary>
+	/// Compares this object with another.
+	/// </summary>
+	/// <param name="that">Compared object.</param>
+	/// <returns>True if the objects are the same.</returns>
+	public override bool Equals(object that)
+	{
+		return that is SparseMatrix && this.Equals(that as Quaternion);
+	}
+
+	/// <summary>
+	/// Get a unique code that is equal for any two equal SparseMatrices.
+	/// </summary>
+	/// <returns>Hash code.</returns>
+	public override int GetHashCode()
+	{
+		int hash = 17;
+
+		hash = unchecked(37 * hash + W.GetHashCode());
+		hash = unchecked(37 * hash + X.GetHashCode());
+		hash = unchecked(37 * hash + Y.GetHashCode());
+		hash = unchecked(37 * hash + Z.GetHashCode());
+
+		return hash;
+	}
+
+	/// <summary>
+	/// Get a string representation of this quaternion.
+	/// </summary>
+	/// <param name="format">Double formatting descriptor.</param>
+	public string ToString(string format)
+	{
+		return "(" + W.ToString(format) + ", " + X.ToString(format) + ", " +
+		             Y.ToString(format) + ", " + Z.ToString(format) + ")";
+	}
+
+	/// <summary>
+	/// Get a string representation of this quaternion.
+	/// </summary>
+	public override string ToString()
+	{
+		return ToString("f3");
+	}
+}
+}
