@@ -288,5 +288,48 @@ public static class MatrixExtensions
 	{
 		return matrix.ToMatrix().Determinant();
 	}
+
+	/// <summary>
+	/// Concatenate two matrices vertically.
+	/// </summary>
+	/// <param name="first">First matrix.</param>
+	/// <param name="second">Second matrix.</param>
+	/// <returns>Concatenated matrix.</returns>
+	public static double[][] VConcatenate(this double[][] first, double[][] second)
+	{
+		if (first.Columns() != second.Columns()) {
+			throw new ArgumentException("matrices must have the same number of columns.");
+		}
+		
+		double[][] concat = Accord.Math.Matrix.Jagged<double>(first.Rows() + second.Rows(), first.Columns(), 0);
+
+		for (int i = 0; i < first.Rows(); i++) {
+		for (int k = 0; k < first.Columns(); k++) {
+			concat[i][k] = first[i][k];
+		}
+		}
+		for (int i = 0, h = first.Rows(); i < second.Rows(); i++, h++) {
+		for (int k = 0; k < second.Columns(); k++) {
+			concat[h][k] = second[i][k];
+		}
+		}
+
+		return concat;
+	}
+
+	/// <summary>
+	/// Create a new square matrix of a given size filled with zeros.
+	/// </summary>
+	/// <param name="size">Number of rows.</param>
+	public static double[][] Zero(int size)
+	{
+		double[][] zero = new double[size][];
+
+		for (int i = 0; i < size; i++) {
+			zero[i] = new double[size];
+		}
+
+		return zero;
+	}
 }
 }
