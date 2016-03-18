@@ -170,10 +170,10 @@ def readgroundtruth(filename):
 			tx  .append(float(framedata[1]))
 			ty  .append(float(framedata[2]))
 			tz  .append(float(framedata[3]))
-			qx  .append(float(framedata[4]))
-			qy  .append(float(framedata[5]))
-			qz  .append(float(framedata[6]))
-			qw  .append(float(framedata[7]))
+			qw  .append(float(framedata[4]))
+			qx  .append(float(framedata[5]))
+			qy  .append(float(framedata[6]))
+			qz  .append(float(framedata[7]))
 	
 	return time, tx, ty, tz, qw, qx, qy, qz
 
@@ -188,6 +188,16 @@ def readdepth(filename):
 			time.append(float(framedata[0]))
 	
 	return time
+
+def rotate(qw, qx, qy, qz, ryaw, rpitch, rroll):
+	rot     = Quaternion.FromYPR(ryaw, rpitch, rroll)
+	rotated = [Quaternion(q[0], q[1], q[2], q[3]) * rot for q in zip(qw, qx, qy, qz)]
+	qw      = [q.w for q in rotated]
+	qx      = [q.x for q in rotated]
+	qy      = [q.y for q in rotated]
+	qz      = [q.z for q in rotated]
+	
+	return (qw, qx, qy, qz)
 
 def tolocalcoords(x, y, z, qw, qx, qy, qz):
 	dx = np.diff(x)
@@ -205,15 +215,15 @@ def tolocalcoords(x, y, z, qw, qx, qy, qz):
 	dlocy = [q.y for q in dlocal]
 	dlocz = [q.z for q in dlocal]
 	
-	dangle = [dquat[i].ypr() for i in xrange(len(dquat))]
+	dangle = [dq.ypr() for dq in dquat]
 	
 	dyaw, dpitch, droll = zip(*dangle)
 	
 	return dlocx, dlocy, dlocz, dyaw, dpitch, droll
 
-def toglobalcoords(dlocx, dlocy, dlocz, dyaw, dpitch, droll):
-	location    = Point(0, 0, 0)
-	orientation = Quaternion(0, 1, 0, 0)
+def toglobalcoords(dlocx, dlocy, dlocz, dyaw, dpitch, droll, x0=0, y0=0, z0=0, qw0=1, qx0=0, qy0=0, qz0=0):
+	location    = Point(x0, y0, z0)
+	orientation = Quaternion(qw0, qx0, qy0, qz0)
 	
 	x  = [location.x]
 	y  = [location.y]
@@ -259,28 +269,55 @@ def writemovements(filename, dx, dy, dz, dyaw, dpitch, droll):
 			              "0" + "\n")  # last one is dcamera
 
 if __name__ == '__main__':
-	if len(sys.argv) != 4:
-		print "usage: python", __file__, "groundtruth.txt depth.txt output.in"
+	if len(sys.argv) > 4 or len(sys.argv) < 3:
+		print "usage: python", __file__, "output.in groundtruth.txt [depth.txt]"
 		sys.exit(1)
 	
 	print "reading groundtruth"
-	timegt, tx, ty, tz, qw, qx, qy, qz = readgroundtruth(sys.argv[1])
+	timegt, tx, ty, tz, qw, qx, qy, qz = readgroundtruth(sys.argv[2])
 	
-	print "reading depth timestamps"
-	timedepth = readdepth(sys.argv[2])
-	
-	print "interpolating data"
-	tx = np.interp(timedepth, timegt, tx)
-	ty = np.interp(timedepth, timegt, ty)
-	tz = np.interp(timedepth, timegt, tz)
-	qw = np.interp(timedepth, timegt, qw)
-	qx = np.interp(timedepth, timegt, qx)
-	qy = np.interp(timedepth, timegt, qy)
-	qz = np.interp(timedepth, timegt, qz)
+	if len(sys.argv) > 3:
+		print "reading depth timestamps"
+		timedepth = readdepth(sys.argv[3])
+		
+		print "interpolating data"
+		tx = np.interp(timedepth, timegt, tx)
+		ty = np.interp(timedepth, timegt, ty)
+		tz = np.interp(timedepth, timegt, tz)
+		qw = np.interp(timedepth, timegt, qw)
+		qx = np.interp(timedepth, timegt, qx)
+		qy = np.interp(timedepth, timegt, qy)
+		qz = np.interp(timedepth, timegt, qz)
 	
 	print "calculating local differential forms"
+	
+	qw, qx, qy, qz = rotate(qw, qx, qy, qz, 0, np.pi, 0)
+	#qw, qx, qy, qz = rotate(qw, qx, qy, qz, 0, -np.pi/2, 0)
+	
+	print qw[0], qx[0], qy[0], qz[0]
+	
+	with open("assets/sim.world") as sf:
+		lines = sf.readlines()
+	
+	lines[1] = "\t{:.16f} {:.16f} {:.16f} {:.16f} {:.16f} {:.16f} {:.16f}\n".format(tx[0], ty[0], tz[0], qw[0], qx[0], qy[0], qz[0])
+	
+	with open("assets/sim.world", "w") as sf:
+		sf.writelines(lines)
+	
 	dx, dy, dz, dyaw, dpitch, droll = tolocalcoords(tx, ty, tz, qw, qx, qy, qz)
-	x2, y2, z2, qw2, qx2, qy2, qz2  = toglobalcoords(dx, dy, dz, dyaw, dpitch, droll)
+	x2, y2, z2, qw2, qx2, qy2, qz2  = toglobalcoords(dx, dy, dz, dyaw, dpitch, droll, tx[0], ty[0], tz[0], qw[0], qx[0], qy[0], qz[0])
+	
+	#fig = plot.figure()
+	#ax = fig.gca(projection='3d')
+	#ax.plot(tx, ty, tz)
+	#fig2 = plot.figure()
+	#ax2 = fig2.gca(projection='3d')
+	#ax2.plot(x2, y2, z2)
+	#plot.show()
+	
+	#print sum(np.array(x2) - np.array(tx)), sum(np.array(y2) - np.array(ty)), sum(np.array(z2) - np.array(tz))
+	
+	#dz = [-z for z in dz]
 	
 	print "writing to file"
-	writemovements(sys.argv[3], dx, dy, dz, dyaw, dpitch, droll)
+	writemovements(sys.argv[1], dx, dy, dz, dyaw, dpitch, droll)

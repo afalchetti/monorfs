@@ -301,9 +301,7 @@ public static class FileParser
 			throw new FormatException("Vehicle description must have exactly seven arguments: x, y, z (location), theta, ax, ay, az (rotation axis)");
 		}
 
-		double[] location = new double[3] {vehiclepose[0], vehiclepose[1], vehiclepose[2]};
-		double   angle    = vehiclepose[3];
-		double[] axis     = new double[3] {vehiclepose[4], vehiclepose[5], vehiclepose[6]};
+		Pose3D pose = new Pose3D(new double[7] {vehiclepose[0], vehiclepose[1], vehiclepose[2], vehiclepose[3], vehiclepose[4], vehiclepose[5], vehiclepose[6]});
 
 		List<double[]> maploc      = new List<double[]>();
 		List<string>   mapdescript = dict["landmarks"];
@@ -323,10 +321,10 @@ public static class FileParser
 			Range     clip  = new Range((float) focaldata[1], (float) focaldata[2]);
 			Rectangle film  = new Rectangle((int) focaldata[3], (int) focaldata[4], (int) focaldata[5], (int) focaldata[6]);
 
-			return new SimulatedVehicle(location, angle, axis, maploc, focal, film, clip);
+			return new SimulatedVehicle(pose, maploc, focal, film, clip);
 		}
 		else {
-			return new SimulatedVehicle(location, angle, axis, maploc);
+			return new SimulatedVehicle(pose, maploc);
 		}
 	}
 
@@ -340,9 +338,7 @@ public static class FileParser
 		string descriptor = "";
 
 		descriptor += "pose\n\t"
-		            + string.Join(" ", vehicle.Pose.Location.Convert(x => x.ToString("g6"))) + " "
-		            + vehicle.Pose.Angle  .ToString("g6") + " "
-		            + string.Join(" ", vehicle.Pose.Axis.Convert(x => x.ToString("g6"))) + "\n";
+		            + string.Join(" ", vehicle.Pose.State.Convert(x => x.ToString("g6"))) + "\n";
 
 		descriptor += "focal\n\t"
 		            + vehicle.VisionFocal    .ToString("g6") + " "

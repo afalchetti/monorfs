@@ -93,33 +93,29 @@ public class SimulatedVehicle : Vehicle
 	/// theta = 0 and rotation axis = {1, 0, 0} with no landmarks.
 	/// </summary>
 	public SimulatedVehicle()
-		: this(new double[3] {0, 0, 0}, 0, new double[3] {1, 0, 0}, new List<double[]>()) {}
+		: this(Pose3D.Identity, new List<double[]>()) {}
 
 	/// <summary>
 	/// Construct a new Vehicle object from its initial state.
 	/// </summary>
-	/// <param name="location">Spatial coordinates.</param>
-	/// <param name="theta">Orientation angle.</param>
-	/// <param name="axis">Orientation rotation axis.</param>
+	/// <param name="initial">Initial pose.</param>
 	/// <param name="landmarks">Landmark 3d locations against which the measurements are performed.</param>
-	public SimulatedVehicle(double[] location, double theta, double[] axis, List<double[]> landmarks)
-		: this(location, theta, axis, landmarks, 575.8156,
+	public SimulatedVehicle(Pose3D initial, List<double[]> landmarks)
+		: this(initial, landmarks, 575.8156,
 		       new Rectangle(-640 / 2, -480 / 2, 640, 480),
-		       new Range(0.1f, 10f)) {}
+		       new Range(0.1f, 2f)) {}
 
 	/// <summary>
 	/// Construct a new Vehicle object from its initial state.
 	/// </summary>
-	/// <param name="location">Spatial coordinates.</param>
-	/// <param name="theta">Orientation angle.</param>
-	/// <param name="axis">Orientation rotation axis.</param>
+	/// <param name="initial">Initial pose.</param>
 	/// <param name="landmarks">Landmark 3d locations against which the measurements are performed.</param>
 	/// <param name="focal">Focal lenghth.</param>
 	/// <param name="film">Film area.</param>
 	/// <param name="clip">Range clipping area.</param>
-	public SimulatedVehicle(double[] location, double theta, double[] axis, List<double[]> landmarks,
+	public SimulatedVehicle(Pose3D initial, List<double[]> landmarks,
 	                        double focal, Rectangle film, Range clip)
-		: base(location, theta, axis, focal, film, clip)
+		: base(initial, focal, film, clip)
 	{
 		ClutterCount = ClutterDensity * FilmArea.Height * FilmArea.Width * RangeClip.Length;
 

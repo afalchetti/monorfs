@@ -215,37 +215,27 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// Construct a vehicle with default constants.
 	/// </summary>
-	protected Vehicle() : this(new double[3] {0, 0, 0}, 0, new double[3] {1, 0, 0}) {}
+	protected Vehicle() : this(Pose3D.Identity) {}
 
 	/// <summary>
 	/// Construct a new Vehicle object from its initial state.
 	/// </summary>
-	/// <param name="location">Spatial coordinates.</param>
-	/// <param name="theta">Orientation angle.</param>
-	/// <param name="axis">Orientation rotation axis.</param>
-	protected Vehicle(double[] location, double theta, double[] axis)
-		: this(location, theta, axis, 575.8156,
+	/// <param name="initial">Initial pose.</param>
+	protected Vehicle(Pose3D initial)
+		: this(initial, 575.8156,
 	           new Rectangle(-640 / 2, -480 / 2, 640, 480),
-			   new Range(0.1f, 10f)) {}
+			   new Range(0.1f, 2f)) {}
 
 	/// <summary>
 	/// Construct a new Vehicle object from its initial state and appropiate constants.
 	/// </summary>
-	/// <param name="location">Spatial coordinates.</param>
-	/// <param name="theta">Orientation angle.</param>
-	/// <param name="axis">Orientation rotation axis.</param>
+	/// <param name="initial">Initial pose.</param>
 	/// <param name="focal">Focal lenghth.</param>
 	/// <param name="film">Film area.</param>
 	/// <param name="clip">Range clipping area.</param>
-	protected Vehicle(double[] location, double theta, double[] axis, double focal, Rectangle film, Range clip)
+	protected Vehicle(Pose3D initial, double focal, Rectangle film, Range clip)
 	{
-		double w = Math.Cos(theta / 2);
-		double d = Math.Sin(theta / 2);
-
-		axis.Divide(axis.Euclidean(), true);
-		
-		//State       = new double[7] {location[0], location[1], location[2], w, d * axis[0], d * axis[1], d * axis[2]};
-		Pose        = new Pose3D(new double[7] {location[0], location[1], location[2], w, d * axis[0], d * axis[1], d * axis[2]});
+		Pose        = new Pose3D(initial);
 		VisionFocal = focal;
 		FilmArea    = film;
 		RangeClip   = clip;
@@ -280,7 +270,7 @@ public abstract class Vehicle : IDisposable
 	/// <param name="that">Copied general vehicle.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
 	protected Vehicle(Vehicle that, bool copytrajectory = false)
-		: this(that.Pose.Location, 0, new double[3] {1, 0, 0})
+		: this(that.Pose)
 	{
 		this.Pose               = new Pose3D(that.Pose);
 		this.Graphics           = that.Graphics;

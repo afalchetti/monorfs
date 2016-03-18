@@ -257,7 +257,7 @@ public class Viewer : Manipulator
 			explorer = FP.VehicleFromSimFile(File.ReadAllText(scenefile));
 		}
 		else {
-			explorer = new SimulatedVehicle(new double[3] {0, 0, 0}, 0, new double[3] {0, 0, 1}, new List<double[]>());
+			explorer = new SimulatedVehicle(Pose3D.Identity, new List<double[]>());
 		}
 
 		return new Viewer("monorfs - viewing " + datafile, explorer, trajectory, estimate, map, measurements, tags, 30, sidebarfile);
