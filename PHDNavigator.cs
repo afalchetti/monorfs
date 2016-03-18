@@ -28,6 +28,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 using Accord.Math;
 
@@ -325,7 +326,7 @@ public class PHDNavigator : Navigator
 	public override void SlamUpdate(GameTime time, List<double[]> measurements)
 	{
 		// map update
-		System.Threading.Tasks.Parallel.For(0, VehicleParticles.Length, i => {
+		Parallel.For(0, VehicleParticles.Length, i => {
 			Map predicted, corrected;
 
 			predicted = PredictConditional(measurements, VehicleParticles[i], MapModels[i], toexplore[i]);
@@ -388,16 +389,8 @@ public class PHDNavigator : Navigator
 			clikelihood *= corrected.Evaluate(component.Mean);
 		}
 
-		double pcount = 0;
-		double ccount = 0;
-
-		foreach (var component in predicted) {
-			pcount += component.Weight;
-		}
-
-		foreach (var component in corrected) {
-			ccount += component.Weight;
-		}
+		double pcount = predicted.ExpectedSize;
+		double ccount = corrected.ExpectedSize;
 
 		double setlikelihood = SetLikelihood(measurements, cvisible, pose);
 
@@ -702,18 +695,23 @@ public class PHDNavigator : Navigator
 		List<Gaussian> landmarks = model.ToList();
 		landmarks.Sort((a, b) => Math.Sign(b.Weight - a.Weight));
 
-		for (int i = 0; i < Math.Min(MaxQuantity, landmarks.Count); i++) {
-			if (landmarks[i].Weight < MinWeight) {
+		int weightcut = 0;
+
+		for (weightcut = 0; weightcut < Math.Min(MaxQuantity, landmarks.Count); weightcut++) {
+			if (landmarks[weightcut].Weight < MinWeight) {
 				break;
 			}
+		}
 
+		for (int i = 0; i < weightcut; i++) {
 			candidate = landmarks[i];
 			close     = new Map();
 
-			for (int k = i + 1; k < Math.Min(MaxQuantity, landmarks.Count); k++) {
+			for (int k = i + 1; k < weightcut; k++) {
 				if (Gaussian.AreClose(landmarks[i], landmarks[k], MergeThreshold)) {
 					close.Add(landmarks[k]);
 					landmarks.RemoveAt(k--);
+					weightcut--;
 				}
 			}
 
