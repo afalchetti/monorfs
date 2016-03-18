@@ -134,11 +134,13 @@ public class OdometryNavigator : Navigator
 			}
 		}
 
-		BestMapModel.Clear();
+		// NOTE The map is not being used for anything right now, since it's way too big;
+		//      for post-processing speed, just remove it
+		//BestMapModel.Clear();
 
-		foreach (Gaussian landmark in maplist) {
-			BestMapModel.Add(landmark);
-		}
+		//foreach (Gaussian landmark in maplist) {
+		//	BestMapModel.Add(landmark);
+		//}
 
 		UpdateMapHistory(time);
 	}

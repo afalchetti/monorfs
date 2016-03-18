@@ -71,13 +71,13 @@ public static class Config
 
 	// KinectVehicle
 	public static int  KinectDelta    = 2;
-	public static bool KeypointFilter = false;
+	public static bool KeypointFilter = true;
 
 	// Map
 	public static double DensityDistanceThreshold = 1;//10*Math.Sqrt(BirthCovariance[0][0]);
 
 	// Navigator
-	public static bool ShowVisible = true;
+	public static bool ShowVisible = false;
 
 	// PHDNavigator
 	public static double[][] BirthCovariance = new double[3][] { new double[3] {1e-3, 0, 0},
@@ -85,8 +85,8 @@ public static class Config
 	                                                             new double[3] {0, 0, 1e-3} };
 	public static double BirthWeight          = 0.05;
 	public static double MinWeight            = 1e-2;
-	public static double MinEffectiveParticle = 0.3;
-	public static int    MaxQuantity          = 500;
+	public static double MinEffectiveParticle = 0.2;
+	public static int    MaxQuantity          = 200;
 	public static double MergeThreshold       = 3e0;
 	public static double ExplorationThreshold = 1e-5;
 	public static bool   RenderAllParticles   = true;

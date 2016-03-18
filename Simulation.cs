@@ -524,12 +524,15 @@ public class Simulation : Manipulator
 		KeyboardState keyboard   = new KeyboardState();
 
 		if (Commands.Count == 0) {  // no infinite simulations, make it one command = one frame
-			Commands.Add(new double[6]);
+			Commands = new List<double[]>();
 		}
 
-		while (!commanddepleted) {
+		int i = 1;
+		while (!commanddepleted && !Explorer.WantsToStop) {
 			time = new GameTime(time.TotalGameTime.Add(dt), dt);
 			Update(time, keyboard, keyboard, 1.0);
+			Console.Write(i + ", ");
+			i++;
 		}
 	}
 }

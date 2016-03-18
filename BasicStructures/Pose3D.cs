@@ -237,12 +237,6 @@ public class Pose3D : IPose<Pose3D>
 		
 		double[] lie = 2.Multiply(Quaternion.Log(dq));
 
-
-		if (double.IsNaN(lie[0])) {
-			int x = 1;
-			Quaternion.Log(dq);
-		}
-
 		return new double[6] {dx.X, dx.Y, dx.Z, lie[0], lie[1], lie[2]};
 	}
 
