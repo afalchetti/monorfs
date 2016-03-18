@@ -35,9 +35,10 @@ using AForge;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
 
-using TimedState = System.Collections.Generic.List<System.Tuple<double, double[]>>;
-using TimedArray = System.Collections.Generic.List<System.Tuple<double, double[]>>;
-using U          = monorfs.Util;
+using TimedState    = System.Collections.Generic.List<System.Tuple<double, double[]>>;
+using TimedArray    = System.Collections.Generic.List<System.Tuple<double, double[]>>;
+using TimedMapModel = System.Collections.Generic.List<System.Tuple<double, monorfs.Map>>;
+using U             = monorfs.Util;
 
 namespace monorfs
 {
@@ -153,6 +154,11 @@ public abstract class Vehicle : IDisposable
 	/// Full odometry history.
 	/// </summary>
 	public TimedArray WayOdometry { get; private set; }
+
+	/// <summary>
+	/// History of landmark visibility.
+	/// </summary>
+	public TimedMapModel WayVisibleMaps { get; private set; }
 	
 	/// <summary>
 	/// Cached measurements from the update process for rendering purposes.
@@ -255,9 +261,12 @@ public abstract class Vehicle : IDisposable
 		Groundtruth      = new TimedState();
 		KnowsGroundtruth = false;
 
-		WayOdometry = new TimedArray();
-		WayPoints   = new TimedState();
-		WayPoints.Add(Tuple.Create(0.0, Util.SClone(Pose.State)));
+		WayOdometry    = new TimedArray();
+		WayPoints      = new TimedState();
+		WayVisibleMaps = new TimedMapModel();
+
+		WayPoints     .Add(Tuple.Create(0.0, Util.SClone(Pose.State)));
+		WayVisibleMaps.Add(Tuple.Create(0.0, new Map()));
 
 		HasSidebar   = false;
 		WantsToStop  = false;
@@ -290,13 +299,17 @@ public abstract class Vehicle : IDisposable
 		this.MeasurementCovariance = that.MeasurementCovariance.MemberwiseClone();
 
 		if (copytrajectory) {
-			this.WayPoints   = new TimedState(that.WayPoints);
-			this.WayOdometry = new TimedArray(that.WayOdometry);
+			this.WayPoints      = new TimedState(that.WayPoints);
+			this.WayOdometry    = new TimedArray(that.WayOdometry);
+			this.WayVisibleMaps = new TimedMapModel(that.WayVisibleMaps);
 		}
 		else {
-			this.WayOdometry = new TimedArray();
-			this.WayPoints = new TimedState();
-			this.WayPoints.Add(Tuple.Create(0.0, Util.SClone(that.Pose.State)));
+			this.WayOdometry    = new TimedArray();
+			this.WayPoints      = new TimedState();
+			this.WayVisibleMaps = new TimedMapModel();
+
+			this.WayPoints     .Add(Tuple.Create(0.0, Util.SClone(Pose.State)));
+			this.WayVisibleMaps.Add(Tuple.Create(0.0, new Map()));
 		}
 	}
 

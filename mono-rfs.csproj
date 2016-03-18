@@ -14,7 +14,7 @@
     <SignAssembly>false</SignAssembly>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>x86</PlatformTarget>
+    <PlatformTarget>x64</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
@@ -27,12 +27,13 @@
     <Commandlineparameters>-i=simulation -f=map.world -c=movroom.in -p=20 -a=phd</Commandlineparameters>
     <CustomCommands>
       <CustomCommands>
-        <Command type="AfterBuild" command="cp -ru ${ProjectDir}/additional/* ${ProjectDir}/isam2/bin/Debug/libisam2.so ${TargetDir}" workingdir="${ProjectDir}" externalConsole="True" />
+        <Command type="AfterBuild" command="cp -ru ${ProjectDir}/additional/* ${ProjectDir}/isam2/bin/Debug/libisam2.so ${ProjectDir}/kpextractor/bin/Debug/libkpextractor.so ${ProjectDir}/postanalysis/bin/Debug/postanalysis.exe ${TargetDir}" workingdir="${ProjectDir}" externalConsole="True" />
       </CustomCommands>
     </CustomCommands>
+    <ConsolePause>false</ConsolePause>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <PlatformTarget>x86</PlatformTarget>
+    <PlatformTarget>x64</PlatformTarget>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
     <ErrorReport>prompt</ErrorReport>
@@ -43,7 +44,7 @@
     <Commandlineparameters>-i=kinect -f=room.oni -c=movroom.in -p=200 -a=isam2</Commandlineparameters>
     <CustomCommands>
       <CustomCommands>
-        <Command type="AfterBuild" command="cp -ru ${ProjectDir}/additional/* ${ProjectDir}/isam2/bin/Release/libisam2.so ${TargetDir}" workingdir="${ProjectDir}" externalConsole="True" />
+        <Command type="AfterBuild" command="cp -ru ${ProjectDir}/additional/* ${ProjectDir}/isam2/bin/Release/libisam2.so ${ProjectDir}/kpextractor/bin/Release/libkpextractor.so ${ProjectDir}/postanalysis/bin/Release/postanalysis.exe ${TargetDir}" workingdir="${ProjectDir}" externalConsole="True" />
       </CustomCommands>
     </CustomCommands>
   </PropertyGroup>

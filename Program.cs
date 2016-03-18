@@ -227,6 +227,8 @@ public class Program
 				File.WriteAllText(Path.Combine(output, "estimate.out"),     sim.SerializedEstimate);
 				Console.WriteLine("  -- writing map model history");
 				File.WriteAllText(Path.Combine(output, "maps.out"),         sim.SerializedMaps);
+				Console.WriteLine("  -- writing visible map history");
+				File.WriteAllText(Path.Combine(output, "vismaps.out"),      sim.SerializedVisibleMaps);
 				Console.WriteLine("  -- writing measurements history");
 				File.WriteAllText(Path.Combine(output, "measurements.out"), sim.SerializedMeasurements);
 				Console.WriteLine("  -- writing tags");

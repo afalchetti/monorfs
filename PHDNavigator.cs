@@ -36,7 +36,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 using TimedState    = System.Collections.Generic.List<System.Tuple<double, double[]>>;
-using TimedMapModel = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
+using TimedMapModel = System.Collections.Generic.List<System.Tuple<double, monorfs.Map>>;
 
 namespace monorfs
 {

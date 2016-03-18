@@ -205,13 +205,25 @@ public class SimulatedVehicle : Vehicle
 			return;
 		}
 
+		double[][] diraccov = new double[3][] { new double[3] {0.001, 0, 0},
+		                                        new double[3] {0.001, 0, 0},
+		                                        new double[3] {0.001, 0, 0} };
+
+		Map visible = new Map();
+		for (int i = 0; i < Landmarks.Count; i++) {
+			if (Visible(Landmarks[i])) {
+				visible.Add(new Gaussian(Landmarks[i], diraccov, 1.0));
+			}
+		}
+
+		WayVisibleMaps.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, visible));
+
 		base.Update(time, reading);
 	}
 	
 	/// <summary>
 	/// Obtain a measurement from the hidden state.
-	/// It does not use any randomness or misdetection, 
-	/// as it is designed to be used with UKF filters.
+	/// It does not use any randomness or misdetection.
 	/// </summary>
 	/// <param name="landmark">Landmark 3d location against which the measurement is performed.</param>
 	/// <returns>Pixel-range measurements.</returns>

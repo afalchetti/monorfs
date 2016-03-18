@@ -179,6 +179,18 @@ public class Simulation : Manipulator
 	}
 
 	/// <summary>
+	/// Get a string representation of the groundtruth visible map history.
+	/// </summary>
+	public string SerializedVisibleMaps
+	{
+		get
+		{
+			return string.Join("\n|\n", Explorer.WayVisibleMaps.ConvertAll(m => m.Item1.ToString("g6") + "\n" + string.Join("\n",
+			                                                               m.Item2.ConvertAll(g => g.LinearSerialization))));
+		}
+	}
+
+	/// <summary>
 	/// Serializes a trajectory waypoints.
 	/// </summary>
 	/// <returns>Serialization string.</returns>
