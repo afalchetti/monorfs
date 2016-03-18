@@ -2,8 +2,7 @@
 bin/*
 obj/*
 packages/*
+assets/*
 *.suo
 *.user
 *.userprefs
-additional/*.oni
-additional/*.in
