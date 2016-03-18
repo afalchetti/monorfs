@@ -497,11 +497,20 @@ public class SparseMatrix : IEnumerable<SparseItem>
 	/// <param name="map">Applied mapping.</param>
 	public void Apply(Func<double, double> map)
 	{
+		var newdata = new Dictionary<int, Dictionary<int, double>>();
 		foreach (var row in data) {
-		foreach (var item in row.Value) {
-			row.Value[item.Key] = map(item.Value);
+			var newrow = new Dictionary<int, double>();
+
+			foreach (var item in row.Value) {
+				newrow[item.Key] = map(item.Value);
+			}
+
+			newdata.Add(row.Key, newrow);
 		}
-		}
+
+		data = newdata;
+
+		DefaultValue = map(DefaultValue);
 	}
 
 	/// <summary>

@@ -90,7 +90,7 @@ public static class GraphCombinatorics
 		while ((root = Array.IndexOf(matchx, -1)) != -1) {
 			// annotate all its slacks
 			AE.Fill(parent, root);
-			AE.Fill(slack, i => matrix.Defines(root, i) ? labelx[root] + labely[i] - matrix[root, i] : double.PositiveInfinity);
+			AE.Fill(slack, i => labelx[root] + labely[i] - matrix[root, i]);
 			
 			Array.Clear(visitx, 0, visitx.Length);
 			Array.Clear(visity, 0, visity.Length);
@@ -140,7 +140,7 @@ public static class GraphCombinatorics
 
 					for (int i = 0; i < labely.Length; i++) {
 						if (!visity[i]) {
-							double mdelta = matrix.Defines(match, i) ? labelx[match] + labely[i] - matrix[match, i] : double.PositiveInfinity;
+							double mdelta = labelx[match] + labely[i] - matrix[match, i];
 							if (mdelta < slack[i]) {
 								slack [i] = mdelta;
 								parent[i] = match;
