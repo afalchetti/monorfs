@@ -1,0 +1,4 @@
+// build output
+bin/*
+obj/*
+*.md.pc

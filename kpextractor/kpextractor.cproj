@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{1601C8D6-C6FE-46EB-8049-959B181023EA}</ProjectGuid>
+    <Compiler>
+      <Compiler ctype="GppCompiler" />
+    </Compiler>
+    <Language>CPP</Language>
+    <Target>Bin</Target>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\Debug</OutputPath>
+    <Externalconsole>true</Externalconsole>
+    <OutputName>kpextractor</OutputName>
+    <CompileTarget>SharedLibrary</CompileTarget>
+    <DefineSymbols>DEBUG MONODEVELOP</DefineSymbols>
+    <SourceDirectory>.</SourceDirectory>
+    <ExtraCompilerArguments>-std=c++11 -ggdb  -O0</ExtraCompilerArguments>
+    <ExtraLinkerArguments>-Wl,-rpath='$ORIGIN'</ExtraLinkerArguments>
+    <Libs>
+      <Libs>
+        <Lib>opencv_core</Lib>
+        <Lib>opencv_highgui</Lib>
+        <Lib>opencv_imgproc</Lib>
+        <Lib>opencv_features2d</Lib>
+      </Libs>
+    </Libs>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <OutputPath>bin\Release</OutputPath>
+    <Externalconsole>true</Externalconsole>
+    <OutputName>kpextractor</OutputName>
+    <CompileTarget>SharedLibrary</CompileTarget>
+    <OptimizationLevel>3</OptimizationLevel>
+    <DefineSymbols>MONODEVELOP</DefineSymbols>
+    <SourceDirectory>.</SourceDirectory>
+    <ExtraCompilerArguments>-std=c++11 -O3</ExtraCompilerArguments>
+    <ExtraLinkerArguments>-Wl,-rpath='$ORIGIN'</ExtraLinkerArguments>
+    <Libs>
+      <Libs>
+        <Lib>opencv_core</Lib>
+        <Lib>opencv_highgui</Lib>
+        <Lib>opencv_imgproc</Lib>
+        <Lib>opencv_features2d</Lib>
+      </Libs>
+    </Libs>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="kpextractor.cpp" />
+  </ItemGroup>
+</Project>

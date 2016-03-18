@@ -135,12 +135,12 @@ public class KinectVehicle : Vehicle
 	/// <summary>
 	/// Interest points from the previous frame.
 	/// </summary>
-	private List<FastRetinaKeypoint> prevkeypoints;
+	private List<IFeaturePoint> prevkeypoints;
 
 	/// <summary>
 	/// Interest points from the previous frame.
 	/// </summary>
-	private List<FastRetinaKeypoint> prevprevkeypoints;
+	private List<IFeaturePoint> prevprevkeypoints;
 
 	/// <summary>
 	/// Keypoint matches against last frame.
@@ -238,8 +238,8 @@ public class KinectVehicle : Vehicle
 			colorcache    = new Queue<Color[]>();
 			featurecache  = new Queue<List<SparseItem>>();
 			interest      = new List<SparseItem>();
-			prevkeypoints = new List<FastRetinaKeypoint>();
-			prevprevkeypoints = new List<FastRetinaKeypoint>();
+			prevkeypoints = new List<IFeaturePoint>();
+			prevprevkeypoints = new List<IFeaturePoint>();
 			
 			if (device.IsFile) {
 				device.PlaybackControl.Speed = -1;
@@ -364,6 +364,14 @@ public class KinectVehicle : Vehicle
 	/// <param name="interest">Out. List of interest points extracted from the map.</param>
 	private void ReadProcessFrame(out float[][] depthframe, out Color[] colorframe, out List<SparseItem> interest)
 	{
+		using (VideoFrameRef frameref = depth.ReadFrame()) {
+			depthframe = DepthFrameToArray(frameref);
+		}
+
+		using (VideoFrameRef frameref = color.ReadFrame()) {
+			colorframe = ColorFrameToArray(frameref);
+		}
+
 		// remove one frame from each stream to compensate for duplication
 		// (this happens because each stream creates a frame index and there are two streams)
 		// note that now double-stream is mandatory as the features are extracted from the color space
@@ -373,15 +381,7 @@ public class KinectVehicle : Vehicle
 		using (VideoFrameRef frameref = depth.ReadFrame()) {}
 		using (VideoFrameRef frameref = color.ReadFrame()) {}
 
-		using (VideoFrameRef frameref = depth.ReadFrame()) {
-			depthframe = DepthFrameToArray(frameref);
-		}
-
-		using (VideoFrameRef frameref = color.ReadFrame()) {
-			colorframe = ColorFrameToArray(frameref);
-		}
-
-		interest = ExtractKeypoints(colorframe, depthframe, (int) ResX, (int) ResY, 85);
+		interest = ExtractKeypoints(colorframe, depthframe, (int) ResX, (int) ResY, 20);
 	}
 
 	/// <summary>
@@ -476,25 +476,18 @@ public class KinectVehicle : Vehicle
 		var detector = new FastRetinaKeypointDetector(threshold);
 		int border   = Math.Min(50, (int) (width * 0.05));
 
-		List<FastRetinaKeypoint> keypointsF = new List<FastRetinaKeypoint>();
-		List<SparseItem>         keypoints  = new List<SparseItem>();
+		List<IFeaturePoint> keypointsF = new List<IFeaturePoint>();
+		List<SparseItem>    keypoints  = new List<SparseItem>();
 
 		detector.ComputeDescriptors = (KeypointFilter) ? FastRetinaKeypointDescriptorType.Standard :
 		                                                   FastRetinaKeypointDescriptorType.None;
 
-		int bwidth  = 0;
-		int bheight = 0;
+		keypointsF = ExtractORB(image, width, height);
 
-		using (UnmanagedImage bitmap = ColorMatrixToImage(image, width, height)) {
-			keypointsF = detector.ProcessImage(bitmap);
-			bwidth     = bitmap.Width;
-			bheight    = bitmap.Height;
-		}
-
-		List<FastRetinaKeypoint> filtered = keypointsF;
+		List<IFeaturePoint> filtered = new List<IFeaturePoint>();
 
 		if (KeypointFilter && keypointsF.Count > 4 && prevkeypoints.Count > 4) {
-			var descriptors = new Dictionary<IntPoint, FastRetinaKeypoint>();
+			var descriptors = new Dictionary<IntPoint, IFeaturePoint>();
 
 			foreach (var point in keypointsF) {
 				descriptors[new IntPoint((int) point.X, (int) point.Y)] = point;
@@ -513,7 +506,7 @@ public class KinectVehicle : Vehicle
 				ransac.Estimate(matches);
 				int[] inliers = ransac.Inliers;
 
-				filtered = new List<FastRetinaKeypoint>();
+				filtered = new List<IFeaturePoint>();
 
 				this.matches = new IntPoint[2][];
 				this.matches[0] = new IntPoint[inliers.Length];
@@ -526,12 +519,25 @@ public class KinectVehicle : Vehicle
 					this.matches[0][i] = matches[0][inliers[i]];
 					this.matches[1][i] = matches[1][inliers[i]];
 
-					if (x >= border && x < bwidth  - border &&
-					    y >= border && y < bheight - border &&
+					if (x >= border && x < width  - border &&
+					    y >= border && y < height - border &&
 						depth[x][y] > 0) {
 
 						filtered.Add(descriptors[matches[1][inliers[i]]]);
 					}
+				}
+			}
+		}
+		else {
+			for (int i = 0; i < keypointsF.Count; i++) {
+				int x = (int) keypointsF[i].X;
+				int y = (int) keypointsF[i].Y;
+
+				if (x >= border && x < width  - border &&
+					y >= border && y < height - border &&
+					depth[x][y] > 0) {
+
+					filtered.Add(keypointsF[i]);
 				}
 			}
 		}
@@ -582,8 +588,8 @@ public class KinectVehicle : Vehicle
 	}
 
 	/// <summary>
-	/// Obtain a data stream for a UnmanagedImage object from
-	/// a bidimensional matrix.
+	/// Obtain an UnmanagedImage object from
+	/// a squeezed color matrix.
 	/// </summary>
 	/// <param name="matrix">Original matrix.</param>
 	/// <param name="width">Image width.</param>
@@ -604,6 +610,73 @@ public class KinectVehicle : Vehicle
 
 		return image;
 	}
+
+	/// <summary>
+	/// Obtain a grayscale UnmanagedImage object from
+	/// a squeezed color matrix.
+	/// </summary>
+	/// <param name="matrix">Original matrix.</param>
+	/// <param name="width">Image width.</param>
+	/// <param name="height">Image height.</param>
+	/// <returns>Color unmanaged image.</returns>
+	private static UnmanagedImage ColorMatrixToGrayImage(Color[] matrix, int width, int height)
+	{
+		var data = new byte[matrix.Length];
+		UnmanagedImage image = null;
+
+		for (int i = 0; i < matrix.Length; i++) {
+			data[i] = (byte)(1/3.0 * ((float) matrix[i].R + (float) matrix[i].G + (float) matrix[i].B));
+		}
+
+		var converter = new Accord.Imaging.Converters.ArrayToImage(width, height);
+		converter.Convert(data, out image);
+
+		return image;
+	}
+
+	/// <summary>
+	/// Obtain a grayscale UnmanagedImage object from
+	/// a squeezed color matrix.
+	/// </summary>
+	/// <param name="matrix">Original matrix.</param>
+	/// <param name="width">Image width.</param>
+	/// <param name="height">Image height.</param>
+	/// <returns>Color unmanaged image.</returns>
+	private unsafe static List<IFeaturePoint> ExtractORB(Color[] matrix, int width, int height)
+	{
+		byte[]  data = new byte[matrix.Length];
+		double* kp;
+		int     length;
+
+		for (int i = 0; i < matrix.Length; i++) {
+			data[i] = (byte)(1/3.0 * ((float) matrix[i].R + (float) matrix[i].G + (float) matrix[i].B));
+		}
+
+		List<IFeaturePoint> keypoints = new List<IFeaturePoint>();
+
+		try {
+		fixed(byte* pdata = data) {
+			kp = (double*) getkeypointsorb((IntPtr) pdata, height, width, out length);
+		}
+
+		for (int i = 0, h = 0; i < length; i++, h += 2) {
+			keypoints.Add(new SimpleKeyPoint(kp[h], kp[h+1]));
+		}
+
+		deletearray((IntPtr) kp);
+
+		}
+		catch {
+			Console.WriteLine("hi");
+		}
+		return keypoints;
+	}
+
+	[DllImport("libkpextractor.so")]
+	private extern static IntPtr getkeypointsorb(IntPtr data, int rows, int cols, out int length);
+
+	[DllImport("libkpextractor.so")]
+	private extern static void deletearray(IntPtr data);
 
 	/// <summary>
 	/// Transform a point in local 3D space (x-y-depth) into a range measurement.
@@ -822,6 +895,20 @@ public class KinectVehicle : Vehicle
 		if (device != null) {
 			device.Dispose();
 		}
+	}
+}
+
+public class SimpleKeyPoint : IFeaturePoint
+{
+	public double X { get; set; }
+	public double Y { get; set; }
+	public double[] Descriptor { get; set; }
+
+	public SimpleKeyPoint(double x, double y)
+	{
+		X          = x;
+		Y          = y;
+		Descriptor = new double[0];
 	}
 }
 }
