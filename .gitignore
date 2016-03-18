@@ -6,3 +6,4 @@ assets/*
 *.suo
 *.user
 *.userprefs
+*.cfg
