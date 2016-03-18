@@ -114,5 +114,26 @@ public class KinectTrackVehicle : TrackVehicle
 		// the point is in front of the depth map (i.e. not occluded)
 		return range <= depth[x][y];
 	}
+
+	/// <summary>
+	/// Find if a landmark is visible in measurement space and
+	/// return a fuzzy value for points near the border of the visible region.
+	/// </summary>
+	/// <param name="measurement">Queried landmark in pixel-range coordinates.</param>
+	/// <returns>True if the landmark is visible; false otherwise.</returns>
+	public override double FuzzyVisibleM(double[] measurement)
+	{
+		int   x     = (int) (measurement[0] + resx / 2);
+		int   y     = (int) (measurement[1] + resy / 2);
+		float range = (float) measurement[2];
+
+		double    minwdistance = base.FuzzyVisibleM(measurement);
+		float[][] depth        = getdepth();
+
+		minwdistance = Math.Min(minwdistance, (range - RangeClip.Min)  / VisibilityRamp[2]);
+		minwdistance = Math.Min(minwdistance, (depth[x][y]  - range) / VisibilityRamp[2]);
+
+		return Math.Max(0, Math.Min(1, minwdistance));
+	}
 }
 }

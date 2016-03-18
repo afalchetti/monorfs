@@ -75,6 +75,11 @@ public class SimulatedVehicle : Vehicle
 	/// </summary>
 	public static bool PerfectStill { get { return Config.PerfectStill; } }
 
+	/// <summary>
+	/// Sizes for the visibility ramp, one per measurement-space coordinate;
+	/// the visibility grows linearly from zero at the original border
+	/// to detectionProbability at the configured size.
+	/// </summary>
 	public static double[] VisibilityRamp { get { return Config.VisibilityRamp; } }
 
 	/// <summary>
