@@ -245,6 +245,11 @@ public class Program
 					File.Delete(recfile);
 				}
 
+				string dirpath = Path.GetDirectoryName(recfile);
+				if (dirpath != "") {
+					Directory.CreateDirectory(dirpath);
+				}
+
 				ZipFile.CreateFromDirectory(output, recfile);
 
 				Console.WriteLine("  -- cleaning up");

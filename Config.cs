@@ -38,6 +38,9 @@ namespace monorfs
 /// </summary>
 public static class Config
 {
+	// Manipulator
+	public static double AxisLimit = 10.0;
+
 	// Simulation
 	public static TimeSpan MeasureElapsed = new TimeSpan(10000000/30);
 	public static float[]  MapClip        = new float[4] {-6, 6, -3, 3};

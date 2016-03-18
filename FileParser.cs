@@ -81,7 +81,6 @@ public static class FileParser
 
 			TimedState trajectory = TimedArrayFromDescriptor(lines.Submatrix(1, lines.Length - 1), dim);
 
-
 			// filtering, disregard history updates (i.e. future affecting the past)
 			if (filterhistory) {
 				filtered.Add(trajectory[trajectory.Count - 1]);

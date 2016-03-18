@@ -478,7 +478,7 @@ public abstract class Manipulator : Game
 			pass.Apply();
 			
 			Navigator.Render(camera);
-			RenderHUD();
+			RenderHUD(camera);
 		}
 
 		// sidebar
@@ -501,6 +501,11 @@ public abstract class Manipulator : Game
 		Flip.Draw(SideBuffer,  SideDest,  SideBuffer .Bounds, Color.White);
 		Flip.DrawString(font, Message,    messagepos,    Color.White);
 		Flip.DrawString(font, TagMessage, TagMessagePos, TagColor);
+
+		double limit = Config.AxisLimit;
+		renderAxisAnnotations(new double[3] {-limit, 0, 0}, new double[3] {+limit, 0, 0}, 5);
+		renderAxisAnnotations(new double[3] {0, -limit, 0}, new double[3] {0, +limit, 0}, 5);
+		renderAxisAnnotations(new double[3] {0, 0, -limit}, new double[3] {0, 0, +limit}, 5);
 		
 		Flip.End();
 
@@ -510,13 +515,17 @@ public abstract class Manipulator : Game
 	/// <summary>
 	/// Render any heads-up display.
 	/// </summary>
-	public void RenderHUD()
+	/// <param name="camera">Camera 4d transform matrix.</param>
+	public void RenderHUD(double[][] camera)
 	{
+		double[][] vertices;
+		Color      color;
+
 		if (mousefocusproj != null) {
 			const float halflen = 0.085f;
 
-			Color      color    = Color.OrangeRed;
-			double[][] vertices = new double[8][];
+			color    = Color.OrangeRed;
+			vertices = new double[8][];
 
 			vertices[0] = new double[] {mousefocusproj[0] -     halflen, mousefocusproj[1] -     halflen, mousefocusproj[2]};
 			vertices[1] = new double[] {mousefocusproj[0] - 1.3*halflen, mousefocusproj[1] +           0, mousefocusproj[2]};
@@ -528,6 +537,110 @@ public abstract class Manipulator : Game
 			vertices[7] = new double[] {mousefocusproj[0] +           0, mousefocusproj[1] - 1.3*halflen, mousefocusproj[2]};
 
 			Graphics.DrawUser2DPolygon(vertices, 0.03f, color, true);
+		}
+
+		// axes
+		double limit = Config.AxisLimit;
+		renderAxis(new double[3] {-limit, 0, 0}, new double[3] {+limit, 0, 0}, new double[3] {0, 0.1, 0}, 1);
+		renderAxis(new double[3] {0, -limit, 0}, new double[3] {0, +limit, 0}, new double[3] {0.1, 0, 0}, 1);
+		renderAxis(new double[3] {0, 0, -limit}, new double[3] {0, 0, +limit}, new double[3] {0.1, 0, 0}, 1);
+	}
+
+	/// <summary>
+	/// Render an ticked and annotated axis.
+	/// </summary>
+	/// <param name="from">From here.</param>
+	/// <param name="to">To here.</param>
+	/// <param name="tick">Relative vector for the tick lines.</param>
+	/// <param name="tickres">Tick resolution.</param>
+	private void renderAxis(double[] from, double[] to, double[] tick, double tickres)
+	{
+		double[][] vertices = new double[2][];
+
+		vertices[0] = camera.TransformH(from);
+		vertices[1] = camera.TransformH(to);
+		Graphics.DrawUser2DPolygon(vertices, 0.02f, Color.Black);
+
+		double[] delta    = to.Subtract(from);
+		double[] tickunit = tickres.Multiply(delta.Normalize());
+		double   length   = delta.Euclidean();
+		double   limit    = length / 2;  // [-limit, limit]
+		int      nticks   = (int) (limit / tickres);
+
+		double[] zero    = to.Add(from).Divide(2);
+		double[] postick = zero.Add(tickunit);
+		double[] negtick = zero.Subtract(tickunit);
+
+		for (int i = 0; i < nticks; i++) {
+			vertices[0] = camera.TransformH(postick);
+			vertices[1] = camera.TransformH(postick.Add(tick));
+			Graphics.DrawUser2DPolygon(vertices, 0.02f, Color.Black);
+
+			vertices[0] = camera.TransformH(negtick);
+			vertices[1] = camera.TransformH(negtick.Add(tick));
+			Graphics.DrawUser2DPolygon(vertices, 0.02f, Color.Black);
+
+			postick = postick.Add(tickunit);
+			negtick = negtick.Subtract(tickunit);
+		}
+	}
+
+	/// <summary>
+	/// Render an ticked and annotated axis.
+	/// </summary>
+	/// <param name="from">From here.</param>
+	/// <param name="to">To here.</param>
+	/// <param name="tickres">Tick resolution; how often to annotate the axis.</param>
+	private void renderAxisAnnotations(double[] from, double[] to, double tickres)
+	{
+		double[] delta    = to.Subtract(from);
+
+		// if too small, don't annotate anything (otherwise it will just be a mess)
+		double[] proj = camera.TransformH(delta).Submatrix(0, 1);
+		if (proj.SquareEuclidean() < 1 * 1) {
+			return;
+		}
+
+		double[] tickunit = tickres.Multiply(delta.Normalize());
+		double   length   = delta.Euclidean();
+		double   limit    = length / 2;  // [-limit, limit]
+		int      nticks   = (int) (limit / tickres);
+
+		double[] zero    = to.Add(from).Divide(2);
+		double[] postick = zero.Add(tickunit);
+		double[] negtick = zero.Subtract(tickunit);
+
+		float a = SceneDest.Width / (MapClip[1] - MapClip[0]);
+		float x = SceneDest.Center.X;
+		float y = SceneDest.Center.Y;
+
+		for (int i = 1; i <= nticks; i++) {
+			double[] ppos = camera.TransformH(postick);
+			double[] npos = camera.TransformH(negtick);
+
+			Vector2 p = new Vector2(a * (float) ppos[0] + x, a * (float) -ppos[1] + y);
+			Vector2 n = new Vector2(a * (float) npos[0] + x, a * (float) -npos[1] + y);
+
+			string ptext  = (tickres * i).ToString("F0");
+			Vector2 psize = font.MeasureString(ptext);
+
+			string ntext  = (-tickres * i).ToString("F0");
+			Vector2 nsize = font.MeasureString(ntext);
+
+			p.X = p.X - psize.X / 2 - 7;
+			n.X = n.X - nsize.X / 2 - 7;
+
+			if (SceneDest.Contains(new Rectangle((int) p.X, (int) p.Y, 15, 20))) {
+
+				Flip.DrawString(font, ptext, p, Color.Black);
+			}
+
+			if (SceneDest.Contains(new Rectangle((int) n.X, (int) n.Y, 15, 20))) {
+				Flip.DrawString(font, ntext, n, Color.Black);
+			}
+
+			postick = postick.Add(tickunit);
+			negtick = negtick.Subtract(tickunit);
 		}
 	}
 
