@@ -360,7 +360,7 @@ public abstract class Vehicle : IDisposable
 		double[] noise = time.ElapsedGameTime.TotalSeconds.Multiply(
 		                     U.RandomGaussianVector(new double[6] {0, 0, 0, 0, 0, 0},
 		                                            MotionCovarianceL));
-		Pose = Pose.Add(noise);
+		odometry = odometry.Add(noise);
 
 		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(Pose.State)));
 	}
