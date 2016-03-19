@@ -204,7 +204,7 @@ public class Plot
 
 			for (int i = 0; i < Map.Count; i++) {
 				foreach (Gaussian landmark in VisibleLandmarks[i].Item2) {
-					if (cumulative.Near(landmark.Mean, 1e-5).Count == 0) {
+					if (cumulative.Near(landmark.Mean, 1e-5).Count == 0 && landmark.Weight > 0) {
 						cumulative.Add(landmark);
 					}
 				}

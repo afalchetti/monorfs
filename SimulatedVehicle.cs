@@ -206,19 +206,6 @@ public class SimulatedVehicle : Vehicle
 			return;
 		}
 
-		double[][] diraccov = new double[3][] { new double[3] {0.001, 0, 0},
-		                                        new double[3] {0.001, 0, 0},
-		                                        new double[3] {0.001, 0, 0} };
-
-		Map visible = new Map();
-		for (int i = 0; i < Landmarks.Count; i++) {
-			if (Visible(Landmarks[i])) {
-				visible.Add(new Gaussian(Landmarks[i], diraccov, 1.0));
-			}
-		}
-
-		WayVisibleMaps.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, visible));
-
 		base.Update(time, reading);
 	}
 	
@@ -281,18 +268,28 @@ public class SimulatedVehicle : Vehicle
 	/// Obtain several measurements from the hidden state.
 	/// Ladmarks may be misdetected.
 	/// </summary>
+	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <returns>Pixel-range measurements.</returns>
-	public override List<double[]> Measure()
+	public override List<double[]> Measure(GameTime time)
 	{
 		List<double[]> measurements = new List<double[]>();
 		DataAssociation = new List<int>();
+		Map visible = new Map();
 
-		// add every measurement with probability = DetectionProbbility
+		double[][] diraccov = new double[3][] { new double[3] {0.001, 0, 0},
+		                                        new double[3] {0.001, 0, 0},
+		                                        new double[3] {0.001, 0, 0} };
+
+		// add every measurement with probability = DetectionProbability
 		for (int i = 0; i < Landmarks.Count; i++) {
 			if (Visible(Landmarks[i])) {
 				if (U.Uniform.Next() < detectionProbability) {
 					measurements   .Add(MeasureDetected(Landmarks[i]));
 					DataAssociation.Add(i);
+					visible.Add(new Gaussian(Landmarks[i], diraccov, 1.0));
+				}
+				else {
+					visible.Add(new Gaussian(Landmarks[i], diraccov, 0.0));  // weight indicates visible but not detected
 				}
 			}
 		}
@@ -322,6 +319,8 @@ public class SimulatedVehicle : Vehicle
 		foreach (double[] z in measurements) {
 			MappedMeasurements.Add(MeasureToMap(z));
 		}
+
+		WayVisibleMaps.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, visible));
 
 		return measurements;
 	}

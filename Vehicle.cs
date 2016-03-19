@@ -384,8 +384,9 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// Obtain several measurements from the hidden state.
 	/// </summary>
+	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <returns>Pixel-range measurements.</returns>
-	public abstract List<double[]> Measure();
+	public abstract List<double[]> Measure(GameTime time);
 
 	/// <summary>
 	/// Remove all the localization history and start it again from the current position.

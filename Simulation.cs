@@ -464,7 +464,7 @@ public class Simulation : Manipulator
 			}
 
 			if (time.TotalGameTime - lastnavigationupdate.TotalGameTime >= MeasureElapsed) {
-				List<double[]> measurements = Explorer.Measure();
+				List<double[]> measurements = Explorer.Measure(time);
 				WayMeasurements.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, measurements));
 				
 				try {

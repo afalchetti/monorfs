@@ -184,8 +184,9 @@ public class RecordVehicle : Vehicle
 	/// Obtain several measurements from the hidden state.
 	/// Ladmarks may be misdetected.
 	/// </summary>
+	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <returns>Pixel-range measurements.</returns>
-	public override List<double[]> Measure()
+	public override List<double[]> Measure(GameTime time)
 	{
 		List<double[]> measurements = Measurements[FrameIndex].Item2;
 
