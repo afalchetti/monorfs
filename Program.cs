@@ -30,13 +30,15 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
-
-using Accord.Extensions.Imaging;
+using System.Diagnostics;
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+
+using DotImaging;
+using DotImaging.Primitives2D;
+
 using NDesk.Options;
-using System.Diagnostics;
 
 namespace monorfs
 {
@@ -57,7 +59,7 @@ public class Program
 		int width  = frames[0].Width;
 		int height = frames[0].Height;
 
-		using (VideoWriter writer = new VideoWriter(file, new Accord.Extensions.Size(width, height),
+		using (VideoWriter writer = new VideoWriter(file, new Size(width, height),
 		                                            30, true, VideoCodec.FromName("MJPG"))) {
 			writer.Open();
 

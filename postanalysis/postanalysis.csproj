@@ -32,28 +32,19 @@
     <Reference Include="System" />
     <Reference Include="System.IO.Compression.FileSystem" />
     <Reference Include="Accord">
-      <HintPath>..\packages\Accord.2.15.0\lib\net45\Accord.dll</HintPath>
-    </Reference>
-    <Reference Include="AForge">
-      <HintPath>..\packages\AForge.2.2.5\lib\AForge.dll</HintPath>
-    </Reference>
-    <Reference Include="AForge.Math">
-      <HintPath>..\packages\AForge.Math.2.2.5\lib\AForge.Math.dll</HintPath>
+      <HintPath>..\packages\Accord.3.0.2\lib\net45\Accord.dll</HintPath>
     </Reference>
     <Reference Include="Accord.Math">
-      <HintPath>..\packages\Accord.Math.2.15.0\lib\net45\Accord.Math.dll</HintPath>
+      <HintPath>..\packages\Accord.Math.3.0.2\lib\net45\Accord.Math.dll</HintPath>
     </Reference>
     <Reference Include="Accord.Statistics">
-      <HintPath>..\packages\Accord.Statistics.2.15.0\lib\net45\Accord.Statistics.dll</HintPath>
+      <HintPath>..\packages\Accord.Statistics.3.0.2\lib\net45\Accord.Statistics.dll</HintPath>
     </Reference>
     <Reference Include="Accord.MachineLearning">
-      <HintPath>..\packages\Accord.MachineLearning.2.15.0\lib\net45\Accord.MachineLearning.dll</HintPath>
-    </Reference>
-    <Reference Include="AForge.Imaging">
-      <HintPath>..\packages\AForge.Imaging.2.2.5\lib\AForge.Imaging.dll</HintPath>
+      <HintPath>..\packages\Accord.MachineLearning.3.0.2\lib\net45\Accord.MachineLearning.dll</HintPath>
     </Reference>
     <Reference Include="Accord.Imaging">
-      <HintPath>..\packages\Accord.Imaging.2.15.0\lib\net45\Accord.Imaging.dll</HintPath>
+      <HintPath>..\packages\Accord.Imaging.3.0.2\lib\net45\Accord.Imaging.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -62,6 +53,7 @@
     <Compile Include="Plot.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <Import Project="..\packages\Accord.3.0.2\build\Accord.targets" Condition="Exists('..\packages\Accord.3.0.2\build\Accord.targets')" />
   <ItemGroup>
     <ProjectReference Include="..\mono-rfs.csproj">
       <Project>{4CDBBDE8-05E3-4F78-A4EC-2945427BDD7B}</Project>

@@ -66,35 +66,8 @@
     <Reference Include="NiWrapper.Net">
       <HintPath>packages\manual\NiWrapper.Net.x86.2.2.0.34\lib\NiWrapper.Net.dll</HintPath>
     </Reference>
-    <Reference Include="MonoGame.Framework">
-      <HintPath>packages\MonoGame.Framework.Linux.3.4.0.459\lib\net40\MonoGame.Framework.dll</HintPath>
-    </Reference>
-    <Reference Include="OpenTK">
-      <HintPath>packages\MonoGame.Framework.Linux.3.4.0.459\lib\net40\OpenTK.dll</HintPath>
-    </Reference>
-    <Reference Include="Tao.Sdl">
-      <HintPath>packages\MonoGame.Framework.Linux.3.4.0.459\lib\net40\Tao.Sdl.dll</HintPath>
-    </Reference>
     <Reference Include="System.IO.Compression.FileSystem" />
-    <Reference Include="DotImaging.Primitives2D">
-      <HintPath>packages\DotImaging.Primitives2D.2.5.3\lib\net45\DotImaging.Primitives2D.dll</HintPath>
-    </Reference>
     <Reference Include="System.Numerics" />
-    <Reference Include="Accord.Extensions.Core">
-      <HintPath>packages\manual\Accord.Net.Extensions\bin\Release\Accord.Extensions.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="Accord.Extensions.Imaging.GenericImage">
-      <HintPath>packages\manual\Accord.Net.Extensions\bin\Release\Accord.Extensions.Imaging.GenericImage.dll</HintPath>
-    </Reference>
-    <Reference Include="Accord.Extensions.Imaging.IO">
-      <HintPath>packages\manual\Accord.Net.Extensions\bin\Release\Accord.Extensions.Imaging.IO.dll</HintPath>
-    </Reference>
-    <Reference Include="Accord.Extensions.Math">
-      <HintPath>packages\manual\Accord.Net.Extensions\bin\Release\Accord.Extensions.Math.dll</HintPath>
-    </Reference>
-    <Reference Include="nunit.framework">
-      <HintPath>packages\NUnit.3.0.1\lib\net45\nunit.framework.dll</HintPath>
-    </Reference>
     <Reference Include="Accord">
       <HintPath>packages\Accord.3.0.2\lib\net45\Accord.dll</HintPath>
     </Reference>
@@ -109,6 +82,27 @@
     </Reference>
     <Reference Include="Accord.Imaging">
       <HintPath>packages\Accord.Imaging.3.0.2\lib\net45\Accord.Imaging.dll</HintPath>
+    </Reference>
+    <Reference Include="nunit.framework">
+      <HintPath>packages\NUnit.3.2.0\lib\net45\nunit.framework.dll</HintPath>
+    </Reference>
+    <Reference Include="MonoGame.Framework">
+      <HintPath>packages\MonoGame.Framework.Linux.3.5.0.1678\lib\net40\MonoGame.Framework.dll</HintPath>
+    </Reference>
+    <Reference Include="NVorbis">
+      <HintPath>packages\MonoGame.Framework.Linux.3.5.0.1678\lib\net40\NVorbis.dll</HintPath>
+    </Reference>
+    <Reference Include="OpenTK">
+      <HintPath>packages\MonoGame.Framework.Linux.3.5.0.1678\lib\net40\OpenTK.dll</HintPath>
+    </Reference>
+    <Reference Include="DotImaging.Primitives2D">
+      <HintPath>packages\DotImaging.Primitives2D.4.7.6\lib\net45\DotImaging.Primitives2D.dll</HintPath>
+    </Reference>
+    <Reference Include="DotImaging.GenericImage">
+      <HintPath>packages\DotImaging.GenericImage.4.7.6\lib\net45\DotImaging.GenericImage.dll</HintPath>
+    </Reference>
+    <Reference Include="DotImaging.IO">
+      <HintPath>packages\DotImaging.IO.4.7.6\lib\net45\DotImaging.IO.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -155,7 +149,6 @@
     <None Include="App.config" />
     <None Include="packages.config" />
     <None Include="OpenTK.dll.config" />
-    <None Include="Tao.Sdl.dll.config" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
@@ -163,6 +156,7 @@
   <Import Project="packages\Baseclass.Contrib.Nuget.Output.2.0.0\build\net40\Baseclass.Contrib.Nuget.Output.targets" Condition="Exists('packages\Baseclass.Contrib.Nuget.Output.2.0.0\build\net40\Baseclass.Contrib.Nuget.Output.targets')" />
   <Import Project="packages\Baseclass.Contrib.Nuget.Output.1.0.7\build\net40\Baseclass.Contrib.Nuget.Output.targets" Condition="Exists('packages\Baseclass.Contrib.Nuget.Output.1.0.7\build\net40\Baseclass.Contrib.Nuget.Output.targets')" />
   <Import Project="packages\Accord.3.0.2\build\Accord.targets" Condition="Exists('packages\Accord.3.0.2\build\Accord.targets')" />
+  <Import Project="packages\DotImaging.IO.4.7.6\build\DotImaging.IO.targets" Condition="Exists('packages\DotImaging.IO.4.7.6\build\DotImaging.IO.targets')" />
   <PropertyGroup>
     <PostBuildEvent Condition=" '$(OS)' == 'Windows_NT' ">xcopy $(ProjectDir)additional $(TargetDir) /E /Y /D</PostBuildEvent>
   </PropertyGroup>
