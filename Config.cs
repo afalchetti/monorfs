@@ -171,5 +171,51 @@ public static class Config
 		// fill missing fields
 		Util.GetMotionCovariances(MotionCovariance, out MotionCovarianceQ, out MotionCovarianceL);
 	}
+
+	/// <summary>
+	/// Get a string representation for the entire configuration.
+	/// </summary>
+	public static new string ToString()
+	{
+		FieldInfo[] fields = typeof (Config).GetFields(BindingFlags.Static | BindingFlags.Public);
+		string[]    lines  = new string[fields.Length];
+		int         i      = 0;
+
+		foreach (FieldInfo field in fields)
+		{
+			string repr = "";
+
+			if (field.FieldType == typeof (double[][])) {
+				double[][] value = (double[][]) field.GetValue(null);
+
+				repr = value.ToString(new OctaveMatrixFormatProvider(
+				                              DefaultMatrixFormatProvider.CurrentCulture));
+			}
+			else if (field.FieldType == typeof (double[])) {
+				double[] value = (double[]) field.GetValue(null);
+
+				repr = value.ToString(new OctaveMatrixFormatProvider(
+				                              DefaultMatrixFormatProvider.CurrentCulture));
+			}
+			else if (field.FieldType == typeof (float[])) {
+				float[] value = (float[]) field.GetValue(null);
+
+				repr = value.ToString(new OctaveMatrixFormatProvider(
+				                              DefaultMatrixFormatProvider.CurrentCulture));
+			}
+			else if (field.FieldType == typeof (TimeSpan)) {
+				repr = ((TimeSpan) field.GetValue(null)).TotalSeconds.ToString();
+			}
+			else {
+				repr = field.GetValue(null).ToString().Replace('\n', ' ');
+			}
+
+			lines[i] = field.Name + ": " + repr;
+
+			i++;
+		}
+
+		return string.Join("\n", lines);
+	}
 }
 }

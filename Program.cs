@@ -235,6 +235,8 @@ public class Program
 				File.WriteAllText(Path.Combine(output, "measurements.out"), sim.SerializedMeasurements);
 				Console.WriteLine("  -- writing tags");
 				File.WriteAllText(Path.Combine(output, "tags.out"), sim.SerializedTags);
+				Console.WriteLine("  -- writing config");
+				File.WriteAllText(Path.Combine(output, "config.cfg"), Config.ToString());
 
 				if (sim.Explorer.HasSidebar) {
 					Console.WriteLine("  -- writing sidebar video");
