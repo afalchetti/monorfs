@@ -21,7 +21,7 @@ echo "outputting to ${suboutdir}"
 echo "from ${solverdir}"
 
 echo "Solving with PHD, only mapping"
-/opt/monodevelop/bin/mono "${solver}" -x -i=simulation -f="${assetdir}/sim.world" -c="${assetdir}/movsim-map.in" -a=phd -p=${particlecount} -g="${cfgfile}" -r="${phdfile}"
+/opt/monodevelop/bin/mono "${solver}" -x -i=simulation -f="${assetdir}/sim-full.world" -c="${assetdir}/movsim-map.in" -a=phd -p=${particlecount} -g="${cfgfile}" -r="${phdfile}"
 
 /opt/monodevelop/bin/mono "${plotter}" -f="${phdfile}" -c=1 -p=2 -H='timed'
 

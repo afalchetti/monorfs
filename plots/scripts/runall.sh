@@ -5,8 +5,8 @@ assetdir="${2:-assets}"
 solverdir="${3:-../..}"
 
 solverdir=$( realpath "${solverdir}" )
-assetdir=$( realpath "${solverdir}/${assetdir}" )
-outdir=$( realpath "${solverdir}/${outdir}" )
+assetdir="${solverdir}/${assetdir}"
+outdir="${solverdir}/${outdir}"
 
 mkdir -p "${outdir}"
 
