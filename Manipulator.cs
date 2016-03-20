@@ -381,7 +381,9 @@ public abstract class Manipulator : Game
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	protected override void Update(GameTime time)
 	{
-		simtime = Realtime ? time : new GameTime(simtime.TotalGameTime.Add(FrameElapsed), FrameElapsed);
+		if (Realtime) {
+			simtime = time;
+		}
 
 		KeyboardState keyboard = Keyboard.GetState();
 		MouseState    mouse    = Mouse.GetState();
@@ -453,6 +455,10 @@ public abstract class Manipulator : Game
 		prevkeyboard = keyboard;
 		prevmouse    = mouse;
 		base.Update(time);
+
+		if (!Realtime) {
+			simtime = new GameTime(simtime.TotalGameTime.Add(FrameElapsed), FrameElapsed);
+		}
 	}
 
 	/// <summary>

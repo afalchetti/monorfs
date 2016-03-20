@@ -181,10 +181,6 @@ public static class FileParser
 		string[]          frames  = descriptor.Split('\n');
 		TimedMeasurements history = new TimedMeasurements();
 
-		// measurements have one less data than everything else as they come
-		// in between frames; to simplify edge cases, add an "empty" measurement at the beggining
-		history.Add(Tuple.Create(0.0, new List<double[]>()));
-
 		foreach (string frame in frames) {
 			string[] parts = frame.Split(':');
 			double time    = -1;
@@ -423,9 +419,6 @@ public static class FileParser
 		else {
 			tags = new TimedMessage();
 		}
-
-		// insert a dummy frame to simplify indexing
-		odometry.Insert(0, Tuple.Create(0.0, new double[6]));
 
 		explorer = new RecordVehicle(trajectory, odometry, measurements, tags, template.Landmarks);
 

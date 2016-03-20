@@ -160,6 +160,8 @@ public class Viewer : Manipulator
 		FrameIndex   = 0;
 		TagChanged   = false;
 
+		Measurements.Insert(0, Tuple.Create(0.0, new List<double[]>()));
+
 		while (Measurements.Count < map.Count) {
 			Measurements.Add(Tuple.Create(map[Measurements.Count].Item1, new List<double[]>()));
 		}

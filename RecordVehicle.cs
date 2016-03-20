@@ -29,6 +29,8 @@
 using System;
 using System.Collections.Generic;
 
+using Accord.Math;
+
 using Microsoft.Xna.Framework;
 
 using U  = monorfs.Util;
@@ -103,25 +105,30 @@ public class RecordVehicle : Vehicle
 	                     TimedMeasurements measurements, TimedMessage tags,
 	                     List<double[]> landmarks)
 	{
-		Groundtruth = trajectory;
-		Odometry     = odometry;
-		Measurements = measurements;
+		if (trajectory.Count != measurements.Count + 1) {
+			throw new ArgumentException("Measurements length must be one short of the trajectory length.");
+		}
+
+		if (trajectory.Count != odometry.Count + 1) {
+			throw new ArgumentException("Odometry length must be one short of the trajectory length.");
+		}
+
+		if (trajectory.Count < 1) {
+			throw new ArgumentException("Trajectory length must be positive");
+		}
+
+		Groundtruth  = trajectory;
+		Odometry     = new TimedState(odometry);
+		Measurements = new TimedMeasurements(measurements);
 		Tags         = tags;
 
-		if (Trajectory.Count != Measurements.Count) {
-			throw new ArgumentException("Trajectory and measurement data must be have the same length.");
-		}
-
-		if (Trajectory.Count != Odometry.Count) {
-			throw new ArgumentException("Trajectory and odometry data must be have the same length.");
-		}
-
-		if (Trajectory.Count < 1) {
-			throw new ArgumentException("Trajectory length must be nonzero");
-		}
+		Odometry    .Insert(0, Tuple.Create(0.0, new double[6] {0, 0, 0, 0, 0, 0}));
+		Measurements.Insert(0, Tuple.Create(0.0, new List<double[]>()));
 
 		RecLength  = Trajectory.Count;
 		FrameIndex = 1;
+
+		updateWants();
 
 		Landmarks = landmarks;
 		Pose      = new Pose3D(Trajectory[0].Item2);
@@ -131,15 +138,10 @@ public class RecordVehicle : Vehicle
 	}
 
 	/// <summary>
-	/// Apply the motion model to the vehicle.
+	/// Update WantsSLAM and WantsMapping.
 	/// </summary>
-	/// <param name="time">Provides a snapshot of timing values.</param>
-	/// <param name="reading">Odometry reading (dx, dy, dz, dpitch, dyaw, droll).</param>
-	public override void Update(GameTime time, double[] reading)
+	private void updateWants()
 	{
-		Pose = new Pose3D(Trajectory[FrameIndex].Item2);
-		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(Pose.State)));
-
 		// Updates SLAM/Mapping suggestions from tags
 		WantsSLAM    = false;
 		WantsMapping = false;
@@ -161,6 +163,17 @@ public class RecordVehicle : Vehicle
 				}
 			}
 		}
+	}
+
+	/// <summary>
+	/// Apply the motion model to the vehicle.
+	/// </summary>
+	/// <param name="time">Provides a snapshot of timing values.</param>
+	/// <param name="reading">Odometry reading (dx, dy, dz, dpitch, dyaw, droll).</param>
+	public override void Update(GameTime time, double[] reading)
+	{
+		Pose = new Pose3D(Trajectory[FrameIndex].Item2);
+		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(Pose.State)));
 	}
 
 	/// <summary>
@@ -192,6 +205,8 @@ public class RecordVehicle : Vehicle
 
 		if (FrameIndex < RecLength - 1) {
 			FrameIndex++;
+
+			updateWants();
 		}
 		else {
 			WantsToStop = true;
