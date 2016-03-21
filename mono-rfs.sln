@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
 VisualStudioVersion = 12.0.21005.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "mono-rfs", "mono-rfs.csproj", "{4CDBBDE8-05E3-4F78-A4EC-2945427BDD7B}"
-EndProject
 Project("{2857B73E-F847-4B02-9238-064979017E93}") = "isam2", "isam2\isam2.cproj", "{55AB62F6-DA11-4F72-8D9F-FA95F677E3FD}"
 EndProject
 Project("{2857B73E-F847-4B02-9238-064979017E93}") = "video2oni", "video2oni\video2oni.cproj", "{9A8792E0-BD59-4766-A00E-2EDA4E1E4974}"
@@ -12,6 +10,10 @@ EndProject
 Project("{2857B73E-F847-4B02-9238-064979017E93}") = "kpextractor", "kpextractor\kpextractor.cproj", "{1601C8D6-C6FE-46EB-8049-959B181023EA}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "postanalysis", "postanalysis\postanalysis.csproj", "{A46436BE-076A-4A63-A5C5-E9E653D6068E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "mono-rfs-lib", "mono-rfs-lib\mono-rfs-lib.csproj", "{4CDBBDE8-05E3-4F78-A4EC-2945427BDD7B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "mono-rfs", "mono-rfs\mono-rfs.csproj", "{ED789E42-D692-4469-85CB-1EC8AEE8E0C9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -39,6 +41,10 @@ Global
 		{A46436BE-076A-4A63-A5C5-E9E653D6068E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A46436BE-076A-4A63-A5C5-E9E653D6068E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A46436BE-076A-4A63-A5C5-E9E653D6068E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ED789E42-D692-4469-85CB-1EC8AEE8E0C9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ED789E42-D692-4469-85CB-1EC8AEE8E0C9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ED789E42-D692-4469-85CB-1EC8AEE8E0C9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ED789E42-D692-4469-85CB-1EC8AEE8E0C9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(MonoDevelopProperties) = preSolution
 		Policies = $0

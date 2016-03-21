@@ -1,0 +1,9 @@
+# Output files
+bin/*
+obj/*
+packages/*
+assets/*
+*.suo
+*.user
+*.userprefs
+*.cfg
