@@ -49,7 +49,7 @@ labels = {"map":     "OSPA map error",
           "loc":     "Pose location error [m]",
           "rot":     "Pose rotation error [rads]",
           "odoloc":  "Pose delta location error [m]",
-          "odorot":  "Pose delta rotation error [m]",
+          "odorot":  "Pose delta rotation error [rads]",
           "size":    "Number of landmarks",
           "pathlen": "Pose location error [m]"}
 
@@ -165,7 +165,7 @@ def plot(layers, tags, axes, label, outfile):
 			mp.annotate(xy=(tag[0], ymax), s=tag[1], color=color, fontsize=5, family="sans-serif",
 				xycoords='data', xytext=(1, -2), textcoords='offset points', rotation="vertical", verticalalignment="top")
 	
-	styles  = ["-b", "-g", "-r", "-k", "-c"]
+	styles  = ["-b", "-g", "-r", "-k", "-c", "--b", "--g", "--r", "--k", "--c"]
 	i       = 0
 	
 	for layer in layers:

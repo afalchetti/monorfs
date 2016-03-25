@@ -82,15 +82,16 @@ class Program
 
 		Plot plot = Plot.FromFiles(file, histmode, ospac, ospap);
 
-		File.WriteAllText(file + ".loc.data",      plot.SerializedLocationError);
-		File.WriteAllText(file + ".rot.data",      plot.SerializedRotationError);
-		File.WriteAllText(file + ".odoloc.data",   plot.SerializedOdoLocationError);
-		File.WriteAllText(file + ".odorot.data",   plot.SerializedOdoRotationError);
-		File.WriteAllText(file + ".map.data",      plot.SerializedMapError);
-		File.WriteAllText(file + ".size.data",     plot.SerializedExpectedSize);
-		File.WriteAllText(file + ".realsize.data", plot.SerializedCorrectSize);
-		File.WriteAllText(file + ".pathlen.data",  plot.SerializedPathLength);
-		File.WriteAllText(file + ".tags.data",     plot.SerializedTags);
+		File.WriteAllText(file + ".loc.data",         plot.SerializedLocationError);
+		File.WriteAllText(file + ".rot.data",         plot.SerializedRotationError);
+		File.WriteAllText(file + ".odoloc.data",      plot.SerializedOdoLocationError);
+		File.WriteAllText(file + ".odorot.data",      plot.SerializedOdoRotationError);
+		File.WriteAllText(file + ".map.data",         plot.SerializedMapError);
+		File.WriteAllText(file + "-spatial.map.data", plot.SerializedSpatialMapError);
+		File.WriteAllText(file + ".size.data",        plot.SerializedExpectedSize);
+		File.WriteAllText(file + ".realsize.data",    plot.SerializedCorrectSize);
+		File.WriteAllText(file + ".pathlen.data",     plot.SerializedPathLength);
+		File.WriteAllText(file + ".tags.data",        plot.SerializedTags);
 	}
 }
 }

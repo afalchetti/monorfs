@@ -378,45 +378,65 @@ public class Plot
 		return a.Subtract(b).Euclidean();
 	}
 
+	private TimedValue spatialMapError;
+
+	public TimedValue SpatialMapError
+	{
+		get
+		{
+			if (spatialMapError == null) {
+				TimedValue dummy = MapError;
+				// calling MapError computes the spatial error
+			}
+
+			return spatialMapError;
+		}
+	}
+
 	public TimedValue MapError
 	{
 		get
 		{
-			TimedValue error = new TimedValue();
+			TimedValue oerror = new TimedValue();
+			TimedValue serror = new TimedValue();
+
+			double ospaerror;
+			double carderror;
+			double spatialerror;
 
 			for (int i = 0; i < Map.Count; i++) {
-				Map jmap = JMAPEstimate(Map[i].Item2);
-				error.Add(Tuple.Create(Map[i].Item1, OSPA(Landmarks, jmap)));
+				Map jmap = BestMapEstimate(Map[i].Item2);
+				ospaerror = OSPA(Landmarks, jmap, out carderror);
+				spatialerror = Math.Pow(Math.Pow(ospaerror, P) - Math.Pow(carderror, P), 1.0/P);
+
+				oerror.Add(Tuple.Create(Map[i].Item1, ospaerror));
+				serror.Add(Tuple.Create(Map[i].Item1, spatialerror));
 			}
 
-			return error;
+			spatialMapError = serror;
+
+			return oerror;
 		}
 	}
 
-	public Map JMAPEstimate(Map map)
+	public Map BestMapEstimate(Map map)
 	{
-		Map jmap = new Map();
-
-		double size = map.ExpectedSize;
-
-		var mlist = map.ToList();
-		mlist.Sort((a, b) => Math.Sign(b.Weight - a.Weight));
+		Map best = new Map();
 
 		double[][] did = { new double[3] {1e-3, 0, 0},
 		                   new double[3] {0, 1e-3, 0},
 		                   new double[3] {0, 0, 1e-3} };
-		
-		for (int n = (int) Math.Round(size); n > 0; n--) {
-			jmap.Add(new Gaussian(mlist[0].Mean, did, 1.0));
 
-			mlist[0] = new Gaussian(mlist[0].Mean, mlist[0].Covariance, mlist[0].Weight - 1);
-			mlist.Sort((a, b) => Math.Sign(b.Weight - a.Weight));
+		foreach (Gaussian component in map) {
+			if (component.Weight > 0.8) {
+				best.Add(new Gaussian(component.Mean, did, 1.0));
+			}
 		}
 
-		return jmap;
+		return best;
 	}
 
-	public double OSPA(Map a, Map b)
+	public double OSPA(Map a, Map b, out double cardinalityerror)
 	{
 		if (a.Count > b.Count) {
 			Map temp = a;
@@ -425,7 +445,8 @@ public class Plot
 		}
 
 		if (a.Count == 0) {
-			return C;
+			cardinalityerror = (b.Count == 0) ? 0 : C;
+			return cardinalityerror;
 		}
 
 		var alist = a.ToList();
@@ -460,6 +481,8 @@ public class Plot
 
 		int[] best = GraphCombinatorics.LinearAssignment(transport);
 		transport.Apply(x => CP - x);
+
+		cardinalityerror = C * Math.Pow((double) (blist.Count - alist.Count) / blist.Count, 1.0/P);
 
 		return Math.Pow(GraphCombinatorics.AssignmentValue(transport, best) / blist.Count, 1.0/P);
 	}
@@ -506,6 +529,14 @@ public class Plot
 		get
 		{
 			return serializedTimedValue(MapError);
+		}
+	}
+
+	public string SerializedSpatialMapError
+	{
+		get
+		{
+			return serializedTimedValue(SpatialMapError);
 		}
 	}
 
