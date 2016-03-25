@@ -100,6 +100,19 @@ public abstract class Manipulator : Game
 	public bool Paused { get; set; }
 
 	/// <summary>
+	/// If true, stop anything in the next frame and try to exit gracefully.
+	/// </summary>
+	public bool Abort {
+		get { return abort; }
+		set { abort = value; }
+	}
+
+	/// <summary>
+	/// Internal abort flag.
+	/// </summary>
+	public volatile bool abort;
+
+	/// <summary>
 	/// If true, the calculations are bound by realtime constraints,
 	/// i.e. if it takes too long, the vehicle will move proportionally.
 	/// Otherwise, the simulated timestep is always the same, regardless of
@@ -381,6 +394,11 @@ public abstract class Manipulator : Game
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	protected override void Update(GameTime time)
 	{
+		if (Abort) {
+			Exit();
+			return;
+		}
+
 		if (Realtime) {
 			simtime = time;
 		}

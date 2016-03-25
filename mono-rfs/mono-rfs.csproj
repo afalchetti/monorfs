@@ -63,6 +63,7 @@
       <HintPath>..\packages\DotImaging.GenericImage.4.7.6\lib\net45\DotImaging.GenericImage.dll</HintPath>
     </Reference>
     <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="Mono.Posix" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />

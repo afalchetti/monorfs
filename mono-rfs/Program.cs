@@ -31,6 +31,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Diagnostics;
+using System.Threading;
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -38,6 +39,7 @@ using Microsoft.Xna.Framework.Graphics;
 using DotImaging;
 using DotImaging.Primitives2D;
 
+using Mono.Unix;
 using NDesk.Options;
 
 namespace monorfs
@@ -47,6 +49,16 @@ namespace monorfs
 /// </summary>
 public class Program
 {
+	/// <summary>
+	/// Main processor.
+	/// </summary>
+	public static Manipulator manipulator;
+
+	/// <summary>
+	/// Thread that listens to SIGINT for graceful termination.
+	/// </summary>
+	public static Thread signalthread;
+
 	/// <summary>
 	/// Save a stream of image frames as an AVI video file.
 	/// </summary>
@@ -95,7 +107,33 @@ public class Program
 		Console.WriteLine();
 		Console.WriteLine("Options:");
 		options.WriteOptionDescriptions(Console.Out);
+	}
 
+	public static void abort()
+	{
+		if (manipulator != null && !manipulator.Abort) {
+			manipulator.Abort = true;
+		}
+		else {
+			Environment.Exit(1);
+		}
+	}
+
+	/// <summary>
+	/// Set a handler for SIGINT, so they system can exit gracefully.
+	/// </summary>
+	public static void setSignalHandler()
+	{
+		UnixSignal sigint = new UnixSignal(Mono.Unix.Native.Signum.SIGINT);
+
+		signalthread = new Thread(() => {
+			while (true) {
+				sigint.WaitOne();
+				abort();
+			}
+		});
+
+		signalthread.Start();
 	}
 
 	/// <summary>
@@ -162,10 +200,13 @@ public class Program
 			Config.FromFile(configfile);
 		}
 
+		setSignalHandler();
+
 		if (viewer) {
 			string tmpdir;
 
 			using (Viewer sim = Viewer.FromFiles(recfile, filterhistory, out tmpdir)) {
+				manipulator = sim;
 				sim.Run();
 
 				if (sim.TagChanged) {
@@ -192,6 +233,7 @@ public class Program
 		}
 		else {
 			using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, input, algorithm, onlymapping, realtime, !headless, noterminate)) {
+				manipulator = sim;
 				SimulatedVehicle initPose = new SimulatedVehicle(sim.Explorer);
 
 				if (headless) {
@@ -262,6 +304,8 @@ public class Program
 		}
 
 		KinectVehicle.Shutdown();
+
+		signalthread.Abort();
 	}
 }
 }

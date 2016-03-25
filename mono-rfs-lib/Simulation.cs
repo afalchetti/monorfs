@@ -528,7 +528,7 @@ public class Simulation : Manipulator
 		}
 
 		int i = 1;
-		while (!commanddepleted && !Explorer.WantsToStop) {
+		while (!commanddepleted && !Explorer.WantsToStop && !Abort) {
 			time = new GameTime(time.TotalGameTime.Add(dt), dt);
 			Update(time, keyboard, keyboard, 1.0);
 			Console.Write(i + ", ");
