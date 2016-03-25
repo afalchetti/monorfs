@@ -106,11 +106,6 @@ public class ISAM2Navigator : Navigator
 	public IndexedMap CandidateMapModel { get; private set; }
 
 	/// <summary>
-	/// Previous SLAM step vehicle pose estimate.
-	/// </summary>
-	public TrackVehicle PreviousEstimate { get; set; }
-
-	/// <summary>
 	/// Next unused label id.
 	/// </summary>
 	private int nextlabel;
@@ -148,13 +143,11 @@ public class ISAM2Navigator : Navigator
 		}
 
 		BestEstimate      = new TrackVehicle();
-		PreviousEstimate  = new TrackVehicle();
 		MapModel          = new IndexedMap();
 		plmodel           = new IndexedMap();
 		CandidateMapModel = new IndexedMap();
 
 		BestEstimate.Pose     = new Pose3D(vehicle.Pose);
-		PreviousEstimate.Pose = new Pose3D(vehicle.Pose);
 
 		handle    = NewNavigator(vehicle.Pose.State, measurementnoise, motionnoise, focal);
 		nextlabel = 0;
@@ -191,7 +184,6 @@ public class ISAM2Navigator : Navigator
 	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
 	public override void SlamUpdate(GameTime time, List<double[]> measurements)
 	{
-		double[]  odometry = BestEstimate.Pose.Subtract(PreviousEstimate.Pose);
 		List<int> labels   = FindLabels(measurements);
 
 		for (int i = labels.Count - 1; i >= 0; i--) {
@@ -211,7 +203,7 @@ public class ISAM2Navigator : Navigator
 			marshalmeasurements[h++] = measurements[i][2];
 		}
 
-		int status = Update(odometry, marshalmeasurements, labels.ToArray(), measurements.Count);
+		int status = Update(BestEstimate.Pose.State, marshalmeasurements, labels.ToArray(), measurements.Count);
 
 		// updates the estimated complete path to show the batch nature of the algorithm
 		List<double[]> trajectory = GetTrajectory();
@@ -226,13 +218,12 @@ public class ISAM2Navigator : Navigator
 
 		// the last one does not have a previous (valid) timestamp so it must be created
 		BestEstimate.WayPoints[trajectory.Count - 1] =
-			Tuple.Create(time.TotalGameTime.TotalSeconds, trajectory[trajectory.Count - 1]);
+			Tuple.Create(time.TotalGameTime.TotalSeconds, BestEstimate.Pose.State);
 
 		// BestEstimate may have been updated several times since the last call to
 		// this method, so it could contain a lot of unused data, remove it
 		BestEstimate.WayPoints = BestEstimate.WayPoints.GetRange(0, trajectory.Count);
 
-		PreviousEstimate.Pose = new Pose3D(BestEstimate.Pose);
 		UpdateTrajectory(time);
 		UpdateMapHistory(time);
 
@@ -478,18 +469,18 @@ public class ISAM2Navigator : Navigator
 	/// <summary>
 	/// Update the solver estimates from unmanaged code.
 	/// </summary>
-	/// <param name="odometry">Odometry readings as [dx, dy, dz, dyaw, dpitch, droll].</param>
+	/// <param name="newstate">Updated state after odometry as [tx, ty, tz, qw, qx, qy, qz].</param>
 	/// <param name="measurements">Vectorized measurement list as [x1, y1, z1, x2, y2, z2, ...].</param>
 	/// <param name="labels">Data association labels, one per measurement.</param>
 	/// <param name="nmeasurements">Number of measurements.</param>
 	/// <returns>Error code: 0 = ok, 1 = divergence, 2 = duplicate var, -1 = general error.</returns>
-	private unsafe int Update(double[] odometry, double[] measurements, int[] labels, int nmeasurements)
+	private unsafe int Update(double[] newstate, double[] measurements, int[] labels, int nmeasurements)
 	{
 		int retvalue = -1;
-		fixed(double* ptrOdometry     = odometry) {
+		fixed(double* ptrNewState     = newstate) {
 		fixed(double* ptrMeasurements = measurements) {
 		fixed(int*    ptrLabels       = labels) {
-			retvalue = update(handle, (IntPtr) ptrOdometry, (IntPtr) ptrMeasurements, (IntPtr) ptrLabels, nmeasurements, OnlyMapping);
+			retvalue = update(handle, (IntPtr) ptrNewState, (IntPtr) ptrMeasurements, (IntPtr) ptrLabels, nmeasurements, OnlyMapping);
 		}
 		}
 		}
@@ -600,7 +591,7 @@ public class ISAM2Navigator : Navigator
 	private extern static void deletenavigator(HandleRef navigator);
 
 	[DllImport("libisam2.so")]
-	private extern static int update(HandleRef navigator, IntPtr odometry, IntPtr measurements, IntPtr labels, int nmeasurements, bool onlymapping);
+	private extern static int update(HandleRef navigator, IntPtr newstate, IntPtr measurements, IntPtr labels, int nmeasurements, bool onlymapping);
 
 	[DllImport("libisam2.so")]
 	private extern static IntPtr gettrajectory(HandleRef navigator, out int length);

@@ -188,6 +188,10 @@ public class Quaternion
 	/// <returns>Square root.</returns>
 	public Quaternion Sqrt()
 	{
+		if (Math.Abs(W - -1.0) < 1e-8) {
+			return new Quaternion(1, 0, 0, 0);
+		}
+
 		double rw    = Math.Sqrt(0.5 * (1 + W));
 		double alpha = 1 / (2 * rw);
 

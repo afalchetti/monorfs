@@ -189,13 +189,13 @@ Point3 landmarkestimate(double px, double py, double range, Pose3 pose, double f
 
 // update the navigator estimate using new information:
 // odometry and  measurement lists from the last step;
-// 'odometry' format is an array with [dx, dy, dz, dyaw, dpitch, droll]
-// in local coordinates;
+// 'newstate' indicates the new state after incorporating odometry,
+// formatted as [tx, ty, tz, qw, qx, qy, qz];
 // 'measurements' format must be a 3*n double array with the
 // x-y-z coordinates for each one of them;
 // each measurement must be associated to a labeled (int) landmark;
 // 'onlymapping' defines that the update is exact and the estimate should locked on its place
-int update(ISAM2Navigator* navigator, double* odometry, double* measurements,
+int update(ISAM2Navigator* navigator, double* newstate, double* measurements,
            int* labels, int nmeasurements, bool onlymapping)
 {
 	try {
@@ -205,11 +205,9 @@ int update(ISAM2Navigator* navigator, double* odometry, double* measurements,
 
 		// note that dorientation is shifted since the coordinate
 		// system is not the same in this framework
-		Pose3 delta(Rot3::ypr(odometry[5], odometry[4], odometry[3]),
-	                Point3(odometry[0], odometry[1], odometry[2]));
-
-		// add new estimate for new pose (estimate using last pose)
-		Pose3 pestimate = navigator->estimate.at<Pose3>(Symbol('x', navigator->t - 1)) * delta;
+		Pose3 pestimate(Rot3::quaternion(newstate[3], newstate[4], newstate[5], newstate[6]),
+		                Point3(newstate[0], newstate[1], newstate[2]));
+		Pose3 delta = navigator->estimate.at<Pose3>(Symbol('x', navigator->t - 1)).between(pestimate);
 
 		newestimates.insert(Symbol('x', navigator->t), pestimate);
 
@@ -232,7 +230,7 @@ int update(ISAM2Navigator* navigator, double* odometry, double* measurements,
 			maxlabel = max(maxlabel, l);
 		}
 
-		if (odometry != nullptr) {
+		if (newstate != nullptr) {
 			graph.push_back(BetweenFactor<Pose3>(Symbol('x', navigator->t - 1),
 			                                     Symbol('x', navigator->t),
 			                                     delta, navigator->motionnoise));
