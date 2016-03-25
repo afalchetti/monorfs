@@ -444,7 +444,10 @@ public class ISAM2Navigator : Navigator
 	/// </summary>
 	public override void Dispose()
 	{
-		deletenavigator(handle);
+		if (handle.Handle != IntPtr.Zero) {
+			deletenavigator(handle);
+			handle = new HandleRef(this, IntPtr.Zero);
+		}
 	}
 
 	/// <summary>
