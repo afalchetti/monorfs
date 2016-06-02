@@ -63,28 +63,24 @@ public class Program
 	/// Save a stream of image frames as an AVI video file.
 	/// </summary>
 	/// <param name="frames">Ordered list of frames at 30 fps.</param>
+	/// <param name="width">Frame width.</param>
+	/// <param name="height">Frame height.</param>
 	/// <param name="file">Output filename.</param>
-	public static void SaveAsAvi(List<Texture2D> frames, string file)
+	public static void SaveAsAvi(List<Color[]> frames, int width, int height, string file)
 	{
 		if (frames.Count == 0) { return; }
-
-		int width  = frames[0].Width;
-		int height = frames[0].Height;
 
 		using (VideoWriter writer = new VideoWriter(file, new Size(width, height),
 		                                            30, true, VideoCodec.FromName("MJPG"))) {
 			writer.Open();
 
-			foreach (Texture2D frame in frames) {
+			foreach (Color[] frame in frames) {
 				Bgr<byte>[,] bitmap = new Bgr<byte>[height, width];
-				Color[]      linear = new Color[width * height];
-
-				frame.GetData(linear);
 
 				int h = 0; 
 				for (int k = 0; k < height; k++) {
 				for (int i = 0; i < width;  i++) {
-					bitmap[k, i] = new Bgr<byte>(linear[h].B, linear[h].G, linear[h].R);
+					bitmap[k, i] = new Bgr<byte>(frame[h].B, frame[h].G, frame[h].R);
 					h++;
 				}
 				}
@@ -282,7 +278,8 @@ public class Program
 
 				if (sim.Explorer.HasSidebar) {
 					Console.WriteLine("  -- writing sidebar video");
-					SaveAsAvi(sim.SidebarHistory, Path.Combine(output, "sidebar.avi"));
+					SaveAsAvi(sim.SidebarHistory, sim.SideBuffer.Width, sim.SideBuffer.Height,
+					          Path.Combine(output, "sidebar.avi"));
 				}
 
 				Console.WriteLine("  -- compressing");

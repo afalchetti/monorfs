@@ -126,9 +126,7 @@ public class SimulatedVehicle : Vehicle
 			clutterGen = new DegenerateDistribution(0);
 		}
 
-		Landmarks     = landmarks;
-		SidebarWidth  = 1;
-		SidebarHeight = 1;
+		Landmarks = landmarks;
 
 		HasDataAssociation = true;
 		DataAssociation    = new List<int>();

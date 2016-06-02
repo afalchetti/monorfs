@@ -255,9 +255,6 @@ public class KinectVehicle : Vehicle
 			ShowSidebar = sidebar;
 			HasSidebar  = sidebar;
 
-			SidebarWidth  = (int) (depth.VideoMode.Resolution.Width  / Delta);
-			SidebarHeight = (int) (depth.VideoMode.Resolution.Height / Delta) * 2;
-
 			ResX    = depth.VideoMode.Resolution.Width  / Delta;
 			ResY    = depth.VideoMode.Resolution.Height / Delta;
 			xzalpha = 2 * (float) Math.Tan(depth.HorizontalFieldOfView / 2);

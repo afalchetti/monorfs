@@ -106,9 +106,9 @@ public class Viewer : Manipulator
 	public List<Texture2D> SidebarHistory { get; private set; }
 
 	/// <summary>
-	/// "overriden" SideBuffer image.
+	/// Pre-update frame index.
 	/// </summary>
-	private Texture2D SideBuffer2;
+	private int preframeindex;
 
 	/// <summary>
 	/// Mapping between trajectory indices and equivalent map indices (which may have a slower framerate).
@@ -183,7 +183,9 @@ public class Viewer : Manipulator
 
 		// override base class behavior (that is based on explorer HasSidebar)
 		if (!string.IsNullOrEmpty(sidebarfile)) {
-			ScreenCut = 0.7;
+			SidebarWidth  = Explorer.FilmArea.Width;
+			SidebarHeight = 2 * Explorer.FilmArea.Height;
+			ScreenCut     = 0.7;
 		}
 	}
 
@@ -288,6 +290,9 @@ public class Viewer : Manipulator
 			SidebarHistory = frameListFromAvi(sidebarfile);
 			SidebarHistory.Insert(0, nulltexture);
 
+			SidebarWidth  = SidebarHistory[1].Width;
+			SidebarHeight = SidebarHistory[1].Height;
+
 			for (int i = SidebarHistory.Count; i < Trajectory.Count; i++) {
 				SidebarHistory.Add(nulltexture);
 			}
@@ -324,7 +329,7 @@ public class Viewer : Manipulator
 
 		bool speedup = keyboard.IsKeyDown(Keys.LeftShift);
 
-		SideBuffer2            = SidebarHistory[FrameIndex];
+		preframeindex          = FrameIndex;
 		Explorer .WayPoints    = VehicleWaypoints;
 		Explorer .Pose         = new Pose3D(Explorer.WayPoints[Explorer.WayPoints.Count - 1].Item2);
 		Navigator.BestMapModel = Map[mapindices[FrameIndex]].Item2;
@@ -406,7 +411,7 @@ public class Viewer : Manipulator
 		Flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
 		           DepthStencilState.Default, RasterizerState.CullNone);
 
-		Flip.Draw(SideBuffer2, SideDest, SideBuffer2.Bounds, Color.White);
+		Flip.Draw(SidebarHistory[preframeindex], SideDest, SidebarHistory[preframeindex].Bounds, Color.White);
 		
 		Flip.End();
 	}

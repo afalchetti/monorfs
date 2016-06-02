@@ -217,6 +217,16 @@ public abstract class Manipulator : Game
 	private Vector2 messagepos;
 
 	/// <summary>
+	/// Reference sidebar drawing width.
+	/// </summary>
+	public int SidebarWidth { get; protected set; }
+
+	/// <summary>
+	/// Reference sidebar drawing height.
+	/// </summary>
+	public int SidebarHeight { get; protected set; }
+
+	/// <summary>
 	/// Tags in the timeline.
 	/// </summary>
 	public TimedMessage Tags { get; protected set; }
@@ -278,7 +288,9 @@ public abstract class Manipulator : Game
 		graphicsManager.PreferMultiSampling       = true;
 		graphicsManager.IsFullScreen              = false;
 
-		ScreenCut = (Explorer.HasSidebar) ? 0.7 : 1.0;
+		ScreenCut     = (Explorer.HasSidebar) ? 0.7 : 1.0;
+		SidebarWidth  = (Explorer.HasSidebar) ? Explorer.FilmArea.Width : 1;
+		SidebarHeight = (Explorer.HasSidebar) ? 2 * Explorer.FilmArea.Height : 1;
 
 		FrameElapsed = new TimeSpan((long) (10000000/fps));
 		Message      = "";
@@ -345,7 +357,7 @@ public abstract class Manipulator : Game
 
 		SideDest = clipCenter((int) (graphicsManager.PreferredBackBufferWidth * (1 - ScreenCut)),
 		                      graphicsManager.PreferredBackBufferHeight - 40,
-		                      (float) Explorer.SidebarWidth / Explorer.SidebarHeight);
+		                      (float) SidebarWidth / SidebarHeight);
 
 		SideDest.X += (int) (graphicsManager.PreferredBackBufferWidth * ScreenCut);
 		

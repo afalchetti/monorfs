@@ -100,7 +100,7 @@ public class Simulation : Manipulator
 	/// <summary>
 	/// Every sidebar frame seen so far.
 	/// </summary>
-	public List<Texture2D> SidebarHistory;
+	public List<Color[]> SidebarHistory;
 
 	/// <summary>
 	/// Measurement history.
@@ -231,7 +231,7 @@ public class Simulation : Manipulator
 
 		this.noterminate = noterminate;
 
-		SidebarHistory  = new List<Texture2D>();
+		SidebarHistory  = new List<Color[]>();
 		WayMeasurements = new TimedMeasurements();
 		// note that WayMeasurements starts empty as measurements are between frames
 		// so it will have a length |frames| - 1
@@ -503,13 +503,10 @@ public class Simulation : Manipulator
 		base.Draw(time);
 
 		if (!Paused && Explorer.HasSidebar) {
-			Texture2D frame = new Texture2D(Graphics, SideBuffer.Width, SideBuffer.Height);
-			Color[]   data  = new Color[SideBuffer.Width * SideBuffer.Height];
+			Color[] data = new Color[SideBuffer.Width * SideBuffer.Height];
 
 			SideBuffer.GetData(data);
-			frame     .SetData(data);
-
-			SidebarHistory.Add(frame);
+			SidebarHistory.Add(data);
 		}
 	}
 

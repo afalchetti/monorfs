@@ -134,16 +134,6 @@ public abstract class Vehicle : IDisposable
 	public virtual SpriteBatch Flip { get; set; }
 
 	/// <summary>
-	/// Reference sidebar drawing width.
-	/// </summary>
-	public int SidebarWidth { get; protected set; }
-
-	/// <summary>
-	/// Reference sidebar drawing height.
-	/// </summary>
-	public int SidebarHeight { get; protected set; }
-
-	/// <summary>
 	/// Trajectory through which the vehicle has moved.
 	/// The first argument per item is a timestamp, the
 	/// next three are 3D coordinates.
@@ -274,8 +264,6 @@ public abstract class Vehicle : IDisposable
 	{
 		this.Pose               = new Pose3D(that.Pose);
 		this.Graphics           = that.Graphics;
-		this.SidebarWidth       = that.SidebarWidth;
-		this.SidebarHeight      = that.SidebarHeight;
 		this.MappedMeasurements = that.MappedMeasurements;
 		this.Landmarks          = that.Landmarks;
 
