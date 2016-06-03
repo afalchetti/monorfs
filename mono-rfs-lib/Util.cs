@@ -444,6 +444,15 @@ public static class Util
 	}
 
 	/// <summary>
+	/// Seed the internal Accord random generator.
+	/// </summary>
+	public static void SeedGenerators(int seed)
+	{
+		Gaussian.SetSeed(seed);
+		Uniform.SetSeed(seed);
+	}
+
+	/// <summary>
 	/// Typesafe shallow clone of an array.
 	/// </summary>
 	/// <returns>Shallow clone.</returns>

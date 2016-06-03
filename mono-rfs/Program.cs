@@ -34,7 +34,6 @@ using System.Diagnostics;
 using System.Threading;
 
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 using DotImaging;
 using DotImaging.Primitives2D;
@@ -186,6 +185,9 @@ public class Program
 			ShowHelp(options);
 			return;
 		}
+
+		TimeSpan time = DateTime.Now.ToUniversalTime() - new DateTime(2010, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+		Util.SeedGenerators((int) time.TotalSeconds);
 
 		if (!KinectVehicle.Initialize()) {
 			KinectVehicle.Shutdown();
