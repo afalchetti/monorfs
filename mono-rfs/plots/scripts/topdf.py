@@ -80,7 +80,7 @@ def addtags(a, b):
 	for entry in b:
 		close = [x[1] for x in a if abs(x[0] - entry[0]) < 1e-5]
 		
-		if (b[1] not in close):
+		if (entry[1] not in close):
 			tags.append(entry)
 	
 	return tags
