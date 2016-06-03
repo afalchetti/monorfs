@@ -201,10 +201,14 @@ public class SimulatedVehicle : Vehicle
 		// no input, static friction makes the robot stay put (if there is any static friction)
 		if (PerfectStill && reading[0] == 0 && reading[1] == 0 && reading[2] == 0 &&
 			                reading[3] == 0 && reading[4] == 0 && reading[5] == 0) {
-			return;
-		}
+			Pose     = Pose    .Add(reading);
+			OdometryPose = OdometryPose.Add(reading);
 
-		base.Update(time, reading);
+			WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(Pose.State)));
+		}
+		else {
+			base.Update(time, reading);
+		}
 	}
 	
 	/// <summary>

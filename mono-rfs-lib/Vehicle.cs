@@ -100,7 +100,7 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// State using the (noisy) odometry data.
 	/// </summary>
-	private Pose3D odometry;
+	protected Pose3D OdometryPose;
 
 	/// <summary>
 	/// Odometry reference state; state at which the odometry started accumulating.
@@ -230,8 +230,8 @@ public abstract class Vehicle : IDisposable
 		FilmArea    = film;
 		RangeClip   = clip;
 		
-		odometry    = new Pose3D(Pose);
-		refodometry = new Pose3D(Pose);
+		OdometryPose = new Pose3D(Pose);
+		refodometry  = new Pose3D(Pose);
 
 		HasDataAssociation = false;
 		DataAssociation    = new List<int>();
@@ -342,13 +342,13 @@ public abstract class Vehicle : IDisposable
 	/// <param name="reading">Odometry reading (dx, dy, dz, dpitch, dyaw, droll).</param>
 	public virtual void Update(GameTime time, double[] reading)
 	{
-		Pose     = Pose    .Add(reading);
-		odometry = odometry.Add(reading);
+		Pose         = Pose        .Add(reading);
+		OdometryPose = OdometryPose.Add(reading);
 
 		double[] noise = time.ElapsedGameTime.TotalSeconds.Multiply(
 		                     U.RandomGaussianVector(new double[6] {0, 0, 0, 0, 0, 0},
 		                                            MotionCovarianceL));
-		odometry = odometry.Add(noise);
+		OdometryPose = OdometryPose.Add(noise);
 
 		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(Pose.State)));
 	}
@@ -359,9 +359,9 @@ public abstract class Vehicle : IDisposable
 	/// <returns>State diff.</returns>
 	public virtual double[] ReadOdometry(GameTime time)
 	{
-		double[] reading = odometry.Subtract(refodometry);
+		double[] reading = OdometryPose.Subtract(refodometry);
 
-		odometry     = new Pose3D(Pose);
+		OdometryPose = new Pose3D(Pose);
 		refodometry  = new Pose3D(Pose);
 
 		WayOdometry.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(reading)));
