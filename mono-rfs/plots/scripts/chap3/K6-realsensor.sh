@@ -30,6 +30,6 @@ echo "Solving with Odometry in real sensor"
 
 wait
 /opt/monodevelop/bin/mono "${plotter}" -f="${phdfile}" -c=1 -p=2 -H='timed'
-/opt/monodevelop/bin/mono "${plotter}" -f="${pdofile}" -c=1 -p=2 -H='timed'
+/opt/monodevelop/bin/mono "${plotter}" -f="${odofile}" -c=1 -p=2 -H='timed'
 
 popd >/dev/null

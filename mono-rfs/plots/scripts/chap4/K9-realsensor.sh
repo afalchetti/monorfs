@@ -30,12 +30,12 @@ echo "Solving with Odometry in real sensor"
 /opt/monodevelop/bin/mono "${solver}" -x -i=record -f="${phdfile}" -a=odometry -g="${cfgfile}" -r="${odofile}"
 
 echo ""
-echo "Solving with Odometry in real sensor"
+echo "Solving with iSAM2 in real sensor"
 /opt/monodevelop/bin/mono "${solver}" -x -i=record -f="${phdfile}" -a=isam2 -g="${cfgfile}" -r="${isamfile}"
 
 wait
 /opt/monodevelop/bin/mono "${plotter}" -f="${phdfile}" -c=1 -p=2 -H='timed'
-/opt/monodevelop/bin/mono "${plotter}" -f="${pdofile}" -c=1 -p=2 -H='timed'
+/opt/monodevelop/bin/mono "${plotter}" -f="${odofile}" -c=1 -p=2 -H='timed'
 /opt/monodevelop/bin/mono "${plotter}" -f="${isamfile}" -c=1 -p=2 -H='timed'
 
 popd >/dev/null
