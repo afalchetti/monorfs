@@ -96,6 +96,11 @@ public class KinectVehicle : Vehicle
 	public float ResY { get; private set; }
 
 	/// <summary>
+	/// Image border where no keypoint can be found (because of incomplete patches).
+	/// </summary>
+	public int Border { get; private set; }
+
+	/// <summary>
 	/// Last measurement's depth frame.
 	/// </summary>
 	public float[][] DepthFrame;
@@ -259,6 +264,8 @@ public class KinectVehicle : Vehicle
 			ResY    = depth.VideoMode.Resolution.Height / Delta;
 			xzalpha = 2 * (float) Math.Tan(depth.HorizontalFieldOfView / 2);
 			yzalpha = 2 * (float) Math.Tan(depth.VerticalFieldOfView   / 2);
+
+			Border  = 48 / 2 + 3;  // LATCH patch halfsize + ssd halfsize
 			
 			depth.Start();
 			color.Start();

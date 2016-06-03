@@ -51,6 +51,11 @@ public class KinectTrackVehicle : TrackVehicle
 	private float resy;
 
 	/// <summary>
+	/// Image border where no keypoint can be found (because of incomplete patches).
+	/// </summary>
+	private int border;
+
+	/// <summary>
 	/// Kinect real vehicle depth map accesor.
 	/// </summary>
 	private Func<float[][]> getdepth;
@@ -65,6 +70,7 @@ public class KinectTrackVehicle : TrackVehicle
 	{
 		this.resx     = that.resx;
 		this.resy     = that.resy;
+		this.border   = that.border;
 		this.getdepth = that.getdepth;
 	}
 
@@ -81,10 +87,17 @@ public class KinectTrackVehicle : TrackVehicle
 	public KinectTrackVehicle(KinectVehicle that, double motioncovmultiplier, double measurecovmultiplier, double pdetection, double clutter, bool copytrajectory = false)
 		: base(that, motioncovmultiplier, measurecovmultiplier, pdetection, clutter, copytrajectory)
 	{
-		this.resx = that.ResX;
-		this.resy = that.ResY;
-
+		this.resx     = that.ResX;
+		this.resy     = that.ResY;
+		this.border   = that.Border;
 		this.getdepth = () => that.DepthFrame;
+
+		// Since FilmArea is a property (and Rectangle a struct)
+		// Inflate won't work (will occur on the temporary return value)
+		// so a local copy is needed
+		var tmp = this.FilmArea;
+		tmp.Inflate(-this.border, -this.border);
+		this.FilmArea = tmp;
 	}
 
 	/// <summary>
@@ -123,12 +136,17 @@ public class KinectTrackVehicle : TrackVehicle
 	/// <returns>True if the landmark is visible; false otherwise.</returns>
 	public override double FuzzyVisibleM(double[] measurement)
 	{
-		int   x     = (int) (measurement[0] + resx / 2);
-		int   y     = (int) (measurement[1] + resy / 2);
+		int   x     = (int)  (measurement[0] + resx / 2);
+		int   y     = (int)  (measurement[1] + resy / 2);
 		float range = (float) measurement[2];
 
 		double    minwdistance = base.FuzzyVisibleM(measurement);
-		float[][] depth        = getdepth();
+
+		if (minwdistance == 0) {  // outside of image region, can't obtain depth
+			return 0;
+		}
+
+		float[][] depth = getdepth();
 
 		minwdistance = Math.Min(minwdistance, (range - RangeClip.Min)  / VisibilityRamp[2]);
 		minwdistance = Math.Min(minwdistance, (depth[x][y]  - range) / VisibilityRamp[2]);

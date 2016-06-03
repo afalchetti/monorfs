@@ -116,7 +116,7 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// 2D film clipping area (i.e. sensor size and offset) in pixel units.
 	/// </summary>
-	public Rectangle FilmArea { get; private set; }
+	public Rectangle FilmArea { get; protected set; }
 
 	/// <summary>
 	/// Range clipping planes in meters.
