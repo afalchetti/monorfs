@@ -282,19 +282,29 @@ public class Plot
 			return internalerror(Trajectory, estimate);
 
 		case HistMode.Timed:
-			TimedValue error = new TimedValue();
+			TimedValue error      = new TimedValue();
+			int        startindex = 0;
+			var        slamtag    = this.Tags.Find(x => x.Item2.Contains("SLAM") && x.Item2.Contains("on"));
+			double     slamtime   = (slamtag != null) ? slamtag.Item1 : 0;
+			// note that if the tag is not present, Find will return the default Tuple<double, String>
+			// and slamtime will be 0.0, which is correct
+
 
 			for (int i = 0; i < Estimate.Count; i++) {
 				TimedValue localerror = internalerror(Trajectory, Estimate[i].Item2);
 				double     mean       = 0;
 
-				for (int k = 0; k < localerror.Count; k++) {
+				for (int k = startindex; k < localerror.Count; k++) {
 					mean += localerror[k].Item2;
 				}
 
-				mean /= localerror.Count;
+				mean /= localerror.Count - startindex;
 
 				error.Add(Tuple.Create(Estimate[i].Item1, mean));
+
+				if (Estimate[i].Item1 < slamtime) {
+					startindex++;
+				}
 			}
 
 			return error;
