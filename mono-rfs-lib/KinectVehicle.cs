@@ -223,7 +223,7 @@ public class KinectVehicle : Vehicle
 		: base(Pose3D.Identity, 575.8156 / Delta,
 		       new Rectangle(-640 / Delta / 2, -480 / Delta / 2,
 		                      640 / Delta,      480 / Delta),
-		       new Range(0.1f, 2f))
+		       new Range(0.1f, 4f))
 	{
 		try {
 			device = Device.Open((!string.IsNullOrEmpty(inputfile)) ? inputfile : Device.AnyDevice);
@@ -411,13 +411,24 @@ public class KinectVehicle : Vehicle
 			array[i] = new float[subheight];
 		}
 
+		// calculate averages in Delta x Delta neighborhoods
 		int h = 0;
 		for (int k = 0; k < array[0].Length; k++) {
-			h = width * k * Delta;
-
+		for (int m = 0; m < Delta; m++) {
 			for (int i = 0; i < array.Length; i++) {
-				array[i][k] = copy[h];
-				h += Delta;
+			for (int n = 0; n < Delta; n++) {
+				array[i][k] += (copy[h] == 0) ? float.NaN : copy[h];
+				h++;
+			}
+			}
+		}
+		}
+
+		float alpha = 1.0f / (Delta * Delta);
+
+		for (int i = 0; i < array.Length; i++) {
+			for (int k = 0; k < array[0].Length; k++) {
+				array[i][k] *= alpha;
 			}
 		}
 
@@ -440,22 +451,36 @@ public class KinectVehicle : Vehicle
 		byte[] copy = new byte[3 * width * height];
 		Marshal.Copy(data, copy, 0, copy.Length);
 
-		Color[] subsampled = new Color[subwidth * subheight];
+		Vector3[] lpvector = new Vector3[subwidth * subheight];
+		Color[]   lowpass  = new Color[subwidth * subheight];
 
 		int h = 0;
 		int m = 0;
+
 		for (int k = 0; k < subheight; k++) {
-			h = width * k * Delta * 3;
-
-			for (int i = 0; i < subwidth; i++) {
-				subsampled[m] = new Color(copy[h], copy[h + 1], copy[h + 2]);
-
-				h += Delta * 3;
-				m++;
+		for (int p = 0; p < Delta; p++) {
+			m = subwidth * k;
+			
+			for (int i = 0; i < subwidth; i++, m++) {
+			for (int n = 0; n < Delta; n++) {
+				lpvector[m].X += copy[h++];
+				lpvector[m].Y += copy[h++];
+				lpvector[m].Z += copy[h++];
+			}
 			}
 		}
+		}
 
-		return subsampled;
+		float alpha = 1.0f / (Delta * Delta);
+
+		for (m = 0; m < lowpass.Length; m++) {
+			lowpass[m].R = (byte) (alpha * lpvector[m].X);
+			lowpass[m].G = (byte) (alpha * lpvector[m].Y);
+			lowpass[m].B = (byte) (alpha * lpvector[m].Z);
+			lowpass[m].A = (byte) 255;
+		}
+
+		return lowpass;
 	}
 
 	/// <summary>
@@ -733,10 +758,7 @@ public class KinectVehicle : Vehicle
 		for (int k = 0; k < DepthFrame[0].Length; k++) {
 		for (int i = 0; i < DepthFrame   .Length; i++) {
 			float range = GetRange(i, k, DepthFrame[i][k]);
-				m = Math.Max(m, DepthFrame[i][k]);
-			if (range == 0) {
-				range = float.NaN;
-			}
+			m = Math.Max(m, DepthFrame[i][k]);
 			
 			double[] local = MeasureToMap(new double[3] {i - ResX / 2, k - ResY / 2, range});
 			vertices[i][k] = camera.TransformH(local).ToVector3();
