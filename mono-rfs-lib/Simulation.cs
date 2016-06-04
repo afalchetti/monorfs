@@ -453,10 +453,12 @@ public class Simulation : Manipulator
 				Navigator.StartMapping();
 			}
 
+			GameTime origtime = time;
+			time = new GameTime(time.TotalGameTime.Add(FrameElapsed), time.ElapsedGameTime);
 			Explorer.Update(time, new double[6] {dlocx, dlocy, dlocz, dpitch, dyaw, droll});
 
 			if (UseOdometry) {
-				double[] odm = Explorer.ReadOdometry(time);
+				double[] odm = Explorer.ReadOdometry(origtime);
 				Navigator.Update(time, odm);
 			}
 			else {
@@ -516,8 +518,8 @@ public class Simulation : Manipulator
 	/// </summary>
 	public void RunHeadless()
 	{
-		GameTime      time       = new GameTime();
 		TimeSpan      dt         = MeasureElapsed;
+		GameTime      time       = new GameTime(new TimeSpan(), dt);
 		KeyboardState keyboard   = new KeyboardState();
 
 		if (Commands.Count == 0) {  // no infinite simulations, make it one command = one frame
@@ -526,8 +528,8 @@ public class Simulation : Manipulator
 
 		int i = 1;
 		while (!commanddepleted && !Explorer.WantsToStop && !Abort) {
-			time = new GameTime(time.TotalGameTime.Add(dt), dt);
 			Update(time, keyboard, keyboard, 1.0);
+			time = new GameTime(time.TotalGameTime.Add(dt), dt);
 			Console.Write(i + ", ");
 			i++;
 		}

@@ -473,7 +473,7 @@ public abstract class Manipulator : Game
 		camzoom   = Math.Max(0.01, Math.Min(100.0, camzoom * (1 + dcamzoom)));
 		camera    = MatrixExtensions.AngleDistanceCamera(camtarget, camtheta, camphi, camzoom);
 
-		Update(simtime, keyboard, prevkeyboard, multiplier);
+		Update(new GameTime(simtime.TotalGameTime, simtime.ElapsedGameTime), keyboard, prevkeyboard, multiplier);
 
 		mousefocus = getMouseFocus(mouse, out mousefocusproj);
 

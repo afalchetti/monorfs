@@ -29,7 +29,7 @@
 using System;
 using System.Collections.Generic;
 
-using Accord.Math;
+using AForge;
 
 using Microsoft.Xna.Framework;
 
@@ -101,9 +101,13 @@ public class RecordVehicle : Vehicle
 	/// <param name="measurements">Prerecorded measurements.</param>
 	/// <param name="tags">Prerecorded tags.</param>
 	/// <param name="landmarks">Landmark 3d locations against which the measurements were performed.</param>
+	/// <param name="focal">Focal lenghth.</param>
+	/// <param name="film">Film area.</param>
+	/// <param name="clip">Range clipping area.</param>
 	public RecordVehicle(TimedState trajectory, TimedArray odometry,
 	                     TimedMeasurements measurements, TimedMessage tags,
-	                     List<double[]> landmarks)
+	                     List<double[]> landmarks, double focal, Rectangle film, Range clip)
+		: base(Pose3D.Identity, focal, film, clip)
 	{
 		if (trajectory.Count != measurements.Count + 1) {
 			throw new ArgumentException("Measurements length must be one short of the trajectory length.");
@@ -126,9 +130,10 @@ public class RecordVehicle : Vehicle
 		Measurements.Insert(0, Tuple.Create(0.0, new List<double[]>()));
 
 		RecLength  = Trajectory.Count;
-		FrameIndex = 1;
+		FrameIndex = 0;
 
 		updateWants();
+		FrameIndex = 1;
 
 		Landmarks = landmarks;
 		Pose      = new Pose3D(Trajectory[0].Item2);
@@ -204,9 +209,8 @@ public class RecordVehicle : Vehicle
 		List<double[]> measurements = Measurements[FrameIndex].Item2;
 
 		if (FrameIndex < RecLength - 1) {
-			FrameIndex++;
-
 			updateWants();
+			FrameIndex++;
 		}
 		else {
 			WantsToStop = true;

@@ -420,7 +420,8 @@ public static class FileParser
 			tags = new TimedMessage();
 		}
 
-		explorer = new RecordVehicle(trajectory, odometry, measurements, tags, template.Landmarks);
+		explorer = new RecordVehicle(trajectory, odometry, measurements, tags, template.Landmarks,
+		                             template.VisionFocal, template.FilmArea, template.RangeClip);
 
 		if (extrainfo) {
 			TimedTrajectory fullestimate = TrajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), 7, false);
