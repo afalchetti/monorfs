@@ -123,6 +123,27 @@ public class Map : IMap
 	/// Find the landmarks that are near to a point in space.
 	/// </summary>
 	/// <param name="point">Search point.</param>
+	/// <param name="maxcount">Maximum number of nearest landmarks.</param>
+	public Map Near(double[] point, int maxcount)
+	{
+		Map near = new Map();
+		var kdnear = landmarks.Nearest(point, maxcount);
+
+		foreach (var component in kdnear) {
+			if (component.Node == null) {
+				continue;
+			}
+
+			near.Add(component.Node.Value);
+		}
+
+		return near;
+	}
+
+	/// <summary>
+	/// Find the landmarks that are near to a point in space.
+	/// </summary>
+	/// <param name="point">Search point.</param>
 	/// <param name="radius">Maximum distance from point to be included in the submap.</param>
 	public Map Near(double[] point, double radius)
 	{
@@ -130,6 +151,10 @@ public class Map : IMap
 		var kdnear = landmarks.Nearest(point, radius);
 
 		foreach (var component in kdnear) {
+			if (component.Node == null) {
+				continue;
+			}
+
 			near.Add(component.Node.Value);
 		}
 
