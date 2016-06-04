@@ -32,69 +32,118 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
+#include "latch.hpp"
+
 using namespace std;
 using namespace cv;
+using namespace cv::xfeatures2d;
 
 extern "C" {
-double* getkeypointsorb(char* imgstream, int rows, int cols, int* length)
+double* getkeypointslatch(char* imgstream, int rows, int cols, bool calcdescriptors, int* length, char** descstream)
 {
 	Mat image(rows, cols, CV_8UC1, imgstream);
 
 	vector<KeyPoint> kp;
-	ORB orbdetect(150);
-	Mat mask = Mat::ones(image.size(), image.type());
-	orbdetect(image, mask, kp, cv::noArray());
+	Mat        descriptors;
+	double*    kpstream;
+	Ptr<LATCH> detector = LATCH::create();
+	Mat        mask  = Mat::ones(image.size(), image.type());
+	const int  dsize = 32;
+
+	if (calcdescriptors) {
+		(*detector)(image, mask, kp, descriptors);
+	}
+	else {
+		(*detector)(image, mask, kp, cv::noArray());
+	}
 
 	*length = kp.size();
 
-	double* kpstream = new double[2 * (*length)];
+	 if (calcdescriptors) {
+		kpstream    = new double[2 * (*length)];
+		*descstream = new char[dsize * (*length)];
 
-	for (int i = 0, h = 0; i < (*length); i++, h += 2) {
-		kpstream[h+0] = kp[i].pt.x;
-		kpstream[h+1] = kp[i].pt.y;
+		for (int i = 0, h = 0, m = 0; i < (*length); i++) {
+			kpstream[h++] = kp[i].pt.x;
+			kpstream[h++] = kp[i].pt.y;
+
+			for (int k = 0; k < dsize; k++) {
+				(*descstream)[m++] = descriptors.at<char>(i, k);
+			}
+		}
+	}
+	else {
+		kpstream    = new double[2 * (*length)];
+		*descstream = 0;
+
+		for (int i = 0, h = 0; i < (*length); i++) {
+			kpstream[h++] = kp[i].pt.x;
+			kpstream[h++] = kp[i].pt.y;
+		}
 	}
 
 	return kpstream;
 }
 
-void deletearray(double* array)
+double* getkeypointsorb(char* imgstream, int rows, int cols, bool calcdescriptors, int* length, char** descstream)
+{
+	Mat image(rows, cols, CV_8UC1, imgstream);
+
+	vector<KeyPoint> kp;
+	Mat       descriptors;
+	double*   kpstream;
+	ORB       orbdetect(200);
+	Mat       mask  = Mat::ones(image.size(), image.type());
+	const int dsize = 32;
+
+	if (calcdescriptors) {
+		orbdetect(image, mask, kp, descriptors);
+	}
+	else {
+		orbdetect(image, mask, kp, cv::noArray());
+	}
+
+	*length = kp.size();
+
+	 if (calcdescriptors) {
+		kpstream    = new double[2 * (*length)];
+		*descstream = new char[dsize * (*length)];
+
+		for (int i = 0, h = 0, m = 0; i < (*length); i++) {
+			kpstream[h++] = kp[i].pt.x;
+			kpstream[h++] = kp[i].pt.y;
+
+			for (int k = 0; k < dsize; k++) {
+				(*descstream)[m++] = descriptors.at<char>(i, k);
+			}
+		}
+	}
+	else {
+		kpstream    = new double[2 * (*length)];
+		*descstream = 0;
+
+		for (int i = 0, h = 0; i < (*length); i++) {
+			kpstream[h++] = kp[i].pt.x;
+			kpstream[h++] = kp[i].pt.y;
+		}
+	}
+
+	return kpstream;
+}
+
+double* getkeypoints(char* imgstream, int rows, int cols, bool calcdescriptors, int* length, char** descstream)
+{
+	return getkeypointslatch(imgstream, rows, cols, calcdescriptors, length, descstream);
+}
+
+void deletearrayd(double* array)
 {
 	delete[] array;
 }
 
-//int main (int argc, char *argv[])
-//{
-//	VideoCapture reader("room.mp4");
-//
-//	if (!reader.isOpened()) {
-//		return -1;
-//	}
-//
-//	Mat gray;
-//	namedWindow("kp", WINDOW_AUTOSIZE);
-//	int i = 0;
-//	while (true) {
-//		Mat frame;
-//		reader >> frame;
-//
-//		cvtColor(frame, gray, CV_BGR2GRAY);
-//		vector<KeyPoint> keypoints = getKeyPointsFAST(gray);
-//
-//		drawKeypoints(gray, keypoints, gray);
-//
-//		imshow("kp", gray);
-//
-//		if (i == 10) {
-//			waitKey(0);
-//		}
-//		else {
-//			if (waitKey(30) >= 0) { break; }
-//		}
-//
-//		i++;
-//	}
-//
-//	return 0;
-//}
+void deletearrayc(char* array)
+{
+	delete[] array;
 }
 
+}

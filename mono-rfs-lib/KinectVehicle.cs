@@ -495,16 +495,8 @@ public class KinectVehicle : Vehicle
 	/// <returns>List of keypoints in measurement space.</returns>
 	private List<SparseItem> ExtractKeypoints(Color[] image, float[][] depth, int width, int height, int threshold)
 	{
-		var detector = new FastRetinaKeypointDetector(threshold);
-		int border   = Math.Min(50, (int) (width * 0.05));
-
-		List<IFeaturePoint> keypointsF = new List<IFeaturePoint>();
+		List<IFeaturePoint> keypointsF = ExtractRawKeyPoints(image, width, height, KeypointFilter);
 		List<SparseItem>    keypoints  = new List<SparseItem>();
-
-		detector.ComputeDescriptors = (KeypointFilter) ? FastRetinaKeypointDescriptorType.Standard :
-		                                                   FastRetinaKeypointDescriptorType.None;
-
-		keypointsF = ExtractORB(image, width, height);
 
 		List<IFeaturePoint> filtered = new List<IFeaturePoint>();
 
@@ -515,13 +507,13 @@ public class KinectVehicle : Vehicle
 				descriptors[new IntPoint((int) point.X, (int) point.Y)] = point;
 			}
 
-			var matcher = new KNearestNeighborMatching(3);
-			matcher.Threshold = 0.1;
+			var matcher = new KNearestNeighborMatching(3, Distance.Hamming);
+			matcher.Threshold = 0.37;
 
 			var matches = matcher.Match(prevkeypoints, keypointsF);
-			var ransac  = new RansacHomographyEstimator(0.1, 0.9999);
+			var ransac  = new RansacHomographyEstimator(0.1, 0.999);
 
-			this.matches = new IntPoint[2][];
+			this.matches    = new IntPoint[2][];
 			this.matches[0] = new IntPoint[0];
 
 			if (matches[0].Length > 4) {
@@ -530,7 +522,7 @@ public class KinectVehicle : Vehicle
 
 				filtered = new List<IFeaturePoint>();
 
-				this.matches = new IntPoint[2][];
+				this.matches    = new IntPoint[2][];
 				this.matches[0] = new IntPoint[inliers.Length];
 				this.matches[1] = new IntPoint[inliers.Length];
 
@@ -541,10 +533,7 @@ public class KinectVehicle : Vehicle
 					this.matches[0][i] = matches[0][inliers[i]];
 					this.matches[1][i] = matches[1][inliers[i]];
 
-					if (x >= border && x < width  - border &&
-					    y >= border && y < height - border &&
-						depth[x][y] > 0) {
-
+					if (depth[x][y] > 0) {
 						filtered.Add(descriptors[matches[1][inliers[i]]]);
 					}
 				}
@@ -555,17 +544,14 @@ public class KinectVehicle : Vehicle
 				int x = (int) keypointsF[i].X;
 				int y = (int) keypointsF[i].Y;
 
-				if (x >= border && x < width  - border &&
-					y >= border && y < height - border &&
-					depth[x][y] > 0) {
-
+				if (depth[x][y] > 0) {
 					filtered.Add(keypointsF[i]);
 				}
 			}
 		}
 
 		this.prevprevkeypoints = this.prevkeypoints;
-		this.prevkeypoints = keypointsF;
+		this.prevkeypoints     = keypointsF;
 
 		foreach (var point in filtered) {
 			int x = (int) point.X;
@@ -663,12 +649,15 @@ public class KinectVehicle : Vehicle
 	/// <param name="matrix">Original matrix.</param>
 	/// <param name="width">Image width.</param>
 	/// <param name="height">Image height.</param>
+	/// <param name="computeDescriptors">If true, calculate a matching descriptor for each feature.</param>
 	/// <returns>Color unmanaged image.</returns>
-	private unsafe static List<IFeaturePoint> ExtractORB(Color[] matrix, int width, int height)
+	private unsafe static List<IFeaturePoint> ExtractRawKeyPoints(Color[] matrix, int width, int height, bool computeDescriptors)
 	{
-		byte[]  data = new byte[matrix.Length];
-		double* kp;
-		int     length;
+		const int dsize = 32;
+		byte[]    data  = new byte[matrix.Length];
+		double*   kp;
+		byte*     desc;
+		int       length;
 
 		for (int i = 0; i < matrix.Length; i++) {
 			data[i] = (byte)(1/3.0 * ((float) matrix[i].R + (float) matrix[i].G + (float) matrix[i].B));
@@ -676,29 +665,48 @@ public class KinectVehicle : Vehicle
 
 		List<IFeaturePoint> keypoints = new List<IFeaturePoint>();
 
-		try {
 		fixed(byte* pdata = data) {
-			kp = (double*) getkeypointsorb((IntPtr) pdata, height, width, out length);
+			IntPtr pdesc;
+			kp   = (double*) getkeypoints((IntPtr) pdata, height, width,
+			                              computeDescriptors, out length, out pdesc);
+			desc = (byte*) pdesc;
 		}
 
-		for (int i = 0, h = 0; i < length; i++, h += 2) {
-			keypoints.Add(new SimpleKeyPoint(kp[h], kp[h+1]));
+		if (computeDescriptors) {
+			for (int i = 0, h = 0, m = 0; i < length; i++) {
+				double x = kp[h++];
+				double y = kp[h++];
+				byte[] descriptor = new byte[dsize];
+
+				for (int k = 0; k < dsize; k++) {
+					descriptor[k] = desc[m++];
+				}
+
+				keypoints.Add(new SimpleKeyPoint(x, y, descriptor));
+			}
+		}
+		else {
+			for (int i = 0, h = 0; i < length; i++) {
+				double x = kp[h++];
+				double y = kp[h++];
+				keypoints.Add(new SimpleKeyPoint(x, y));
+			}
 		}
 
-		deletearray((IntPtr) kp);
+		deletearrayd((IntPtr) kp);
+		deletearrayc((IntPtr) desc);
 
-		}
-		catch {
-			Console.WriteLine("hi");
-		}
 		return keypoints;
 	}
 
 	[DllImport("libkpextractor.so")]
-	private extern static IntPtr getkeypointsorb(IntPtr data, int rows, int cols, out int length);
+	private extern static IntPtr getkeypoints(IntPtr data, int rows, int cols, [MarshalAs(UnmanagedType.U1)] bool calcdescriptors, out int length, out IntPtr descriptors);
 
 	[DllImport("libkpextractor.so")]
-	private extern static void deletearray(IntPtr data);
+	private extern static void deletearrayd(IntPtr data);
+
+	[DllImport("libkpextractor.so")]
+	private extern static void deletearrayc(IntPtr data);
 
 	/// <summary>
 	/// Transform a point in local 3D space (x-y-depth) into a range measurement.
@@ -900,6 +908,19 @@ public class SimpleKeyPoint : IFeaturePoint
 		X          = x;
 		Y          = y;
 		Descriptor = new double[0];
+	}
+
+	public SimpleKeyPoint(double x, double y, byte[] descriptor)
+	{
+		X          = x;
+		Y          = y;
+		Descriptor = new double[8 * descriptor.Length];
+
+		for (int i = 0, h = 0; i < descriptor.Length; i++) {
+			for (int k = 0, p = (1 << 7); k < 8; k++, p >>= 1) {
+			Descriptor[h++] = ((descriptor[i] & p) != 0) ? 1 : 0;
+		}
+		}
 	}
 }
 }

@@ -28,6 +28,11 @@
         <Lib>opencv_features2d</Lib>
       </Libs>
     </Libs>
+    <Includes>
+      <Includes>
+        <Include>${ProjectDir}/external</Include>
+      </Includes>
+    </Includes>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <OutputPath>bin\Release</OutputPath>
@@ -47,8 +52,20 @@
         <Lib>opencv_features2d</Lib>
       </Libs>
     </Libs>
+    <Includes>
+      <Includes>
+        <Include>${ProjectDir}/external</Include>
+      </Includes>
+    </Includes>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="kpextractor.cpp" />
+    <Compile Include="external\latch.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="external\latch.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="external\" />
   </ItemGroup>
 </Project>
