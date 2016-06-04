@@ -78,6 +78,11 @@ public abstract class Manipulator : Game
 	/// Rendering shader definition.
 	/// </summary>
 	private BasicEffect effect;
+
+	/// <summary>
+	/// Rendering shader for Kinect HUD.
+	/// </summary>
+	private BasicEffect hudeffect;
 	
 	/// <summary>
 	/// Scene double buffer.
@@ -369,6 +374,16 @@ public abstract class Manipulator : Game
 		                                false, SurfaceFormat.Color, DepthFormat.Depth16,
 		                                0, RenderTargetUsage.DiscardContents);
 
+
+		hudeffect            = new BasicEffect(Graphics);
+		hudeffect.Alpha      = 1.0f;
+		hudeffect.View       = Microsoft.Xna.Framework.Matrix.Identity;
+		hudeffect.World      = Microsoft.Xna.Framework.Matrix.Identity;
+		hudeffect.Projection = Microsoft.Xna.Framework.Matrix.CreateOrthographicOffCenter(new Rectangle(0, 0, SideDest.Width, SideDest.Height), -100, 100);
+
+		hudeffect.LightingEnabled    = false;
+		hudeffect.VertexColorEnabled = true;
+
 		prevkeyboard = Keyboard.GetState();
 		prevmouse    = Mouse.GetState();
 
@@ -506,7 +521,7 @@ public abstract class Manipulator : Game
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	protected override void Draw(GameTime time)
 	{
-		// scene panel
+		// visualization
 		Graphics.SetRenderTarget(SceneBuffer);
 		Graphics.Clear(Color.DarkSeaGreen);
 
@@ -521,23 +536,29 @@ public abstract class Manipulator : Game
 		Graphics.SetRenderTarget(SideBuffer);
 		Graphics.Clear(Color.Black);
 
-		Flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
+		Flip.Begin(SpriteSortMode.FrontToBack, BlendState.NonPremultiplied, SamplerState.LinearClamp,
 		           DepthStencilState.Default, RasterizerState.CullNone);
 		
 		Explorer.RenderSide();
 
 		Flip.End();
 
-		// to window
+		// HUD
+		foreach (EffectPass pass in hudeffect.CurrentTechnique.Passes) {
+			pass.Apply();
+			Explorer.RenderSideHUD();
+		}
+
+		// text and axes
 		Graphics.SetRenderTarget(null);
 		Flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
 		           DepthStencilState.Default, RasterizerState.CullNone);
-
+		
 		Flip.Draw(SceneBuffer, SceneDest, SceneBuffer.Bounds, Color.White);
 		Flip.Draw(SideBuffer,  SideDest,  SideBuffer .Bounds, Color.White);
 		Flip.DrawString(font, Message,    messagepos,    Color.White);
 		Flip.DrawString(font, TagMessage, TagMessagePos, TagColor);
-
+		
 		double limit = Config.AxisLimit;
 		renderAxisAnnotations(new double[3] {-limit, 0, 0}, new double[3] {+limit, 0, 0}, 5);
 		renderAxisAnnotations(new double[3] {0, -limit, 0}, new double[3] {0, +limit, 0}, 5);

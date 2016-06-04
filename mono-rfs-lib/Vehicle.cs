@@ -694,6 +694,11 @@ public abstract class Vehicle : IDisposable
 	public virtual void RenderSide() {}
 
 	/// <summary>
+	/// Render any Heads Up Display information, on top of any other graphics in the sidebar.
+	/// </summary>
+	public virtual void RenderSideHUD() {}
+
+	/// <summary>
 	/// Dispose of any resources.
 	/// </summary>
 	public virtual void Dispose() {}

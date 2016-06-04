@@ -164,11 +164,6 @@ public class KinectVehicle : Vehicle
 	private bool ShowSidebar;
 
 	/// <summary>
-	/// Point texture to illustrate landmark positions.
-	/// </summary>
-	private Texture2D landmark;
-
-	/// <summary>
 	/// Renderer.
 	/// </summary>
 	public override GraphicsDevice Graphics
@@ -191,8 +186,6 @@ public class KinectVehicle : Vehicle
 			                       (int) (depth.VideoMode.Resolution.Height / Delta),
 			                       false,
 			                       SurfaceFormat.Color);
-
-			landmark = CreatePoint();
 		}
 	}
 
@@ -779,30 +772,28 @@ public class KinectVehicle : Vehicle
 		int gwidth    = Graphics.Viewport.Width;
 		int gheight   = Graphics.Viewport.Height;
 
-		float ratio = (float) gwidth / vidwidth;
-
 		Flip.Draw(depthsensed, new Rectangle(0, 0,           gwidth,   gheight / 2),
-		                       new Rectangle(0, 0,           vidwidth, vidheight), Color.Gray);
+		                       new Rectangle(0, 0,           vidwidth, vidheight),
+		                       Color.Gray, 0, Vector2.Zero, SpriteEffects.None, 1);
 
 		Flip.Draw(colorsensed, new Rectangle(0, gheight / 2, gwidth,   gheight / 2),
-		                       new Rectangle(0, 0,           vidwidth, vidheight), Color.White);
-
-		foreach (var point in interest) {
-			Flip.Draw(landmark, new Vector2(point.I * ratio - landmark.Width / 2, point.K * ratio - landmark.Height / 2));
-			Flip.Draw(landmark, new Vector2(point.I * ratio - landmark.Width / 2, point.K * ratio - landmark.Height / 2 + gheight / 2));
-		}
+		                       new Rectangle(0, 0,           vidwidth, vidheight),
+		                       Color.Gray, 0, Vector2.Zero, SpriteEffects.None, 1);
 	}
 
-	public void RenderSideHUD()
+	/// <summary>
+	/// Render a Heads Up Display information, on top of any other graphics in the sidebar.
+	/// Additional info regarding keypoint matching is presented.
+	/// </summary>
+	public override void RenderSideHUD()
 	{
 		int vidwidth  = depthsensed.Width;
 		int vidheight = depthsensed.Height;
 		int gwidth    = Graphics.Viewport.Width;
 		int gheight   = Graphics.Viewport.Height;
+		int tgheight  = gheight / 2;
 
 		float ratio = (float) gwidth / vidwidth;
-
-		Console.WriteLine(matches.Length);
 
 		if (matches.Length > 0) {
 			for (int i = 0; i < matches[0].Length; i++) {
@@ -814,8 +805,6 @@ public class KinectVehicle : Vehicle
 				Graphics.DrawUserPrimitives(PrimitiveType.LineList, vertices, 0, 1);
 			}
 		}
-
-		Console.WriteLine(interest.Count + " " + prevkeypoints.Count);
 
 		foreach (var point in prevprevkeypoints) {
 			double[][] vertices = new double[4][];
@@ -837,39 +826,15 @@ public class KinectVehicle : Vehicle
 			vertices[3] = new double[] {point.I * ratio - 2, point.K * ratio - 2, 0};
 
 			Graphics.DrawUser2DPolygon(vertices, 1.0f, Color.White, true);
+
+			vertices[0][1] += tgheight;
+			vertices[1][1] += tgheight;
+			vertices[2][1] += tgheight;
+			vertices[3][1] += tgheight;
+
+			Graphics.DrawUser2DPolygon(vertices, 1.2f, Color.Red, true);
 		}
 	}
-
-	/// <summary>
-	/// Create a 3-pixel wide point texture.
-	/// </summary>
-	/// <returns>Point texture.</returns>
-	public Texture2D CreatePoint()
-    {
-        const int side = 5;
-        Texture2D point = new Texture2D(Graphics, side, side);
-        Color[]   data  = new Color[side * side];
-
-		// white interior
-        for (int i = 0; i < data.Length; i++) {
-			data[i] = Color.White;
-        }
-		
-		// black border
-        for (int i = 0; i < side; i++) {
-			data[i + side * 0]          = Color.Black;
-			data[i + side * (side - 1)] = Color.Black;
-        }
-
-        for (int k = 0; k < side; k++) {
-			data[0          + side * k] = Color.Black;
-			data[(side - 1) + side * k] = Color.Black;
-        }
-
-        point.SetData(data);
-
-        return point;
-    }
 
 	/// <summary>
 	/// Clone an associated vehicle with a new associated simulation particle.
