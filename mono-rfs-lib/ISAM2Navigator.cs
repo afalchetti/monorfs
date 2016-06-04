@@ -591,7 +591,7 @@ public class ISAM2Navigator : Navigator
 	private extern static void deletenavigator(HandleRef navigator);
 
 	[DllImport("libisam2.so")]
-	private extern static int update(HandleRef navigator, IntPtr newstate, IntPtr measurements, IntPtr labels, int nmeasurements, bool onlymapping);
+	private extern static int update(HandleRef navigator, IntPtr newstate, IntPtr measurements, IntPtr labels, int nmeasurements, [MarshalAs(UnmanagedType.U1)] bool onlymapping);
 
 	[DllImport("libisam2.so")]
 	private extern static IntPtr gettrajectory(HandleRef navigator, out int length);
