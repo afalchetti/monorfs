@@ -29,6 +29,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
+using System.Diagnostics;
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
@@ -56,6 +58,11 @@ public enum VehicleType { Simulation, Kinect, Record }
 /// </summary>
 public class Simulation : Manipulator
 {
+	/// <summary>
+	/// Initial vehicle pass as argument with initial pose (for saving it at the end).
+	/// </summary>
+	public SimulatedVehicle InitVehicle;
+
 	/// <summary>
 	/// Automatic simulation command input.
 	/// </summary>
@@ -95,6 +102,22 @@ public class Simulation : Manipulator
 	/// or for performance comparisons of the system with and without it.
 	/// </summary>
 	public static bool UseOdometry { get { return Config.UseOdometry; } }
+
+	/// <summary>
+	/// If a valid string, file name to be used to checkpoint the progress.
+	/// </summary>
+	public string CheckpointFile { get; set; }
+
+	/// <summary>
+	/// Wait time between checkpoints, in seconds (approximate, it depends on the SLAM cycle).
+	/// </summary>
+	/// <value>The checkpoint.</value>
+	public static int CheckpointCycleTime { get { return Config.CheckpointCycleTime; } }
+
+	/// <summary>
+	/// Timer to keep track of checkpoints.
+	/// </summary>
+	private Stopwatch timer;
 
 	/// <summary>
 	/// Every sidebar frame seen so far.
@@ -230,6 +253,10 @@ public class Simulation : Manipulator
 
 		this.noterminate = noterminate;
 
+		timer = new Stopwatch();
+		timer.Start();
+
+		InitVehicle     = new SimulatedVehicle(explorer);
 		SidebarHistory  = new List<Color[]>();
 		WayMeasurements = new TimedMeasurements();
 		// note that WayMeasurements starts empty as measurements are between frames
@@ -341,6 +368,110 @@ public class Simulation : Manipulator
 	}
 
 	/// <summary>
+	/// Save all the state history to a file.
+	/// </summary>
+	/// <param name="filename">Output file name.</param>
+	/// <param name="includesidebar">If false, skip the sidebar video.</param>
+	public void SaveToFile(string filename, bool includesidebar = true, bool verbose = true)
+	{
+
+		string tmp    = Util.TemporaryDir();
+		string output = Path.Combine(tmp, "out");
+		Directory.CreateDirectory(output);
+
+		if (verbose) {
+			Console.WriteLine("writing output");
+		}
+
+		// with artificial data, the scene file has useful information
+		// with real sensors only write pose and focal characteristics
+		if (verbose) {
+			Console.WriteLine("  -- writing scene file");
+		}
+
+		string scenedata = FileParser.VehicleToDescriptor(InitVehicle);
+		File.WriteAllText(Path.Combine(output, "scene.world"), scenedata);
+
+		if (verbose) {
+			Console.WriteLine("  -- writing trajectory history");
+		}
+
+		File.WriteAllText(Path.Combine(output, "trajectory.out"),   SerializedTrajectory);
+
+		if (verbose) {
+			Console.WriteLine("  -- writing odometry history");
+		}
+
+		File.WriteAllText(Path.Combine(output, "odometry.out"),     SerializedOdometry);
+
+		if (verbose) {
+			Console.WriteLine("  -- writing estimate history");
+		}
+
+		File.WriteAllText(Path.Combine(output, "estimate.out"),     SerializedEstimate);
+
+		if (verbose) {
+			Console.WriteLine("  -- writing map model history");
+		}
+
+		File.WriteAllText(Path.Combine(output, "maps.out"),         SerializedMaps);
+
+		if (verbose) {
+			Console.WriteLine("  -- writing visible map history");
+		}
+
+		File.WriteAllText(Path.Combine(output, "vismaps.out"),      SerializedVisibleMaps);
+
+		if (verbose) {
+			Console.WriteLine("  -- writing measurements history");
+		}
+
+		File.WriteAllText(Path.Combine(output, "measurements.out"), SerializedMeasurements);
+
+		if (verbose) {
+			Console.WriteLine("  -- writing tags");
+		}
+
+		File.WriteAllText(Path.Combine(output, "tags.out"), SerializedTags);
+
+		if (verbose) {
+			Console.WriteLine("  -- writing config");
+		}
+
+		File.WriteAllText(Path.Combine(output, "config.cfg"), Config.ToString());
+
+		if (Explorer.HasSidebar && includesidebar) {
+			if (verbose) {
+				Console.WriteLine("  -- writing sidebar video");
+			}
+
+			Util.SaveAsAvi(SidebarHistory, SideBuffer.Width, SideBuffer.Height,
+			               Path.Combine(output, "sidebar.avi"));
+		}
+
+		if (verbose) {
+			Console.WriteLine("  -- compressing");
+		}
+
+		if (File.Exists(filename)) {
+			File.Delete(filename);
+		}
+
+		string dirpath = Path.GetDirectoryName(filename);
+		if (dirpath != "") {
+			Directory.CreateDirectory(dirpath);
+		}
+
+		ZipFile.CreateFromDirectory(output, filename);
+
+		if (verbose) {
+			Console.WriteLine("  -- cleaning up");
+		}
+
+		Directory.Delete(tmp, true);
+	}
+
+	/// <summary>
 	/// Allow the simulation to run logic such as updating the world
 	/// and gathering input.
 	/// </summary>
@@ -350,6 +481,18 @@ public class Simulation : Manipulator
 	/// <param name="multiplier">Movement scale multiplier.</param>
 	protected override void Update(GameTime time, KeyboardState keyboard, KeyboardState prevkeyboard, double multiplier)
 	{
+		if (!string.IsNullOrEmpty(CheckpointFile)) {
+			int elapsed = (int) timer.Elapsed.TotalSeconds;
+
+			if (elapsed > CheckpointCycleTime) {
+				Console.WriteLine("Writing checkpoint to " + CheckpointFile);
+				SaveToFile(CheckpointFile, false, false);
+				Console.WriteLine("Checkpoint complete");
+
+				timer.Restart();
+			}
+		}
+
 		if (!noterminate && (commanddepleted || Explorer.WantsToStop)) {
 			Exit();
 			return;

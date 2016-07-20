@@ -46,9 +46,10 @@ public static class Config
 	public static double AxisLimit = 10.0;
 
 	// Simulation
-	public static TimeSpan MeasureElapsed = new TimeSpan(10000000/30);
-	public static float[]  MapClip        = new float[4] {-6, 6, -3, 3};
-	public static bool     UseOdometry    = true;
+	public static TimeSpan MeasureElapsed      = new TimeSpan(10000000/30);
+	public static float[]  MapClip             = new float[4] {-6, 6, -3, 3};
+	public static bool     UseOdometry         = true;
+	public static int      CheckpointCycleTime = 900;
 
 	// Vehicle
 	public static double[][] MotionCovariance = new double[6][] { new double[6] {5e-3, 0, 0, 0, 0, 0},

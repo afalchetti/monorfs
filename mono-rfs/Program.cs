@@ -53,39 +53,6 @@ public class Program
 	public static Thread signalthread;
 
 	/// <summary>
-	/// Save a stream of image frames as an AVI video file.
-	/// </summary>
-	/// <param name="frames">Ordered list of frames at 30 fps.</param>
-	/// <param name="width">Frame width.</param>
-	/// <param name="height">Frame height.</param>
-	/// <param name="file">Output filename.</param>
-	public static void SaveAsAvi(List<Color[]> frames, int width, int height, string file)
-	{
-		if (frames.Count == 0) { return; }
-
-		using (VideoWriter writer = new VideoWriter(file, new Size(width, height),
-		                                            30, true, VideoCodec.FromName("MJPG"))) {
-			writer.Open();
-
-			foreach (Color[] frame in frames) {
-				Bgr<byte>[,] bitmap = new Bgr<byte>[height, width];
-
-				int h = 0; 
-				for (int k = 0; k < height; k++) {
-				for (int i = 0; i < width;  i++) {
-					bitmap[k, i] = new Bgr<byte>(frame[h].B, frame[h].G, frame[h].R);
-					h++;
-				}
-				}
-
-				writer.Write(bitmap.Lock());
-			}
-
-			writer.Close();
-		}
-	}
-
-	/// <summary>
 	/// Show a description of the program and its parameters to the user.
 	/// </summary>
 	private static void ShowHelp(OptionSet options)
@@ -225,8 +192,8 @@ public class Program
 		}
 		else {
 			using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, input, algorithm, onlymapping, realtime, !headless, noterminate)) {
-				manipulator = sim;
-				SimulatedVehicle initPose = new SimulatedVehicle(sim.Explorer);
+				sim.CheckpointFile = recfile;
+				manipulator        = sim;
 
 				if (headless) {
 					Stopwatch timer = new Stopwatch();
@@ -243,56 +210,7 @@ public class Program
 					sim.Run();
 				}
 
-				string tmp    = Util.TemporaryDir();
-				string output = Path.Combine(tmp, "out");
-				Directory.CreateDirectory(output);
-
-				Console.WriteLine("writing output");
-
-				// with artificial data, the scene file has useful information
-				// with real sensors only write pose and focal characteristics
-				Console.WriteLine("  -- writing scene file");
-				string scenedata = FileParser.VehicleToDescriptor(initPose);
-				File.WriteAllText(Path.Combine(output, "scene.world"), scenedata);
-
-				Console.WriteLine("  -- writing trajectory history");
-				File.WriteAllText(Path.Combine(output, "trajectory.out"),   sim.SerializedTrajectory);
-				Console.WriteLine("  -- writing odometry history");
-				File.WriteAllText(Path.Combine(output, "odometry.out"),     sim.SerializedOdometry);
-				Console.WriteLine("  -- writing estimate history");
-				File.WriteAllText(Path.Combine(output, "estimate.out"),     sim.SerializedEstimate);
-				Console.WriteLine("  -- writing map model history");
-				File.WriteAllText(Path.Combine(output, "maps.out"),         sim.SerializedMaps);
-				Console.WriteLine("  -- writing visible map history");
-				File.WriteAllText(Path.Combine(output, "vismaps.out"),      sim.SerializedVisibleMaps);
-				Console.WriteLine("  -- writing measurements history");
-				File.WriteAllText(Path.Combine(output, "measurements.out"), sim.SerializedMeasurements);
-				Console.WriteLine("  -- writing tags");
-				File.WriteAllText(Path.Combine(output, "tags.out"), sim.SerializedTags);
-				Console.WriteLine("  -- writing config");
-				File.WriteAllText(Path.Combine(output, "config.cfg"), Config.ToString());
-
-				if (sim.Explorer.HasSidebar) {
-					Console.WriteLine("  -- writing sidebar video");
-					SaveAsAvi(sim.SidebarHistory, sim.SideBuffer.Width, sim.SideBuffer.Height,
-					          Path.Combine(output, "sidebar.avi"));
-				}
-
-				Console.WriteLine("  -- compressing");
-
-				if (File.Exists(recfile)) {
-					File.Delete(recfile);
-				}
-
-				string dirpath = Path.GetDirectoryName(recfile);
-				if (dirpath != "") {
-					Directory.CreateDirectory(dirpath);
-				}
-
-				ZipFile.CreateFromDirectory(output, recfile);
-
-				Console.WriteLine("  -- cleaning up");
-				Directory.Delete(tmp, true);
+				sim.SaveToFile(recfile);
 			}
 		}
 
