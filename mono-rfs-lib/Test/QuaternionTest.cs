@@ -30,6 +30,8 @@ using System;
 
 using NUnit.Framework;
 
+using Accord.Math;
+
 namespace monorfs.Test
 {
 /// <summary>
@@ -123,6 +125,38 @@ class QuaternionTest
 		Assert.AreEqual(q.X, recovered.X, 1e-3);
 		Assert.AreEqual(q.Y, recovered.Y, 1e-3);
 		Assert.AreEqual(q.Z, recovered.Z, 1e-3);
+	}
+
+	[Test]
+	public void VectorRotator()
+	{
+		double[] from = new double[] {1, 2.3, 3}.Normalize();
+		double[] to   = new double[] {4.8, 3, 2}.Normalize();
+
+		Quaternion rotator = Quaternion.VectorRotator(from, to);
+
+		double[] recovered = rotator.ToMatrix().Multiply(from);
+
+		Assert.AreEqual(3, recovered.Length);
+		Assert.AreEqual(to[0], recovered[0], 1e-5);
+		Assert.AreEqual(to[1], recovered[1], 1e-5);
+		Assert.AreEqual(to[2], recovered[2], 1e-5);
+	}
+
+	[Test]
+	public void VectorRotatorNone()
+	{
+		double[] from = new double[] {1, 2.3, 3}.Normalize();
+		double[] to   = new double[] {1, 2.3, 3}.Normalize();
+
+		Quaternion rotator = Quaternion.VectorRotator(from, to);
+
+		double[] recovered = rotator.ToMatrix().Multiply(from);
+
+		Assert.AreEqual(3, recovered.Length);
+		Assert.AreEqual(to[0], recovered[0], 1e-5);
+		Assert.AreEqual(to[1], recovered[1], 1e-5);
+		Assert.AreEqual(to[2], recovered[2], 1e-5);
 	}
 }
 }

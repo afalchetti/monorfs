@@ -27,11 +27,8 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
-using System.Collections;
-using System.Collections.Generic;
 
 using Accord.Math;
-using Accord.MachineLearning.Structures;
 
 namespace monorfs
 {
@@ -100,6 +97,19 @@ public class Quaternion
 	}
 
 	/// <summary>
+	/// Construct a new quaternion from its components.
+	/// </summary>
+	/// <param name="w">Scalar component.</param>
+	/// <param name="xyz">Vector coordinate.</param>
+	public Quaternion(double w, double[] xyz)
+	{
+		W = w;
+		X = xyz[0];
+		Y = xyz[1];
+		Z = xyz[2];
+	}
+
+	/// <summary>
 	/// Construct a Quaternion copying its components from another.
 	/// </summary>
 	/// <param name="that">Copied quaternion.</param>
@@ -109,6 +119,25 @@ public class Quaternion
 		this.X = that.X;
 		this.Y = that.Y;
 		this.Z = that.Z;
+	}
+
+	/// <summary>
+	/// Obtain a local linear representation in Lie space for the quaternion around unity.
+	/// </summary>
+	public double[] ToLinear()
+	{
+		//return this.Subtract(Identity);
+		return 2.Multiply(Log(this));
+	}
+
+	/// <summary>
+	/// Retrieve the quaternion from a linear representation in Lie space around unity.
+	/// </summary>
+	/// <param name="linear">Linear representation.</param>
+	public Quaternion FromLinear(double[] linear)
+	{
+		//return Identity.Add(linear);
+		return Exp(0.5.Multiply(linear));
 	}
 
 	/// <summary>
@@ -189,7 +218,7 @@ public class Quaternion
 	public Quaternion Sqrt()
 	{
 		if (Math.Abs(W - -1.0) < 1e-8) {
-			return new Quaternion(1, 0, 0, 0);
+			return Identity;
 		}
 
 		double rw    = Math.Sqrt(0.5 * (1 + W));
@@ -234,6 +263,17 @@ public class Quaternion
 		                      cy * sp * cr + sy * cp * sr,
 		                      sy * cp * cr - cy * sp * sr,
 		                      cy * cp * sr - sy * sp * cr);
+	}
+
+	/// <summary>
+	/// Create a quaternion that rotates a specified unitary vector into another.
+	/// </summary>
+	/// <param name="from">Input vector.</param>
+	/// <param name="to">Output vector.</param>
+	/// <returns>Quaternion that rotates 'from' into 'to'.</returns>
+	public static Quaternion VectorRotator(double[] from, double[] to)
+	{
+		return new Quaternion(1 + from.InnerProduct(to), Matrix.VectorProduct(from, to)).Normalize();
 	}
 
 	/// <param name="a">First quaternion.</param>
