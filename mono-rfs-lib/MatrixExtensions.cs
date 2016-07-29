@@ -31,6 +31,7 @@ using System;
 using Accord.Math;
 
 using Microsoft.Xna.Framework;
+using Accord.Math.Decompositions;
 
 namespace monorfs
 {
@@ -222,6 +223,27 @@ public static class MatrixExtensions
 	}
 
 	/// <summary>
+	/// Calculate the transpose of a vector (a horizontal matrix).
+	/// </summary>
+	/// <param name="vector">Vector to be transposed.</param>
+	/// <param name="shallow">If true, use the same vector for the matrix,
+	/// but changing values in one will be reflected on the other.</param>
+	/// <returns>Transposed vector.</returns>
+	public static double[][] Transpose(this double[] vector, bool shallow = false)
+	{
+		double[][] result = new double[1][];
+
+		if (shallow) {
+			result[0] = vector;
+		}
+		else {
+			result[0] = Util.SClone(vector);
+		}
+
+		return result;
+	}
+
+	/// <summary>
 	/// Multiply a scalar coefficient with a matrix (element-wise), possibly in-place.
 	/// </summary>
 	/// <param name="coeff">Scalar coefficient.</param>
@@ -290,6 +312,56 @@ public static class MatrixExtensions
 	}
 
 	/// <summary>
+	/// Invert a matrix and try to deal with singular matrices by
+	/// introducing a little offset; since singular matrices live in
+	/// a very thin subspace, the offset will almost surely make the
+	/// matrix invertible. Naturally, this matrix may be ill-conditioned
+	/// so the inverse may be inaccurate. Expect to have large components,
+	/// since the zero eigenvalues would give infinite inverse.
+	/// </summary>
+	/// <remarks>
+	/// The matrix must be square for this method to apply.
+	/// This method is in a way the complement of PseudoInverse(),
+	/// since it tries to explode infinite dimensions with "big" numbers,
+	/// instead of passing them as zero.
+	/// </remarks>
+	/// <param name="matrix">Matrix to invert.</param>
+	/// <returns>Matrix inverse.</returns>
+	public static double[][] SingularInverse(this double[][] matrix)
+	{
+		const double eps = 1e-10;
+		double[][] variation = matrix.MemberwiseClone();
+
+		if (variation.Length == 0 || variation.Length != variation[0].Length) {
+			throw new FormatException("Input matrix must be square");
+		}
+
+		for (int i = 0; i < variation.Length; i++) {
+			variation[i][i] += eps;
+		}
+
+		return variation.Inverse();
+	}
+
+	/// <summary>
+	/// Force every entry in the vector to be in the given range.
+	/// </summary>
+	/// <param name="vector">Vector to clamp.</param>
+	/// <param name="min">Minimum value for output.</param>
+	/// <param name="max">Maximum value for output.</param>
+	/// <returns>Clamped vector.</returns>
+	public static double[] Clamp(this double[] vector, double min, double max)
+	{
+		double[] clamped = new double[vector.Length];
+		
+		for (int i = 0; i <clamped.Length; i++) {
+			clamped[i] = Math.Max(min, Math.Min(max, vector[i]));
+		}
+
+		return clamped;
+	}
+
+	/// <summary>
 	/// Concatenate two matrices vertically.
 	/// </summary>
 	/// <param name="first">First matrix.</param>
@@ -330,6 +402,108 @@ public static class MatrixExtensions
 		}
 
 		return zero;
+	}
+
+	/// <summary>
+	/// Compare two vectors by relatively comparing each entry.
+	/// </summary>
+	/// <param name="a">First matrix.</param>
+	/// <param name="b">Second matrix.</param>
+	/// <param name="threshold">Acceptable relative difference between each entry (fraction of the average vector)./param>
+	/// <param name="zerothreshold">Acceptable absolute difference between each entry in the case of zero average./param>
+	/// <returns>True if both vectors are equal.</returns>
+	public static bool IsEqualRelative(this double[] a, double[] b, double threshold, double zerothreshold=1e-5)
+	{
+		if (a.Length != b.Length) {
+			return false;
+		}
+
+		for (int i = 0; i < a.Length; i++) {
+			double diff     = Math.Abs( a[i] - b[i]);
+			double avg      = Math.Abs((a[i] + b[i]) / 2);
+			double relative = diff / avg;
+			if (!Double.IsNaN(relative)) {
+				if (avg > zerothreshold) {
+					if (relative > threshold) {
+						return false;
+					}
+				}
+				else {
+					if (diff > zerothreshold) {
+						return false;
+					}
+				}
+			}
+		}
+
+		return true;
+	}
+
+	/// <summary>
+	/// Compare two matrices by relatively comparing each entry.
+	/// </summary>
+	/// <param name="a">First matrix.</param>
+	/// <param name="b">Second matrix.</param>
+	/// <param name="threshold">Acceptable relative difference between each entry (fraction of the average matrix)./param>
+	/// <param name="zerothreshold">Acceptable absolute difference between each entry in the case of zero average./param>
+	/// <returns>True if both matrices are equal.</returns>
+	public static bool IsEqualRelative(this double[][] a, double[][] b, double threshold, double zerothreshold=1e-5)
+	{
+		if (a.Length != b.Length) {
+			return false;
+		}
+
+		for (int i = 0; i < a   .Length; i++) {
+		for (int k = 0; k < a[i].Length; k++) {
+			double diff     = Math.Abs( a[i][k] - b[i][k]);
+			double avg      = Math.Abs((a[i][k] + b[i][k]) / 2);
+			double relative = diff / avg;
+			if (!Double.IsNaN(relative)) {
+				if (avg > zerothreshold) {
+					if (relative > threshold) {
+						return false;
+					}
+				}
+				else {
+					if (diff > zerothreshold) {
+						return false;
+					}
+				}
+			}
+		}
+		}
+
+		return true;
+	}
+
+	/// <summary>
+	/// Compare two matrices by relatively comparing each entry.
+	/// </summary>
+	/// <param name="a">First matrix.</param>
+	/// <param name="b">Second matrix.</param>
+	/// <param name="threshold">Acceptable relative difference between each entry (fraction of the average matrix)./param>
+	/// <param name="absthreshold">Acceptable absolute difference between each entry in the case of zero average./param>
+	/// <returns>True if both matrices are equal.</returns>
+	public static bool IsEqualRelative(this double[,] a, double[,] b, double threshold, double absthreshold=1e-10)
+	{
+		return a.ToArray().IsEqualRelative(b.ToArray(), threshold, absthreshold);
+	}
+
+	/// <summary>
+	/// Compare two matrices by comparing each entry in their SVD decomposition.
+	/// </summary>
+	/// <param name="a">First matrix.</param>
+	/// <param name="b">Second matrix.</param>
+	/// <param name="threshold">Acceptable relative difference between each entry (fraction of the first matrix)./param>
+	/// <returns>True if both matrices are equal.</returns>
+	public static bool SVDEquals(this double[][] a, double[][] b, double threshold)
+	{
+		var adecomp = new SingularValueDecomposition(a.ToMatrix());
+		var bdecomp = new SingularValueDecomposition(b.ToMatrix());
+
+		return adecomp.Diagonal.IsEqualRelative(bdecomp.Diagonal, threshold) &&
+		       adecomp.LeftSingularVectors .IsEqualRelative(bdecomp.LeftSingularVectors,  threshold) &&
+		       adecomp.RightSingularVectors.IsEqualRelative(bdecomp.RightSingularVectors, threshold);
 	}
 }
 }
