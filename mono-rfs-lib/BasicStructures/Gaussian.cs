@@ -257,40 +257,106 @@ public class Gaussian
 	/// <summary>
 	/// Get a linear string representation in column-major order.
 	/// </summary>
-	public string LinearSerialization
+	/// <param name="format">Double formatting descriptor.</param>
+	/// <returns>String representation.</returns>
+	public string ToString(string format)
 	{
-		get
-		{
-			StringBuilder serialized = new StringBuilder();
+		StringBuilder serialized = new StringBuilder();
 
-			serialized.Append(Weight.ToString("g6"));
-			serialized.Append(";");
-			
-			serialized.Append(Mean[0].ToString("g6"));
+		serialized.Append(Weight.ToString(format));
+		serialized.Append(";");
+		
+		serialized.Append(Mean[0].ToString(format));
 
-			for (int i = 1; i < Mean.Length; i++) {
-				serialized.Append(" ");
-				serialized.Append(Mean[i].ToString("g6"));
-			}
-
-			serialized.Append(";");
-			
-			serialized.Append(Covariance[0][0].ToString("g6"));
-			
-			for (int k = 1; k < Covariance[0].Length; k++) {
-				serialized.Append(" ");
-				serialized.Append(Covariance[0][k].ToString("g6"));
-			}
-
-			for (int i = 1; i < Covariance   .Length; i++) {
-			for (int k = 0; k < Covariance[i].Length; k++) {
-				serialized.Append(" ");
-				serialized.Append(Covariance[i][k].ToString("g6"));
-			}
-			}
-
-			return serialized.ToString();
+		for (int i = 1; i < Mean.Length; i++) {
+			serialized.Append(" ");
+			serialized.Append(Mean[i].ToString(format));
 		}
+
+		serialized.Append(";");
+		
+		serialized.Append(Covariance[0][0].ToString(format));
+		
+		for (int k = 1; k < Covariance[0].Length; k++) {
+			serialized.Append(" ");
+			serialized.Append(Covariance[0][k].ToString(format));
+		}
+
+		for (int i = 1; i < Covariance   .Length; i++) {
+		for (int k = 0; k < Covariance[i].Length; k++) {
+			serialized.Append(" ");
+			serialized.Append(Covariance[i][k].ToString(format));
+		}
+		}
+
+		return serialized.ToString();
+	}
+
+	/// <summary>
+	/// Get a linear string representation in column-major order.
+	/// </summary>
+	/// <returns>String representation.</returns>
+	public override string ToString()
+	{
+		return this.ToString("g6");
+	}
+
+	/// <summary>
+	/// Efficient equality comparer with another gaussian.
+	/// </summary>
+	/// <param name="that">Compared gaussian.</param>
+	/// <param name="threshold">Acceptable differece threshold per each item
+	/// (weight, mean component or covariance component).</param>
+	/// <returns>True if both gaussians are exactly the same.</returns>
+	public bool Equals(Gaussian that, double threshold)
+	{
+		return this.Weight.IsEqual(that.Weight, threshold) &&
+		       this.Mean.IsEqual(that.Mean, threshold) &&
+		       this.Covariance.IsEqual(that.Covariance, threshold);
+	}
+
+	/// <summary>
+	/// Efficient equality comparer with another gaussian using
+	/// exact floating point comparison.
+	/// </summary>
+	/// <param name="that">Compared gaussian.</param>
+	/// <returns>True if both gaussians are exactly the same.</returns>
+	public bool Equals(Gaussian that)
+	{
+		return this.Equals(that, 0.0);
+	}
+
+	/// <summary>
+	/// Compare this object with another.
+	/// </summary>
+	/// <param name="that">Compared object.</param>
+	/// <returns>True if the objects are the same.</returns>
+	public override bool Equals(object that)
+	{
+		return that is Gaussian && this.Equals(that as Gaussian);
+	}
+
+	/// <summary>
+	/// Get a unique code that is equal for any two equal Gaussians.
+	/// </summary>
+	/// <returns>Hash code.</returns>
+	public override int GetHashCode()
+	{
+		int hash = 17;
+
+		hash = unchecked(37 * hash + Weight.GetHashCode());
+
+		for (int i = 0; i < Mean.Length; i++) {
+			hash = unchecked(37 * hash + Mean[i].GetHashCode());
+		}
+
+		for (int i = 0; i < Covariance.Length; i++) {
+		for (int k = 0; k < Covariance[i].Length; k++) {
+			hash = unchecked(37 * hash + Covariance[i][k].GetHashCode());
+		}
+		}
+
+		return hash;
 	}
 }
 }

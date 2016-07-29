@@ -174,7 +174,7 @@ public class Simulation : Manipulator
 		get
 		{
 			return string.Join("\n|\n", Navigator.WayMaps.ConvertAll(m => m.Item1.ToString("g6") + "\n" + string.Join("\n",
-			                                                              m.Item2.ConvertAll(g => g.LinearSerialization))));
+			                                                              m.Item2.ConvertAll(g => g.ToString()))));
 		}
 	}
 
@@ -186,7 +186,7 @@ public class Simulation : Manipulator
 		get
 		{
 			return string.Join("\n|\n", Explorer.WayVisibleMaps.ConvertAll(m => m.Item1.ToString("g6") + "\n" + string.Join("\n",
-			                                                               m.Item2.ConvertAll(g => g.LinearSerialization))));
+			                                                               m.Item2.ConvertAll(g => g.ToString()))));
 		}
 	}
 

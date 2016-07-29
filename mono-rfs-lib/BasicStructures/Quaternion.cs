@@ -277,7 +277,7 @@ public class Quaternion
 	/// <param name="b">Second quaternion.</param>
 	public static bool operator ==(Quaternion a, Quaternion b)
 	{
-		return a.W == b.W && a.X == b.X && a.Y == b.Y && a.Z == b.Z;
+		return a.Equals(b);
 	}
 
 	/// <param name="a">First quaternion.</param>
@@ -291,10 +291,14 @@ public class Quaternion
 	/// Efficient equality comparer with another quaternion.
 	/// </summary>
 	/// <param name="that">Compared quaternion.</param>
-	/// <returns>True if both quaternion are exactly the same.</returns>
-	public bool Equals(Quaternion that)
+	/// <param name="epsilon">Maximum deviation between components.</param>
+	/// <returns>True if both quaternion are the same.</returns>
+	public bool Equals(Quaternion that, double epsilon = 0)
 	{
-		return this.W == that.W && this.X == that.X && this.Y == that.Y && this.Z == that.Z;
+		return Math.Abs(this.W - that.W) < epsilon &&
+		       Math.Abs(this.X - that.X) < epsilon &&
+		       Math.Abs(this.Y - that.Y) < epsilon &&
+		       Math.Abs(this.Z - that.Z) < epsilon;
 	}
 
 	/// <summary>
@@ -304,11 +308,11 @@ public class Quaternion
 	/// <returns>True if the objects are the same.</returns>
 	public override bool Equals(object that)
 	{
-		return that is SparseMatrix && this.Equals(that as Quaternion);
+		return that is Quaternion && this.Equals(that as Quaternion);
 	}
 
 	/// <summary>
-	/// Get a unique code that is equal for any two equal SparseMatrices.
+	/// Get a unique code that is equal for any two equal Quaternions.
 	/// </summary>
 	/// <returns>Hash code.</returns>
 	public override int GetHashCode()

@@ -264,19 +264,71 @@ public class Pose3D : IPose<Pose3D>
 		       MatrixExtensions.Zero(3).Concatenate(Cdelta.Transpose()));
 	}
 
-	/// <summary>
-	/// Get a string representation of the pose.
-	/// </summary>
-	/// <param name="format">Double formatting descriptor.</param>
-	public string ToString(string format)
+	/// <param name="a">First quaternion.</param>
+	/// <param name="b">Second quaternion.</param>
+	public static bool operator ==(Pose3D a, Pose3D b)
 	{
-		return "[(" + X.ToString(format) + ", " + Y.ToString(format) + ", " + Z.ToString(format) + "); " +
-		       Orientation + "]";
+		return a.Equals(b);
+	}
+
+	/// <param name="a">First quaternion.</param>
+	/// <param name="b">Second quaternion.</param>
+	public static bool operator !=(Pose3D a, Pose3D b)
+	{
+		return !(a == b);
+	}
+
+	/// <summary>
+	/// Efficient equality comparer with another 3d pose.
+	/// </summary>
+	/// <param name="that">Compared pose.</param>
+	/// <param name="epsilon">Maximum deviation between components.</param>
+	/// <returns>True if both poses are the same.</returns>
+	public bool Equals(Pose3D that, double epsilon = 0)
+	{
+		return this.Location.IsEqual(that.Location, epsilon) &&
+		       this.Orientation.Equals(that.Orientation, epsilon);
+	}
+
+	/// <summary>
+	/// Compares this object with another.
+	/// </summary>
+	/// <param name="that">Compared object.</param>
+	/// <returns>True if the objects are the same.</returns>
+	public override bool Equals(object that)
+	{
+		return that is Pose3D && this.Equals(that as Pose3D);
+	}
+
+	/// <summary>
+	/// Get a unique code that is equal for any two equal 3d poses.
+	/// </summary>
+	/// <returns>Hash code.</returns>
+	public override int GetHashCode()
+	{
+		int hash = 17;
+
+		hash = unchecked(37 * hash + Location.GetHashCode());
+		hash = unchecked(37 * hash + Orientation.GetHashCode());
+
+		return hash;
 	}
 
 	/// <summary>
 	/// Get a string representation of the pose.
 	/// </summary>
+	/// <param name="format">Double formatting descriptor.</param>
+	/// <returns>String representation.</returns>
+	public string ToString(string format)
+	{
+		return "[(" + X.ToString(format) + ", " + Y.ToString(format) + ", " + Z.ToString(format) + "); " +
+		       Orientation.ToString(format) + "]";
+	}
+
+	/// <summary>
+	/// Get a string representation of the pose.
+	/// </summary>
+	/// <returns>String representation.</returns>
 	public override string ToString()
 	{
 		return ToString("f3");
