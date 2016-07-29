@@ -39,6 +39,9 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using OpenNIWrapper;
 
+using SparseMatrix = monorfs.SparseMatrix<double>;
+using SparseItem   = monorfs.SparseItem<double>;
+
 namespace monorfs
 {
 /// <summary>

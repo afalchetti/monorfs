@@ -37,6 +37,8 @@ using Microsoft.Xna.Framework.Graphics;
 
 using TimedState    = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedMapModel = System.Collections.Generic.List<System.Tuple<double, monorfs.Map>>;
+using SparseMatrix  = monorfs.SparseMatrix<double>;
+using SparseItem    = monorfs.SparseItem<double>;
 
 namespace monorfs
 {

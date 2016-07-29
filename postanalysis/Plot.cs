@@ -44,6 +44,8 @@ using TimedTrajectory   = System.Collections.Generic.List<System.Tuple<double, S
 using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, monorfs.Map>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
 using TimedMessage      = System.Collections.Generic.List<System.Tuple<double, string>>;
+using SparseMatrix      = monorfs.SparseMatrix<double>;
+using SparseItem        = monorfs.SparseItem<double>;
 
 namespace postanalysis
 {

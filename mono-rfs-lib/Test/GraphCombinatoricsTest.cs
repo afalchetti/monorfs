@@ -34,6 +34,8 @@ using NUnit.Framework;
 
 using AE = monorfs.ArrayExtensions;
 using GC = monorfs.GraphCombinatorics;
+using SparseMatrix = monorfs.SparseMatrix<double>;
+using SparseItem   = monorfs.SparseItem<double>;
 
 namespace monorfs.Test
 {

@@ -30,7 +30,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-using AE = monorfs.ArrayExtensions;
+using AE           = monorfs.ArrayExtensions;
+using SparseMatrix = monorfs.SparseMatrix<double>;
+using SparseItem   = monorfs.SparseItem<double>;
 
 namespace monorfs
 {
