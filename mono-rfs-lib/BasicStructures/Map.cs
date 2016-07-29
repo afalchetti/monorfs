@@ -224,7 +224,17 @@ public class Map : IMap
 	/// </summary>
 	/// <param name="match">Match condition.</param>
 	/// <returns>Filtered submap.</returns>
-	public IMap FindAll(Predicate<Gaussian> match)
+	IMap IMap.FindAll(Predicate<Gaussian> match)
+	{
+		return this.FindAll(match);
+	}
+
+	/// <summary>
+	/// Retrieve the submap of all the landmarks that match a condition.
+	/// </summary>
+	/// <param name="match">Match condition.</param>
+	/// <returns>Filtered submap.</returns>
+	public Map FindAll(Predicate<Gaussian> match)
 	{
 		Map filtered = new Map();
 
