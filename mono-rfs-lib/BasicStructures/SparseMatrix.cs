@@ -542,6 +542,37 @@ public class SparseMatrix<T> : IEnumerable<SparseItem<T>>
 	}
 
 	/// <summary>
+	/// Select specified rows and cols, remove the rest and compact the matrix.
+	/// </summary>
+	/// <param name="rows">Selected rows.</param>
+	/// <param name="cols">Selected columns.</param>
+	public SparseMatrix<T> Submatrix(int[] rows, int[] cols)
+	{
+		Dictionary<int, int> rowset = new Dictionary<int, int>();
+		Dictionary<int, int> colset = new Dictionary<int, int>();
+
+		SparseMatrix<T> sub = new SparseMatrix<T>(rows.Length, cols.Length, DefaultValue);
+
+		for (int i = 0; i < rows.Length; i++) {
+			rowset[rows[i]] = i;
+		}
+
+		for (int k = 0; k < rows.Length; k++) {
+			colset[cols[k]] = k;
+		}
+
+		foreach (var item in this) {
+			int i, k;
+			if (rowset.TryGetValue(item.I, out i) &&
+			    colset.TryGetValue(item.K, out k)) {
+				sub[i, k] = item.Value;
+			}
+		}
+
+		return sub;
+	}
+
+	/// <summary>
 	/// Remove all empty rows and columns and then reindex the remaining data.
 	/// </summary>
 	/// <returns></returns>

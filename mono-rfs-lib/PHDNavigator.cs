@@ -423,13 +423,13 @@ public class PHDNavigator : Navigator
 		// use the most probable components approximation otherwise
 		SparseMatrix logprobs = new SparseMatrix(map.Count + measurements.Count, map.Count + measurements.Count, double.NegativeInfinity);
 
-		double     logPD      = Math.Log(pose.PD);
 		double     logclutter = Math.Log(pose.ClutterDensity);
 		Gaussian[] zprobs     = new Gaussian[map.Count];
 
 		int n = 0;
 		foreach (Gaussian landmark in map) {
-			zprobs[n] = new Gaussian(pose.MeasurePerfect(landmark.Mean), pose.MeasurementCovariance, 1);
+			double[] m = pose.MeasurePerfect(landmark.Mean);
+			zprobs[n]  = new Gaussian(m, pose.MeasurementCovariance, pose.DetectionProbabilityM(m));
 			n++;
 		}
 
@@ -439,13 +439,13 @@ public class PHDNavigator : Navigator
 			if (d < 5) {
 				// prob = log (pD * zprob(measurement))
 				// this way multiplying probabilities equals to adding (negative) profits
-				logprobs[i, k] = logPD + Math.Log(zprobs[i].Multiplier) - 0.5 * d * d;
+				logprobs[i, k] = Math.Log(zprobs[i].Weight) + Math.Log(zprobs[i].Multiplier) - 0.5 * d * d;
 			}
 		}
 		}
 		
 		for (int i = 0; i < map.Count; i++) {
-			logprobs[i, measurements.Count + i] = logPD;
+			logprobs[i, measurements.Count + i] = Math.Log(zprobs[i].Weight);
 		}
 
 		for (int i = 0; i < measurements.Count; i++) {
@@ -466,12 +466,10 @@ public class PHDNavigator : Navigator
 	{
 		// exact calculation if there are few components/measurements;
 		// use the most probable components approximation otherwise
-		
-		SparseMatrix       logprobs      = SetLogLikeMatrix(measurements, map, pose);
+		SparseMatrix       llmatrix      = SetLogLikeMatrix(measurements, map, pose);
 		List<SparseMatrix> connectedfull = GraphCombinatorics.ConnectedComponents(llmatrix);
-		
-		double[] logcomp = new double[200];
-		double   total   = 0;
+		double[]           logcomp       = new double[200];
+		double             total         = 0;
 
 		for (int i = 0; i < connectedfull.Count; i++) {
 			int[]        rows;
@@ -515,6 +513,122 @@ public class PHDNavigator : Navigator
 			}
 
 			total += logcomp.LogSumExp(0, m);
+		}
+
+		return total;
+	}
+
+	/// <summary>
+	/// Calculate the set log-likelihood log(P(Z|X, M)), but do not consider visibility
+	/// (everything is fully visible). This is used to avoid uninteresting solution to the
+	/// optimization problem max_X log(P(Z|X, M)). Also gives the pose gradient at the evaluated pose.
+	/// </summary>
+	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
+	/// <param name="map">Map model.</param>
+	/// <param name="pose">Vehicle pose.</param>
+	/// <param name="gradient">Log-likelihood gradient wrt. the pose.</param>
+	/// <returns>Set log-likelihood.</returns>
+	public static double QuasiSetLogLikelihood(List<double[]> measurements, IMap map,
+	                                           SimulatedVehicle pose, out double[] gradient)
+	{
+		// exact calculation if there are few components/measurements;
+		// use the most probable components approximation otherwise
+		SparseMatrix llmatrix = new SparseMatrix(map.Count + measurements.Count, map.Count + measurements.Count, double.NegativeInfinity);
+		var          dlldp    = new SparseMatrix<double[]>(map.Count + measurements.Count, map.Count + measurements.Count, new double[6]);
+		
+		double       logPD      = Math.Log(pose.PD);
+		double       logclutter = Math.Log(pose.ClutterDensity);
+		Gaussian[]   zprobs     = new Gaussian[map.Count];
+		double[][][] zjacobians = new double[map.Count][][];
+		
+		int n = 0;
+		foreach (Gaussian landmark in map) {
+			double[] m    = pose.MeasurePerfect(landmark.Mean);
+			zprobs[n]     = new Gaussian(m, pose.MeasurementCovariance, 1);
+			zjacobians[n] = pose.MeasurementJacobianP(landmark.Mean);
+			n++;
+		}
+		
+		for (int i = 0; i < zprobs.Length;      i++) {
+		for (int k = 0; k < measurements.Count; k++) {
+			double d = zprobs[i].Mahalanobis(measurements[k]);
+			if (d < 5) {
+				// prob = log (pD * zprob(measurement))
+				// this way multiplying probabilities equals to adding (negative) profits
+				llmatrix[i, k] = logPD + Math.Log(zprobs[i].Multiplier) - 0.5 * d * d;
+				dlldp  [i, k]  = (measurements[k].Subtract(zprobs[i].Mean)).Transpose().
+				                     Multiply(zprobs[i].CovarianceInverse).
+				                     Multiply(zjacobians[i]).
+				                     GetRow(0);
+			}
+		}
+		}
+		
+		for (int i = 0; i < map.Count; i++) {
+			llmatrix[i, measurements.Count + i] = logPD;
+		}
+		
+		for (int i = 0; i < measurements.Count; i++) {
+			llmatrix[map.Count + i, i] = logclutter;
+		}
+		
+		List<SparseMatrix> connectedfull = GraphCombinatorics.ConnectedComponents(llmatrix);
+		
+		double[]   logcomp    = new double[200];
+		double[][] dlogcompdp = new double[200][];
+		double     total      = 0;
+		
+		gradient = new double[6];
+		
+		for (int i = 0; i < connectedfull.Count; i++) {
+			int[]        rows;
+			int[]        cols;
+			SparseMatrix component = connectedfull[i].Compact(out rows, out cols);
+			var          dcomp     = dlldp.Submatrix(rows, cols);
+			
+			// fill the (Misdetection x Clutter) quadrant of the matrix with zeros (don't contribute)
+			// NOTE this is filled after the connected components partition because
+			//      otherwise everything would be connected through this quadrant
+			for (int k = 0; k < rows.Length; k++) {
+				if (rows[k] >= map.Count) {
+					for (int h = 0; h < cols.Length; h++) {
+						if (cols[h] >= measurements.Count) {
+							component[k, h] = 0;
+						}
+					}
+				}
+			}
+			
+			IEnumerable<Tuple<int[], double>> assignments;
+			if (component.Rows.Count <= 5) {
+				assignments = GraphCombinatorics.LexicographicalPairing(component, map.Count);
+			}
+			else {
+				assignments  = GraphCombinatorics.MurtyPairing(component);
+			}
+
+			int m = 0;
+			double maxcomp = double.NegativeInfinity;
+			double prev    = 0;
+			foreach (Tuple<int[], double> assignment in assignments) {
+				if (m >= logcomp.Length || prev / maxcomp < 0.001) {
+					break;
+				}
+
+				logcomp   [m] = assignment.Item2;
+				maxcomp    = Math.Max(maxcomp, logcomp[m]);
+				dlogcompdp[m] = new double[6];
+
+				for (int p = 0; p < assignment.Item1.Length; p++) {
+					dlogcompdp[m] = dlogcompdp[m].Add(dcomp[p, assignment.Item1[p]]);
+				}
+
+				m++;
+			}
+
+			total   += logcomp.LogSumExp(0, m);
+			gradient = gradient.Add(dlogcompdp.TemperedAverage(logcomp, 0, m));
+
 		}
 
 		return total;
