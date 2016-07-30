@@ -445,7 +445,7 @@ public class PHDNavigator : Navigator
 		}
 		
 		for (int i = 0; i < map.Count; i++) {
-			logprobs[i, measurements.Count + i] = Math.Log(zprobs[i].Weight);
+			logprobs[i, measurements.Count + i] = Math.Log(1 - zprobs[i].Weight);
 		}
 
 		for (int i = 0; i < measurements.Count; i++) {
@@ -490,25 +490,24 @@ public class PHDNavigator : Navigator
 			}
 
 			IEnumerable<Tuple<int[], double>> assignments;
-			if (component.Rows.Count <= 8) {
-				assignments = GraphCombinatorics.LexicographicalPairing(component, map.Count);
+			bool enumerateall = false;
+			if (component.Rows.Count <= 5) {
+				assignments  = GraphCombinatorics.LexicographicalPairing(component, map.Count);
+				enumerateall = true;
 
 			}
 			else {
-				assignments = GraphCombinatorics.MurtyPairing(component);
+				assignments  = GraphCombinatorics.MurtyPairing(component);
+				enumerateall = false;
 			}
 
-			int    m       = 0;
-			double maxcomp = double.NegativeInfinity;
-			double prev    = 0;
+			int m = 0;
 			foreach (Tuple<int[], double> assignment in assignments) {
-				if (m >= logcomp.Length || prev / maxcomp < 0.001) {
+				if (m >= logcomp.Length || (!enumerateall && logcomp[m] - logcomp[0] < -10)) {
 					break;
 				}
 
 				logcomp[m] = assignment.Item2;
-				maxcomp    = Math.Max(maxcomp, logcomp[m]);
-				
 				m++;
 			}
 
@@ -535,12 +534,13 @@ public class PHDNavigator : Navigator
 		// use the most probable components approximation otherwise
 		SparseMatrix llmatrix = new SparseMatrix(map.Count + measurements.Count, map.Count + measurements.Count, double.NegativeInfinity);
 		var          dlldp    = new SparseMatrix<double[]>(map.Count + measurements.Count, map.Count + measurements.Count, new double[6]);
-		
+
 		double       logPD      = Math.Log(pose.PD);
+		double       log1PD     = Math.Log(1 - pose.PD);
 		double       logclutter = Math.Log(pose.ClutterDensity);
 		Gaussian[]   zprobs     = new Gaussian[map.Count];
 		double[][][] zjacobians = new double[map.Count][][];
-		
+
 		int n = 0;
 		foreach (Gaussian landmark in map) {
 			double[] m    = pose.MeasurePerfect(landmark.Mean);
@@ -565,7 +565,7 @@ public class PHDNavigator : Navigator
 		}
 		
 		for (int i = 0; i < map.Count; i++) {
-			llmatrix[i, measurements.Count + i] = logPD;
+			llmatrix[i, measurements.Count + i] = log1PD;
 		}
 		
 		for (int i = 0; i < measurements.Count; i++) {
@@ -600,23 +600,23 @@ public class PHDNavigator : Navigator
 			}
 			
 			IEnumerable<Tuple<int[], double>> assignments;
+			bool enumerateall = false;
 			if (component.Rows.Count <= 5) {
 				assignments = GraphCombinatorics.LexicographicalPairing(component, map.Count);
+				enumerateall = true;
 			}
 			else {
 				assignments  = GraphCombinatorics.MurtyPairing(component);
+				enumerateall = false;
 			}
 
 			int m = 0;
-			double maxcomp = double.NegativeInfinity;
-			double prev    = 0;
 			foreach (Tuple<int[], double> assignment in assignments) {
-				if (m >= logcomp.Length || prev / maxcomp < 0.001) {
+				if (m >= logcomp.Length || (!enumerateall && logcomp[m] - logcomp[0] < -10)) {
 					break;
 				}
 
 				logcomp   [m] = assignment.Item2;
-				maxcomp    = Math.Max(maxcomp, logcomp[m]);
 				dlogcompdp[m] = new double[6];
 
 				for (int p = 0; p < assignment.Item1.Length; p++) {
