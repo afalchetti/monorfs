@@ -68,9 +68,6 @@
     <Reference Include="Accord.Imaging">
       <HintPath>..\packages\Accord.Imaging.3.0.2\lib\net45\Accord.Imaging.dll</HintPath>
     </Reference>
-    <Reference Include="nunit.framework">
-      <HintPath>..\packages\NUnit.3.2.0\lib\net45\nunit.framework.dll</HintPath>
-    </Reference>
     <Reference Include="NVorbis">
       <HintPath>..\packages\MonoGame.Framework.Linux.3.5.0.1678\lib\net40\NVorbis.dll</HintPath>
     </Reference>
@@ -88,6 +85,9 @@
     </Reference>
     <Reference Include="MonoGame.Framework">
       <HintPath>..\packages\MonoGame.Framework.Linux.3.5.0.1678\lib\net40\MonoGame.Framework.dll</HintPath>
+    </Reference>
+    <Reference Include="nunit.framework">
+      <HintPath>..\packages\NUnit.3.4.1\lib\net45\nunit.framework.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -124,7 +124,6 @@
     <Compile Include="DrawUtils.cs" />
     <Compile Include="Test\QuaternionTest.cs" />
     <Compile Include="Test\Pose3DTest.cs" />
-    <Compile Include="Test\UtilTest.cs" />
     <Compile Include="KinectVehicle.cs" />
     <Compile Include="KinectTrackVehicle.cs" />
     <Compile Include="Test\LoopyPHDNavigatorTest.cs" />

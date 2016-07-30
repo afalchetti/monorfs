@@ -37,6 +37,7 @@ using Accord.Imaging;
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+
 using OpenNIWrapper;
 
 using SparseMatrix = monorfs.SparseMatrix<double>;

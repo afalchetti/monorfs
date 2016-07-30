@@ -273,7 +273,6 @@ public abstract class Manipulator : Game
 	/// <param name="explorer">Explorer vehicle.</param>
 	/// <param name="navigator">SLAM solver.</param>
 	/// <param name="realtime">Realtime data processing.</param>
-	/// <param name="tags">Tags in the timeline.</param>
 	/// <param name="fps">Frame per seconds.</param>
 	protected Manipulator(string title, Vehicle explorer, Navigator navigator, bool realtime, double fps = 30)
 	{

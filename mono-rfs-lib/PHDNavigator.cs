@@ -494,7 +494,6 @@ public class PHDNavigator : Navigator
 			if (component.Rows.Count <= 5) {
 				assignments  = GraphCombinatorics.LexicographicalPairing(component, map.Count);
 				enumerateall = true;
-
 			}
 			else {
 				assignments  = GraphCombinatorics.MurtyPairing(component);

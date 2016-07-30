@@ -27,16 +27,10 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Diagnostics;
 using System.Threading;
-
-using Microsoft.Xna.Framework;
-
-using DotImaging;
-using DotImaging.Primitives2D;
 
 using Mono.Unix;
 using NDesk.Options;

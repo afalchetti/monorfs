@@ -92,9 +92,7 @@ public class ISAM2Navigator : Navigator
 	/// <summary>
 	/// Most accurate estimate model of the map.
 	/// </summary>
-	public override Map BestMapModel {
-		get { return new Map(MapModel);         }
-	}
+	public override Map BestMapModel { get { return new Map(MapModel); } }
 
 	/// <summary>
 	/// Internal indexed representation of the map estimate.

@@ -35,10 +35,11 @@ using AForge;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
 
+using U = monorfs.Util;
+
 using TimedState    = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedArray    = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedMapModel = System.Collections.Generic.List<System.Tuple<double, monorfs.Map>>;
-using U             = monorfs.Util;
 
 namespace monorfs
 {

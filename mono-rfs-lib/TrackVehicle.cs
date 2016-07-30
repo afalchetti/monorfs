@@ -27,11 +27,8 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
-using System.Collections.Generic;
 
-using AForge;
 using Accord.Math;
-using Accord.Statistics.Distributions.Univariate;
 
 using Microsoft.Xna.Framework;
 
