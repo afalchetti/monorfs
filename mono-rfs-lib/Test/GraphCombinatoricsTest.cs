@@ -1,4 +1,4 @@
-﻿// GraphCombinatorics.cs
+﻿// GraphCombinatoricsTest.cs
 // Unit tests for the graph combinatorics algorithms
 // Part of MonoRFS
 //
@@ -263,8 +263,8 @@ class GraphCombinatoricsTest
 		profit[1, 0] = 7; profit[1, 1] = 3; profit[1, 2] = 4;
 		profit[2, 0] = 9; profit[2, 1] = 8; profit[2, 2] = 7;
 
-		IEnumerable<int[]> pairing  = GC.LexicographicalPairing(profit, 3);
-		List<int[]>        expected = new List<int[]>();
+		var         pairing = GC.LexicographicalPairing(profit, 3);
+		List<int[]> expected = new List<int[]>();
 		
 		expected.Add(new int[3] {0, 1, 2});
 		expected.Add(new int[3] {0, 2, 1});
@@ -275,13 +275,9 @@ class GraphCombinatoricsTest
 
 		Assert.AreEqual(expected.Count, pairing.Count());
 
-		foreach (int[] assignment in pairing) {
-			Console.WriteLine("[" + string.Join(", ", Array.ConvertAll(assignment, i => i.ToString())) + "]");
-		}
-
 		int h = 0;
-		foreach (int[] assignment in pairing) {
-			Assert.IsTrue(expected[h++].SequenceEqual(assignment));
+		foreach (Tuple<int[], double> assignment in pairing) {
+			Assert.IsTrue(expected[h++].SequenceEqual(assignment.Item1));
 		}
 	}
 
@@ -294,22 +290,18 @@ class GraphCombinatoricsTest
 		profit[1, 0] = 7; profit[1, 1] = 3; profit[1, 2] = 4;
 		profit[2, 0] = 9; profit[2, 1] = 8; profit[2, 2] = 7;
 
-		IEnumerable<int[]> pairing  = GC.LexicographicalPairing(profit, 1);
-		List<int[]>        expected = new List<int[]>();
+		var         pairing  = GC.LexicographicalPairing(profit, 1);
+		List<int[]> expected = new List<int[]>();
 		
 		expected.Add(new int[3] {0, 2, 1});
 		expected.Add(new int[3] {1, 2, 0});
 		expected.Add(new int[3] {2, 1, 0});
 		
 		Assert.AreEqual(expected.Count, pairing.Count());
-		
-		foreach (int[] assignment in pairing) {
-			Console.WriteLine("[" + string.Join(", ", Array.ConvertAll(assignment, i => i.ToString())) + "]");
-		}
 
 		int h = 0;
-		foreach (int[] assignment in pairing) {
-			Assert.IsTrue(expected[h++].SequenceEqual(assignment));
+		foreach (Tuple<int[], double> assignment in pairing) {
+			Assert.IsTrue(expected[h++].SequenceEqual(assignment.Item1));
 		}
 	}
 
@@ -371,8 +363,8 @@ class GraphCombinatoricsTest
 		profit[1, 0] = 7; profit[1, 1] = 3; profit[1, 2] = 4;
 		profit[2, 0] = 9; profit[2, 1] = 8; profit[2, 2] = 7;
 
-		IEnumerable<int[]> pairing  = GC.MurtyPairing(profit);
-		List<int[]>        expected = new List<int[]>();
+		var         pairing  = GC.MurtyPairing(profit);
+		List<int[]> expected = new List<int[]>();
 		
 		expected.Add(new int[3] {1, 0, 2});
 		expected.Add(new int[3] {1, 2, 0});
@@ -384,8 +376,8 @@ class GraphCombinatoricsTest
 		Assert.AreEqual(expected.Count, pairing.Count());
 
 		int h = 0;
-		foreach (int[] assignment in pairing) {
-			Assert.IsTrue(expected[h++].SequenceEqual(assignment));
+		foreach (Tuple<int[], double> assignment in pairing) {
+			Assert.IsTrue(expected[h++].SequenceEqual(assignment.Item1));
 		}
 	}
 
@@ -398,16 +390,16 @@ class GraphCombinatoricsTest
 			profit[i, i] = 1;
 		}
 		
-		IEnumerable<int[]> pairing  = GC.MurtyPairing(profit);
-		List<int[]>        expected = new List<int[]>();
+		var         pairing  = GC.MurtyPairing(profit);
+		List<int[]> expected = new List<int[]>();
 
 		expected.Add(new int[5] {0, 1, 2, 3, 4});
-		
+
 		Assert.AreEqual(expected.Count, pairing.Count());
 
 		int h = 0;
-		foreach (int[] assignment in pairing) {
-			Assert.IsTrue(expected[h++].SequenceEqual(assignment));
+		foreach (Tuple<int[], double> assignment in pairing) {
+			Assert.IsTrue(expected[h++].SequenceEqual(assignment.Item1));
 		}
 	}
 }

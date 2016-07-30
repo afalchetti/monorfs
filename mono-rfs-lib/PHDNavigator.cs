@@ -465,7 +465,7 @@ public class PHDNavigator : Navigator
 		double total = 1.0;
 		foreach (SparseMatrix component in components) {
 
-			IEnumerable<int[]> assignments;
+			IEnumerable<Tuple<int[], double>> assignments;
 			if (component.Rows.Count <= 8) {
 				assignments = GraphCombinatorics.LexicographicalPairing(component, map.Count);
 
@@ -477,7 +477,7 @@ public class PHDNavigator : Navigator
 			int    h         = 0;
 			double comptotal = 0;
 			double prev      = 0;
-			foreach (int[] assignment in assignments) {
+			foreach (Tuple<int[], double> assignment in assignments) {
 				comptotal += Math.Exp(GraphCombinatorics.AssignmentValue(component, assignment));
 
 				if (h >= 200 || comptotal / prev < 1.001) {

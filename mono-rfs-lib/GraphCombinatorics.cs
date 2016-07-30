@@ -233,8 +233,8 @@ public static class GraphCombinatorics
 	/// Enumerate all possible pairings using a Murty's algorithm.
 	/// </summary>
 	/// <param name="profit">Profit matrix to be maximized.</param>
-	/// <returns>Enumeration of most likely assignments pairing permutations.</returns>
-	public static IEnumerable<int[]> MurtyPairing(SparseMatrix profit)
+	/// <returns>Enumeration of most likely assignments pairing permutations (and their profit assignments).</returns>
+	public static IEnumerable<Tuple<int[], double>> MurtyPairing(SparseMatrix profit)
 	{
 		var       frontier = new PriorityQueue<MurtyNode>();
 		MurtyNode first    = new MurtyNode();
@@ -246,11 +246,12 @@ public static class GraphCombinatorics
 
 		while (frontier.Count > 0) {
 			//Console.WriteLine(frontier.Count);
-			MurtyNode best = frontier.Pop();
+			double value;
+			MurtyNode best = frontier.Pop(out value);
 			//Console.WriteLine(frontier.Count);
 			//Console.WriteLine(best);
 
-			yield return best.Assignment;
+			yield return Tuple.Create(best.Assignment, value);
 
 			//Console.WriteLine("children___");
 			foreach (MurtyNode child in best.Children) {
@@ -271,8 +272,8 @@ public static class GraphCombinatorics
 	/// </summary>
 	/// <param name="profit">Profit matrix to be maximized.</param>
 	/// <param name="modelsize">Number of model components (complete model).</param>
-	/// <returns>Enumeration of model-measurement pairing permutations.</returns>
-	public static IEnumerable<int[]> LexicographicalPairing(SparseMatrix profit, int modelsize)
+	/// <returns>Enumeration of model-measurement pairing permutations (and their profit assignments).</returns>
+	public static IEnumerable<Tuple<int[], double>> LexicographicalPairing(SparseMatrix profit, int modelsize)
 	{
 		int[] permutation = new int[profit.Rows.Count];
 		int   a, b;
@@ -296,7 +297,7 @@ public static class GraphCombinatorics
 		// to avoid equivalent permutations, all the measurement nodes are reversed
 		// so only one permutation of this segment is used
 		Array.Reverse(permutation, measurestart, permutation.Length - measurestart);
-		yield return permutation;
+		yield return Tuple.Create(permutation, AssignmentValue(profit, permutation));
 
 		while (!lastpermutation(permutation)) {
 			// find last a such that p[a] < p[a + 1]
@@ -324,7 +325,7 @@ public static class GraphCombinatorics
 			// to avoid equivalent permutations, all the measurement nodes are reversed
 			// so only one permutation of this segment is used
 			Array.Reverse(permutation, measurestart, permutation.Length - measurestart);
-			yield return permutation;
+			yield return Tuple.Create(permutation, AssignmentValue(profit, permutation));
 		}
 	}
 
@@ -646,12 +647,37 @@ public class PriorityQueue<T> : IEnumerable<KeyValuePair<double, T>>
 	}
 
 	/// <summary>
+	/// Fetch the item with the highest priority.
+	/// </summary>
+	/// <param name="priority">Associated priority.</param>
+	/// <returns>Highest priority item.</returns>
+	public T Top(out double priority)
+	{
+		priority = data[data.Count - 1].Key;
+		return data[data.Count - 1].Value;
+	}
+
+	/// <summary>
 	/// Get the item with the highest priority and remove it from the queue.
 	/// </summary>
 	/// <returns>Highest priority item.</returns>
 	public T Pop()
 	{
 		T item = data[data.Count - 1].Value;
+		data.RemoveAt(data.Count - 1);
+
+		return item;
+	}
+
+	/// <summary>
+	/// Get the item with the highest priority and remove it from the queue.
+	/// </summary>
+	/// <param name="priority">Associated priority.</param>
+	/// <returns>Highest priority item.</returns>
+	public T Pop(out double priority)
+	{
+		priority = data[data.Count - 1].Key;
+		T item   = data[data.Count - 1].Value;
 		data.RemoveAt(data.Count - 1);
 
 		return item;
