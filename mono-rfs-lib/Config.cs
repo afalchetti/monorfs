@@ -98,7 +98,8 @@ public static class Config
 	public static double NavigatorClutterDensity         = ClutterDensity;
 
 	// LoopyPHDNavigator
-	public static double GradientAscentRate = 0.03;
+	public static double GradientAscentRate = 4e-4;
+	public static double GradientClip       = 10;
 
 	// ISAM2Navigator
 	public static double MatchThreshold       = 3.0;

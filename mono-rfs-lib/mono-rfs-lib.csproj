@@ -127,6 +127,7 @@
     <Compile Include="Test\UtilTest.cs" />
     <Compile Include="KinectVehicle.cs" />
     <Compile Include="KinectTrackVehicle.cs" />
+    <Compile Include="Test\LoopyPHDNavigatorTest.cs" />
     <Compile Include="FakeNavigator.cs" />
     <Compile Include="FakeVehicle.cs" />
   </ItemGroup>
