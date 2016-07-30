@@ -362,6 +362,95 @@ public static class MatrixExtensions
 	}
 
 	/// <summary>
+	/// Calculate log(sum(exp(vector))) as numerically stable as possible.
+	/// This corresponds to a soft version of the max() operation.
+	/// </summary>
+	/// <param name="vector">Array of entries.</param>
+	/// <param name="begin">First index to consider.</param>
+	/// <param name="end">Last+1 index to consider.</param>
+	/// <returns>Log-sum-exp value.</returns>
+	public static double LogSumExp(this double[] vector, int begin, int end)
+	{
+		double max   = double.NegativeInfinity;
+		double value = 0;
+
+		if (begin < 0) {
+			throw new ArgumentException("Begin index must be greater or equal to zero");
+		}
+
+		if (end > vector.Length) {
+			throw new ArgumentException("End index must be less or equal to the vector size");
+		}
+
+		for (int i = begin; i < end; i++) {
+			max = Math.Max(max, vector[i]);
+		}
+
+		if (double.IsNegativeInfinity(max)) {
+			return double.NegativeInfinity;
+		}
+
+		for (int i = begin; i < end; i++) {
+			value += Math.Exp(vector[i] - max);
+		}
+
+		value = max + Math.Log(value);
+
+		return value;
+	}
+
+	/// <summary>
+	/// Calculate an weighted average of the form Sum(Exp(weight) * vector) / Sum(Exp(weight))
+	/// as numerically stable as possible.
+	/// </summary>
+	/// <param name="vectors">Array of vectors.</param>
+	/// <param name="weights">Log-weights for the average.</param>
+	/// <param name="begin">First index to consider.</param>
+	/// <param name="end">Last+1 index to consider.</param>
+	/// <returns>Tempered average of the vectors.</returns>
+	public static double[] TemperedAverage(this double[][] vectors, double[] weights, int begin, int end)
+	{
+		if (vectors.Length != weights.Length) {
+			throw new ArgumentException("There must be exactly one weight per vector");
+		}
+
+		if (begin < 0) {
+			throw new ArgumentException("Begin index must be greater or equal to zero");
+		}
+
+		if (end > vectors.Length) {
+			throw new ArgumentException("End index must be less or equal to the vector size");
+		}
+
+		if (vectors.Length == 0) {
+			return new double[0];
+		}
+
+		double   max   = double.NegativeInfinity;
+		double[] value = new double[vectors[0].Length];
+
+		for (int i = begin; i < end; i++) {
+			max = Math.Max(max, weights[i]);
+		}
+
+		if (double.IsNegativeInfinity(max)) {
+			return new double[6];
+		}
+
+		for (int i = begin; i < end; i++) {
+			weights[i] = Math.Exp(weights[i] - max);
+		}
+
+		weights = weights.Normalize();
+
+		for (int i = begin; i < end; i++) {
+			value = value.Add(weights[i].Multiply(vectors[i]));
+		}
+
+		return value;
+	}
+
+	/// <summary>
 	/// Concatenate two matrices vertically.
 	/// </summary>
 	/// <param name="first">First matrix.</param>
