@@ -185,9 +185,26 @@ public class Pose3D : IPose<Pose3D>
 	/// <param name="that">Copied pose.</param>
 	public Pose3D(Pose3D that)
 		: this(that.State) {}
-	
+
 	/// <summary>
-	/// Obtain a local linear representation for the pose around unity.
+	/// Obtain a local odometry representation for the pose around unity.
+	/// </summary>
+	public double[] ToOdometry()
+	{
+		return this.DiffOdometry(Identity);
+	}
+
+	/// <summary>
+	/// Retrieve the pose from an odometry representation around unity.
+	/// </summary>
+	/// <param name="linear">Linear representation.</param>
+	public Pose3D FromOdometry(double[] linear)
+	{
+		return Identity.AddOdometry(linear);
+	}
+
+	/// <summary>
+	/// Obtain a local lie linear representation for the pose around unity.
 	/// </summary>
 	public double[] ToLinear()
 	{
@@ -195,7 +212,7 @@ public class Pose3D : IPose<Pose3D>
 	}
 
 	/// <summary>
-	/// Retrieve the pose from a linear representation around unity.
+	/// Retrieve the pose from a lie linear representation around unity.
 	/// </summary>
 	/// <param name="linear">Linear representation.</param>
 	public Pose3D FromLinear(double[] linear)
@@ -204,12 +221,77 @@ public class Pose3D : IPose<Pose3D>
 	}
 
 	/// <summary>
-	/// Move the pose by an odometry delta.
+	/// Add a linear vector in Lie space to the the pose around its pose manifold.
+	/// It uses global coordinates, where translation and rotation are independent.
+	/// </summary>
+	/// <param name="delta">Odometry delta.</param>
+	public Pose3D AddGlobal(double[] delta)
+	{
+		Quaternion neworientation = Orientation.Add(new double[3] {delta[3], delta[4], delta[5]});
+		double[]   location       = new double[3] {X + delta[0], Y + delta[1], Z + delta[2]};
+
+		return new Pose3D(location, neworientation.Normalize());
+	}
+
+	/// <summary>
+	/// Find the linear vector in semi-Lie space that transforms another pose into this one.
+	/// It uses global coordinates, where translation and rotation are independent.
+	/// </summary>
+	/// <param name="origin">Origin pose.</param>
+	public double[] SubtractGlobal(Pose3D origin)
+	{
+		double[] dq = this.Orientation.Subtract(origin.Orientation);
+		double[] dx = this.Location.Subtract(origin.Location);
+
+		return new double[6] {dx[0], dx[1], dx[2], dq[0], dq[1], dq[2]};
+	}
+
+	/// <summary>
+	/// Add a linear vector in semi-Lie space to the the pose around its pose manifold.
 	/// </summary>
 	/// <param name="delta">Odometry delta.</param>
 	public Pose3D Add(double[] delta)
 	{
-		Quaternion dorientation   = Quaternion.Identity.Add(new double[3] {delta[3], delta[4], delta[5]});
+		Quaternion neworientation = Orientation.Add(new double[3] {delta[3], delta[4], delta[5]});
+		Quaternion dlocation      = Orientation * new Quaternion(0, delta[0], delta[1], delta[2]) * Orientation.Conjugate();
+
+		double[]   location    = new double[3] {X + dlocation.X, Y + dlocation.Y, Z + dlocation.Z};
+		Quaternion orientation = neworientation.Normalize();
+
+		return new Pose3D(location, orientation);
+	}
+
+	/// <summary>
+	/// Find the linear vector in semi-Lie space that transforms another pose into this one.
+	/// </summary>
+	/// <param name="origin">Origin pose.</param>
+	public double[] Subtract(Pose3D origin)
+	{
+		Quaternion dq       = origin.Orientation.Conjugate() * this.Orientation;
+		double[]   dxglobal = this.Location.Subtract(origin.Location);
+		Quaternion dx       = origin.Orientation.Conjugate() *
+		                          new Quaternion(0, dxglobal[0], dxglobal[1], dxglobal[2]) *
+		                          origin.Orientation;
+
+		double[] lie = dq.ToLinear();
+
+		return new double[6] {dx.X, dx.Y, dx.Z, lie[0], lie[1], lie[2]};
+	}
+
+	/// <summary>
+	/// Move the pose by an odometry delta.
+	/// </summary>
+	/// <param name="delta">Odometry delta.</param>
+	public Pose3D AddOdometry(double[] delta)
+	{
+		// equivalent to: (inlined and simplified for performance)
+		// double[] lie = Quaternion.Identity.FromLinear(new double[3] {delta[3], delta[4], delta[5]}).Sqrt().ToLinear();
+		// double[] dq  = new double[6] {0, 0, 0, lie[0], lie[1], lie[2]};
+		// double[] dx  = new double[6] {delta[0], delta[1], delta[2], 0, 0, 0};
+		// 
+		// return this.Add(dq).Add(dx).Add(dq);
+
+		Quaternion dorientation   = Quaternion.Identity.FromLinear(new double[3] {delta[3], delta[4], delta[5]});
 		Quaternion neworientation = Orientation * dorientation;
 		Quaternion middelta       = dorientation.Sqrt();
 		Quaternion midrotation    = Orientation * middelta;
@@ -225,8 +307,15 @@ public class Pose3D : IPose<Pose3D>
 	/// Find the odometry delta that transforms another pose into this.
 	/// </summary>
 	/// <param name="origin">Origin pose.</param>
-	public double[] Subtract(Pose3D origin)
+	public double[] DiffOdometry(Pose3D origin)
 	{
+		// equivalent to: (inlined and simplified for performance)
+		// double[] lie  = (origin.Orientation.Conjugate() * this.Orientation).ToLinear();
+		// double[] sqrt = new double[6] {0, 0, 0, lie[0]/2, lie[1]/2, lie[2]/2};
+		// double[] dx   = (this.Add((-1.0).Multiply(sqrt))).Subtract(origin.Add(sqrt));
+		// 
+		// return new double[6] {dx[0], dx[1], dx[2], lie[0], lie[1], lie[2]};
+
 		Quaternion dq          = origin.Orientation.Conjugate() * this.Orientation;
 		Quaternion middelta    = dq.Sqrt();
 		Quaternion midrotation = origin.Orientation * middelta;
@@ -235,33 +324,103 @@ public class Pose3D : IPose<Pose3D>
 		                             new Quaternion(0, dxglobal[0], dxglobal[1], dxglobal[2]) *
 		                             midrotation;
 		
-		double[] lie = 2.Multiply(Quaternion.Log(dq));
-
+		double[] lie = dq.ToLinear();
+		
 		return new double[6] {dx.X, dx.Y, dx.Z, lie[0], lie[1], lie[2]};
 	}
 
 	/// <summary>
-	/// Obtain a linearization for the Add operation around this pose.
+	/// Obtain a linearization for the Add operation around the given delta.
+	/// </summary>
+	/// <param name="delta">Odometry reading.</param>
+	/// <returns>Jacobian.</returns>
+	public double[][] AddJacobian(double[] delta)
+	{
+		double[][] Crot   = Orientation.ToMatrix();
+
+		double[][] zero     = MatrixExtensions.Zero(3);
+		double[][] identity = new double[3][] { new double[3] {1, 0, 0},
+		                                        new double[3] {0, 1, 0},
+		                                        new double[3] {0, 0, 1} };
+
+		return Crot.Concatenate(zero).VConcatenate(
+		       zero.Concatenate(identity));
+	}
+
+	/// <summary>
+	/// Obtain a linearization for the Subtract operation around this pose.
+	/// </summary>
+	/// <param name="origin">Odometry reading.</param>
+	/// <returns>Jacobian.</returns>
+	public double[][] SubtractJacobian(Pose3D origin)
+	{
+		double[][] Crot   = origin.Orientation.ToMatrix();
+
+		double[][] zero     = MatrixExtensions.Zero(3);
+		double[][] identity = new double[3][] { new double[3] {1, 0, 0},
+		                                        new double[3] {0, 1, 0},
+		                                        new double[3] {0, 0, 1} };
+
+		return Crot.Transpose().Concatenate(zero).VConcatenate(
+		       zero            .Concatenate(identity));
+	}
+
+	/// <summary>
+	/// Obtain a linearization for the AddOdometry operation around this pose.
 	/// It follows the form
 	/// f(x[k-1], u) - x[k] ~ F dx[k-1] + G dx[k] - a.
 	/// </summary>
 	/// <param name="delta">Odometry reading.</param>
 	/// <returns>Jacobian (F).</returns>
-	public double[][] AddJacobian(double[] delta)
+	public double[][] AddOdometryJacobian(double[] delta)
 	{
 		Quaternion dorientation = Quaternion.Identity.Add(new double[3] {delta[3], delta[4], delta[5]});
-		Quaternion middelta     = dorientation.Sqrt();
+		Quaternion sqrt         = dorientation.Sqrt();
 
-		double[][] Cdelta       = Util.Quat2Matrix(dorientation);
-		double[][] Cmiddelta    = Util.Quat2Matrix(middelta);
+		// double[][] Crot   = Orientation.ToMatrix();
+		double[][] Cmid   = (Orientation * sqrt).ToMatrix();
+		double[][] Cdelta = dorientation.ToMatrix();
+		double[][] Csqrt  = sqrt.ToMatrix();
 
 		double[][] crossdX  = Util.CrossProductMatrix(new double[3] {delta[0], delta[1], delta[2]});
 
-		double[][] dxdq = (-1.0).Multiply(Cmiddelta.Transpose())
-		                        .Multiply(crossdX);
+		double[][] identity = new double[3][] { new double[3] {1, 0, 0},
+		                                        new double[3] {0, 1, 0},
+		                                        new double[3] {0, 0, 1} };
 
-		return Cdelta.Transpose()      .Concatenate(dxdq).VConcatenate(
+		double[][] dxdq = (-1.0).Multiply(Cmid).Multiply(crossdX).Multiply(Csqrt.Transpose());
+
+		return identity                .Concatenate(dxdq).VConcatenate(
 		       MatrixExtensions.Zero(3).Concatenate(Cdelta.Transpose()));
+
+		//double[][] Jsqrt = identity.Add(Csqrt.Transpose()).PseudoInverse();
+		//double[][] dxdq1 = (-1.0).Multiply(Crot).Multiply(crossdX);
+		//double[][] dxdq2 = (-1.0).Multiply(Cmid).Multiply(crossdX).Multiply(Jsqrt);
+
+		// (AddJacobian)
+		//return identity                .Concatenate(dxdq1).VConcatenate(
+		//       MatrixExtensions.Zero(3).Concatenate(Cdelta.Transpose()));
+
+		// (AddOdometryJacobian wrt delta)
+		//return Cmid                    .Concatenate(dxdq2).VConcatenate(
+		//       MatrixExtensions.Zero(3).Concatenate(identity));
+	}
+
+	/// <summary>
+	/// Get the transformation matrix representation of this pose.
+	/// </summary>
+	/// <returns>Pose matrix.</returns>
+	public double[][] ToMatrix()
+	{
+		double[][] Crot = Orientation.ToMatrix();
+
+		return new double[4][]
+		{
+			new double[4] {Crot[0][0], Crot[0][1], Crot[0][2], X},
+			new double[4] {Crot[1][0], Crot[1][1], Crot[1][2], Y},
+			new double[4] {Crot[2][0], Crot[2][1], Crot[2][2], Z},
+			new double[4] {         0,          0,          0, 1}
+		};
 	}
 
 	/// <param name="a">First quaternion.</param>

@@ -46,6 +46,17 @@ public interface IPose<Pose>
 	double[] State { get; }
 
 	/// <summary>
+	/// Obtain a local odometry representation for the pose around unity.
+	/// </summary>
+	double[] ToOdometry();
+
+	/// <summary>
+	/// Retrieve the pose from an odometry representation around unity.
+	/// </summary>
+	/// <param name="odometry">Linear representation.</param>
+	Pose FromOdometry(double[] odometry);
+
+	/// <summary>
 	/// Obtain a local linear representation for the pose around unity.
 	/// </summary>
 	double[] ToLinear();
@@ -60,10 +71,22 @@ public interface IPose<Pose>
 	/// Move the pose by an odometry delta.
 	/// </summary>
 	/// <param name="delta">Odometry delta.</param>
+	Pose AddOdometry(double[] delta);
+
+	/// <summary>
+	/// Find the odometry delta that transforms another pose into this one.
+	/// </summary>
+	/// <param name="origin">Origin pose.</param>
+	double[] DiffOdometry(Pose origin);
+
+	/// <summary>
+	/// Add a linear vector (e.g. in Lie space) to the the pose around its pose manifold.
+	/// </summary>
+	/// <param name="delta">Odometry delta.</param>
 	Pose Add(double[] delta);
 
 	/// <summary>
-	/// Find the odometry delta that transforms another pose into this.
+	/// Find the linear vector (e.g. in Lie space) that transforms another pose into this one.
 	/// </summary>
 	/// <param name="origin">Origin pose.</param>
 	double[] Subtract(Pose origin);

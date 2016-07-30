@@ -94,8 +94,8 @@ public class TrackVehicle : SimulatedVehicle
 		                      reading[3] == 0 && reading[4] == 0 && reading[5] == 0)) {
 			double[] noise = time.ElapsedGameTime.TotalSeconds.Multiply(
 			                     U.RandomGaussianVector(new double[6] {0, 0, 0, 0, 0, 0},
-			                                            MotionCovarianceL));
-			Pose = Pose.Add(noise);
+			                                            MotionCovariance));
+			Pose = Pose.AddOdometry(noise);
 		}
 
 		WayPoints[WayPoints.Count - 1] = Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(Pose.State));

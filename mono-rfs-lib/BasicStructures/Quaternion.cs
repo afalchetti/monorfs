@@ -313,6 +313,27 @@ public class Quaternion
 		return new Quaternion(-q.W, -q.X, -q.Y, -q.Z);
 	}
 
+	/// <summary>
+	/// Get the unitary matrix representation of this quaternion.
+	/// </summary>
+	/// <returns>Rotation matrix.</returns>
+	public double[][] ToMatrix()
+	{
+		double xx = X * X;
+		double yy = Y * Y;
+		double zz = Z * Z;
+		double xy = X * Y;
+		double xz = X * Z;
+		double xw = X * W;
+		double yz = Y * Z;
+		double yw = Y * W;
+		double zw = Z * W;
+
+		return new double[3][] { new double[3] {1 - 2 * (yy + zz), 2 * (xy - zw),     2 * (xz + yw)},
+		                         new double[3] {2 * (xy + zw),     1 - 2 * (xx + zz), 2 * (yz - xw)},
+		                         new double[3] {2 * (xz - yw),     2 * (yz + xw),     1 - 2 * (xx + yy)} };
+	}
+
 	/// <param name="a">First quaternion.</param>
 	/// <param name="b">Second quaternion.</param>
 	public static bool operator ==(Quaternion a, Quaternion b)

@@ -58,9 +58,6 @@ public static class Config
 	                                                              new double[6] {0, 0, 0, 0, 2e-4, 0},
 	                                                              new double[6] {0, 0, 0, 0, 0, 2e-4} };
 	
-	public static double[][] MotionCovarianceQ;
-	public static double[][] MotionCovarianceL;
-	
 	public static double[][] MeasurementCovariance = new double[3][] { new double[3] {2e-0, 0, 0},
 	                                                                   new double[3] {0, 2e-0, 0},
 	                                                                   new double[3] {0, 0, 1e-3} };
@@ -110,13 +107,6 @@ public static class Config
 
 	// OdometryNavigator
 	public static double OdometryMergeThreshold = 1e-2;
-
-	/// <summary>
-	/// Static constructor. Fill missing fields.
-	/// </summary>
-	static Config() {
-		Util.GetMotionCovariances(MotionCovariance, out MotionCovarianceQ, out MotionCovarianceL);
-	}
 
 	/// <summary>
 	/// Read configuration instructions from file.
@@ -171,9 +161,6 @@ public static class Config
 				}
 			}
 		}
-
-		// fill missing fields
-		Util.GetMotionCovariances(MotionCovariance, out MotionCovarianceQ, out MotionCovarianceL);
 	}
 
 	/// <summary>

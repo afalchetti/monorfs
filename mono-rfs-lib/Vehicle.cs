@@ -48,44 +48,14 @@ namespace monorfs
 public abstract class Vehicle : IDisposable
 {
 	/// <summary>
-	/// Internal motion model covariance matrix. Yaw-pitch-roll representation.
+	/// Internal motion model covariance matrix. Lie algebra representation.
 	/// </summary>
 	protected double[][] motionCovariance = Config.MotionCovariance;
 
 	/// <summary>
-	/// Internal motion model covariance matrix. Quaternion representation.
-	/// </summary>
-	protected double[][] motionCovarianceQ = Config.MotionCovarianceQ;
-
-	/// <summary>
-	/// Internal motion model covariance matrix. Lie algebra representation.
-	/// </summary>
-	protected double[][] motionCovarianceL = Config.MotionCovarianceL;
-
-	/// <summary>
-	/// Motion model covariance matrix. Yaw-pitch-roll representation.
-	/// </summary>
-	public double[][] MotionCovariance
-	{
-		get {
-			return motionCovariance;
-		}
-
-		set {
-			motionCovariance = value;
-			Util.GetMotionCovariances(motionCovariance, out motionCovarianceQ, out motionCovarianceL);
-		}
-	}
-
-	/// <summary>
-	/// Motion model covariance matrix. Quaternion representation.
-	/// </summary>
-	public double[][] MotionCovarianceQ { get { return motionCovarianceQ; } }
-
-	/// <summary>
 	/// Motion model covariance matrix. Lie algebra representation.
 	/// </summary>
-	public double[][] MotionCovarianceL { get { return motionCovarianceL; } }
+	public double[][] MotionCovariance { get { return motionCovariance; } }
 
 	/// <summary>
 	/// Measurement model covariance matrix.
@@ -272,8 +242,6 @@ public abstract class Vehicle : IDisposable
 		this.RangeClip    = that.RangeClip;
 
 		this.motionCovariance      = that.motionCovariance.MemberwiseClone();
-		this.motionCovarianceQ     = that.motionCovarianceQ.MemberwiseClone();
-		this.motionCovarianceL     = that.motionCovarianceL.MemberwiseClone();
 		this.MeasurementCovariance = that.MeasurementCovariance.MemberwiseClone();
 
 		if (copytrajectory) {
@@ -342,13 +310,13 @@ public abstract class Vehicle : IDisposable
 	/// <param name="reading">Odometry reading (dx, dy, dz, dpitch, dyaw, droll).</param>
 	public virtual void Update(GameTime time, double[] reading)
 	{
-		Pose         = Pose        .Add(reading);
-		OdometryPose = OdometryPose.Add(reading);
+		Pose         = Pose        .AddOdometry(reading);
+		OdometryPose = OdometryPose.AddOdometry(reading);
 
 		double[] noise = time.ElapsedGameTime.TotalSeconds.Multiply(
 		                     U.RandomGaussianVector(new double[6] {0, 0, 0, 0, 0, 0},
-		                                            MotionCovarianceL));
-		OdometryPose = OdometryPose.Add(noise);
+		                                            MotionCovariance));
+		OdometryPose = OdometryPose.AddOdometry(noise);
 
 		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(Pose.State)));
 	}
@@ -359,7 +327,7 @@ public abstract class Vehicle : IDisposable
 	/// <returns>State diff.</returns>
 	public virtual double[] ReadOdometry(GameTime time)
 	{
-		double[] reading = OdometryPose.Subtract(refodometry);
+		double[] reading = OdometryPose.DiffOdometry(refodometry);
 
 		OdometryPose = new Pose3D(Pose);
 		refodometry  = new Pose3D(Pose);

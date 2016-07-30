@@ -167,13 +167,10 @@ public class SimulatedVehicle : Vehicle
 	public SimulatedVehicle(Vehicle that, double motioncovmultiplier, double measurecovmultiplier, double pdetection, double clutter, bool copytrajectory = false)
 		: base(that, copytrajectory)
 	{
-		this.detectionProbability = pdetection;
-		this.ClutterDensity       = clutter;
-		this.ClutterCount         = this.ClutterDensity * this.FilmArea.Height * this.FilmArea.Width * this.RangeClip.Length;
-
+		this.detectionProbability  = pdetection;
+		this.ClutterDensity        = clutter;
+		this.ClutterCount          = this.ClutterDensity * this.FilmArea.Height * this.FilmArea.Width * this.RangeClip.Length;
 		this.motionCovariance      = motioncovmultiplier.Multiply(that.MotionCovariance);
-		this.motionCovarianceQ     = motioncovmultiplier.Multiply(that.MotionCovarianceQ);
-		this.motionCovarianceL     = motioncovmultiplier.Multiply(that.MotionCovarianceL);
 		this.MeasurementCovariance = measurecovmultiplier.Multiply(that.MeasurementCovariance);
 
 		if (this.ClutterCount > 0) {
@@ -201,8 +198,8 @@ public class SimulatedVehicle : Vehicle
 		// no input, static friction makes the robot stay put (if there is any static friction)
 		if (PerfectStill && reading[0] == 0 && reading[1] == 0 && reading[2] == 0 &&
 			                reading[3] == 0 && reading[4] == 0 && reading[5] == 0) {
-			Pose     = Pose    .Add(reading);
-			OdometryPose = OdometryPose.Add(reading);
+			Pose         = Pose        .AddOdometry(reading);
+			OdometryPose = OdometryPose.AddOdometry(reading);
 
 			WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(Pose.State)));
 		}
@@ -335,7 +332,7 @@ public class SimulatedVehicle : Vehicle
 	/// <param name="odometry">Odometry.</param>
 	public double[][] MotionJacobian(double[] odometry)
 	{
-		return Pose.AddJacobian(odometry);
+		return Pose.AddOdometryJacobian(odometry);
 	}
 
 	/// <summary>
@@ -358,8 +355,9 @@ public class SimulatedVehicle : Vehicle
 		                          new double[] {0,                     VisionFocal / local.Z, -VisionFocal * local.Y / (local.Z * local.Z)},
 		                          new double[] {local.X / mag,         local.Y / mag,         local.Z /mag}};
 
-		// the jacobian of the change of coordinates part of the measurement process is the rotation matrix 
-		double[][] jrotation = ME.MatrixFromQuaternion(Pose.Orientation);
+		// the jacobian of the change of coordinates part of
+		// the measurement process is the conjugate of the rotation matrix
+		double[][] jrotation = Pose.Orientation.Conjugate().ToMatrix();
 
 		return jprojection.Multiply(jrotation);
 	}

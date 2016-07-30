@@ -344,8 +344,8 @@ public class Plot
 		error.Add(Tuple.Create(groundtruth[0].Item1, 0.0));
 
 		for (int i = 1; i < estimate.Count; i++) {
-			Pose3D godo = new Pose3D().FromLinear(groundtruth[i].Item2.Subtract(groundtruth[i-1].Item2));
-			Pose3D eodo = new Pose3D().FromLinear(estimate[i].Item2.Subtract(estimate[i-1].Item2));
+			Pose3D godo = Pose3D.Identity.FromOdometry(groundtruth[i].Item2.Subtract(groundtruth[i-1].Item2));
+			Pose3D eodo = Pose3D.Identity.FromOdometry(estimate[i].Item2.Subtract(estimate[i-1].Item2));
 
 			error.Add(Tuple.Create(groundtruth[i].Item1, diffloc(godo.State, eodo.State)));
 		}
@@ -360,8 +360,8 @@ public class Plot
 		error.Add(Tuple.Create(groundtruth[0].Item1, 0.0));
 
 		for (int i = 1; i < estimate.Count; i++) {
-			Pose3D godo = new Pose3D().FromLinear(groundtruth[i].Item2.Subtract(groundtruth[i-1].Item2));
-			Pose3D eodo = new Pose3D().FromLinear(estimate[i].Item2.Subtract(estimate[i-1].Item2));
+			Pose3D godo = Pose3D.Identity.FromOdometry(groundtruth[i].Item2.Subtract(groundtruth[i-1].Item2));
+			Pose3D eodo = Pose3D.Identity.FromOdometry(estimate[i].Item2.Subtract(estimate[i-1].Item2));
 
 			error.Add(Tuple.Create(groundtruth[i].Item1, diffrot(godo.State, eodo.State)));
 		}
@@ -374,7 +374,7 @@ public class Plot
 		Pose3D A = new Pose3D(a);
 		Pose3D B = new Pose3D(b);
 
-		return new Pose3D().FromLinear(A.Subtract(B)).Location.Euclidean();
+		return Pose3D.Identity.FromOdometry(A.DiffOdometry(B)).Location.Euclidean();
 	}
 
 	private double diffrot(double[] a, double[] b)
@@ -382,7 +382,7 @@ public class Plot
 		Pose3D A = new Pose3D(a);
 		Pose3D B = new Pose3D(b);
 
-		return Math.Abs(new Pose3D().FromLinear(A.Subtract(B)).Angle);
+		return Math.Abs(Pose3D.Identity.FromOdometry(A.DiffOdometry(B)).Angle);
 	}
 
 	private double difflandmark(double[] a, double[] b)

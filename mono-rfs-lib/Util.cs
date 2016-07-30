@@ -89,20 +89,6 @@ public static class Util
 		return (normal >= 0) ? normal : normal + 2 * Math.PI;
 	}
 
-	/// <summary>
-	/// Get the matrix representation of a rotation quaternion.
-	/// </summary>
-	/// <param name="q">Rtation quaternion.</param>
-	/// <returns>Matrix representation.</returns>
-	public static double[][] Quat2Matrix(Quaternion q)
-	{
-		return new double[3][]
-		{
-			new double[3] {q.W*q.W + q.X*q.X - q.Y*q.Y - q.Z*q.Z, 2 * (q.X*q.Y - q.W*q.Z),               2 * (q.W*q.Y + q.X*q.Z)},
-			new double[3] {2 * (q.X*q.Y + q.W*q.Z),               q.W*q.W - q.X*q.X + q.Y*q.Y - q.Z*q.Z, 2 * (q.Y*q.Z - q.W*q.X)},
-			new double[3] {2 * (q.X*q.Z - q.W*q.Y),               2 * (q.W*q.X + q.Y*q.Z),               q.W*q.W - q.X*q.X - q.Y*q.Y + q.Z*q.Z}
-		};
-	}
 
 	/// <summary>
 	/// Transform a quaternion-based pose into its Lie algebra representation around
