@@ -265,14 +265,26 @@ public abstract class Navigator : IDisposable
 	}
 
 	/// <summary>
-	/// Render the 5-sigma ellipse of gaussian.
+	/// Render the 5-sigma ellipse of gaussian (using the default color).
 	/// </summary>
 	/// <param name="gaussian">Gaussian to be rendered.</param>
 	/// <param name="camera">Camera 4d transform matrix.</param>
 	public void RenderGaussian(Gaussian gaussian, double[][] camera)
 	{
-		Color incolor  = Color.DeepSkyBlue; incolor.A  = 200;
-		Color outcolor = Color.Blue;        outcolor.A = 200;
+		RenderGaussian(gaussian, camera, Color.DeepSkyBlue);
+	}
+
+	/// <summary>
+	/// Render the 5-sigma ellipse of gaussian.
+	/// </summary>
+	/// <param name="gaussian">Gaussian to be rendered.</param>
+	/// <param name="camera">Camera 4d transform matrix.</param>
+	/// <param name="incolor">Color to be used for filling the gaussian.</param>
+	public void RenderGaussian(Gaussian gaussian, double[][] camera, Color incolor)
+	{
+		Color outcolor = Color.Blue;
+		incolor.A      = 200;
+		outcolor.A     = 200;
 		
 		double weight;
 		

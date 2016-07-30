@@ -824,12 +824,11 @@ public class LoopyPHDNavigator : Navigator
 	{
 		DrawUtils.DrawTrajectory(Graphics, RefVehicle.Groundtruth, Color.Yellow, camera);
 		RefVehicle.RenderLandmarks(camera);
-		RefVehicle.RenderBody(camera);
-		RenderTimedGaussian(MessagesFromPast, Color.Red, camera);
-		RenderTimedGaussian(MessagesFromFuture, Color.Green, camera);
-//		RenderTimedGaussian(MessagesFromMap, camera);
-		RenderTimedGaussian(FusedEstimate, Color.Blue, camera);
-		//RenderTimedGaussian(MessagesFromMap, camera);
+		//RefVehicle.RenderBody(camera);
+		//RenderTimedGaussian(MessagesFromPast, Color.Red, camera);
+		//RenderTimedGaussian(MessagesFromFuture, Color.Green, camera);
+		//RenderTimedGaussian(MessagesFromMap, Color.Orange, camera);
+		RenderTimedGaussian(FusedEstimate, Color.Gray, camera);
 		RenderMap(camera);
 	}
 
@@ -847,7 +846,7 @@ public class LoopyPHDNavigator : Navigator
 			double[]   location = pose.Item2.Mean.Submatrix(0, 2);
 			double[][] loccov   = pose.Item2.Covariance.Submatrix(0, 2, 0, 2);
 
-			RenderGaussian(new Gaussian(location, loccov, 1.0), camera);
+			RenderGaussian(new Gaussian(location, loccov, 1.0), camera, color);
 			trajectory.Add(Tuple.Create(pose.Item1, Util.SClone(pose.Item2.Mean)));
 		}
 
