@@ -630,6 +630,7 @@ public class PHDNavigator : Navigator
 		double[][]   R  = pose.MeasurementCovariance;
 		double[][]   I  = Accord.Math.Matrix.Identity(3).ToArray();
 		double[][]   m  = new double  [model.Count][];
+		double[][]   mp = new double  [model.Count][];
 		double[][][] H  = new double  [model.Count][][];
 		double[][][] P  = new double  [model.Count][][];
 		double[][][] PH = new double  [model.Count][][];
@@ -642,11 +643,12 @@ public class PHDNavigator : Navigator
 		int n = 0;
 		foreach (Gaussian component in model) {
 			m [n] = component.Mean;
+			mp[n] = pose.MeasurePerfect(m[n]);
 			H [n] = pose.MeasurementJacobian(m[n]);
 			P [n] = component.Covariance;
 			PH[n] = P[n].MultiplyByTranspose(H[n]);
-			S [n] = H[n].Multiply(P[n].MultiplyByTranspose(H[n])).Add(R);
-			mc[n] = new Gaussian(pose.MeasurePerfect(m[n]), S[n], component.Weight);
+			S [n] = H[n].Multiply(PH[n]).Add(R);
+			mc[n] = new Gaussian(mp[n], S[n], component.Weight);
 
 			qindex.Add(component, n);
 			q.Add(mc[n]);
@@ -672,8 +674,9 @@ public class PHDNavigator : Navigator
 			foreach (var landmark in near) {
 				int i = qindex[landmark];
 
-				double[][] gain       = PH[i].Multiply(S[i].Inverse());
-				double[]   mean       = m[i].Add(gain.Multiply(measurement.Subtract(pose.MeasurePerfect(m[i]))));
+				// double[][] gain       = PH[i].Multiply(S[i].Inverse());
+				double[][] gain       = PH[i].Multiply(mc[i].CovarianceInverse);
+				double[]   mean       = m[i].Add(gain.Multiply(measurement.Subtract(mp[i])));
 				double[][] covariance = I.Subtract(gain.Multiply(H[i])).Multiply(P[i]);
 
 				double weight = PD * landmark.Weight * mc[i].Evaluate(measurement) / (pose.ClutterDensity + PD * weightsum);
