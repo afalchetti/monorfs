@@ -776,7 +776,7 @@ public class PHDNavigator : Navigator
 		foreach (Gaussian component in model) {
 			m [n] = component.Mean;
 			mp[n] = pose.MeasurePerfect(m[n]);
-			H [n] = pose.MeasurementJacobian(m[n]);
+			H [n] = pose.MeasurementJacobianL(m[n]);
 			P [n] = component.Covariance;
 			PH[n] = P[n].MultiplyByTranspose(H[n]);
 			S [n] = H[n].Multiply(PH[n]).Add(R);

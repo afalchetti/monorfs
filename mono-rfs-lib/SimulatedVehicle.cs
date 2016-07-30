@@ -336,12 +336,12 @@ public class SimulatedVehicle : Vehicle
 	}
 
 	/// <summary>
-	/// Obtain the jacobian of the measurement model.
+	/// Obtain the jacobian of the measurement model wrt. the landmark.
 	/// Designed to be used with EKF filters.
 	/// </summary>
 	/// <param name="landmark">Landmark 3d location against which the measurement is performed.</param>
 	/// <returns>Measurement model linearization jacobian.</returns>
-	public double[][] MeasurementJacobian(double[] landmark)
+	public double[][] MeasurementJacobianL(double[] landmark)
 	{
 		double[]   diff  = landmark.Subtract(Pose.Location);
 		Quaternion local = Pose.Orientation.Conjugate() *
@@ -349,8 +349,9 @@ public class SimulatedVehicle : Vehicle
 
 		// the jacobian of the homography projection part is given by
 		// f/z I 0
-		//  X/|X|
-		double mag = Math.Sqrt(local.X * local.X + local.Y * local.Y + local.Z * local.Z);
+		// sgn(loc.z) X/|X|
+		// (arbitrarily choosing -1 as the sign for zero)
+		double mag = ((local.Z > 0) ? 1 : -1) * Math.Sqrt(local.X * local.X + local.Y * local.Y + local.Z * local.Z);
 		double[][] jprojection = {new double[] {VisionFocal / local.Z, 0,                     -VisionFocal * local.X / (local.Z * local.Z)},
 		                          new double[] {0,                     VisionFocal / local.Z, -VisionFocal * local.Y / (local.Z * local.Z)},
 		                          new double[] {local.X / mag,         local.Y / mag,         local.Z /mag}};
@@ -360,6 +361,38 @@ public class SimulatedVehicle : Vehicle
 		double[][] jrotation = Pose.Orientation.Conjugate().ToMatrix();
 
 		return jprojection.Multiply(jrotation);
+	}
+
+	/// <summary>
+	/// Obtain the jacobian of the measurement model wrt. the pose.
+	/// Designed to be used with EKF filters.
+	/// </summary>
+	/// <param name="landmark">Landmark 3d location against which the measurement is performed.</param>
+	/// <returns>Measurement model linearization jacobian.</returns>
+	public double[][] MeasurementJacobianP(double[] landmark)
+	{
+		double[]   diff  = landmark.Subtract(Pose.Location);
+		Quaternion local = Pose.Orientation.Conjugate() *
+			                    new Quaternion(0, diff[0], diff[1], diff[2]) * Pose.Orientation;
+
+		// the jacobian of the homography projection part is given by
+		// f/z I 0
+		// sgn(loc.z) X/|X|
+		// (arbitrarily choosing -1 as the sign for zero)
+		double mag = ((local.Z > 0) ? 1 : -1) * Math.Sqrt(local.X * local.X + local.Y * local.Y + local.Z * local.Z);
+		double[][] jprojection = {new double[] {VisionFocal / local.Z, 0,                     -VisionFocal * local.X / (local.Z * local.Z)},
+		                          new double[] {0,                     VisionFocal / local.Z, -VisionFocal * local.Y / (local.Z * local.Z)},
+		                          new double[] {local.X / mag,         local.Y / mag,         local.Z /mag}};
+
+		// the jacobian of the change of coordinates part of
+		// the measurement process is given by
+		// -Prot'    -Prot' [l - Ploc]_x
+		double[][] jlocation = (-1.0).Multiply(Pose.Orientation.Conjugate().ToMatrix());
+		double[][] jrotation = jlocation.Multiply(Util.CrossProductMatrix(diff));
+
+		double[][] jlocal = jlocation.Concatenate(jrotation);
+
+		return jprojection.Multiply(jlocal);
 	}
 
 	/// <summary>
