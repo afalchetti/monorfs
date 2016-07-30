@@ -296,7 +296,8 @@ public class LoopyPHDNavigator : Navigator
 			MessagesFromFuture.Add(Tuple.Create(0.0, (Gaussian) null));
 		}
 
-		Parallel.For(0, FusedEstimate.Count, i => {
+		Parallel.For(0, initial.Count,
+		             new ParallelOptions { MaxDegreeOfParallelism = Config.NParallel}, i => {
 			MessagesFromPast  [i] = Tuple.Create(FusedEstimate[i].Item1, new Gaussian(FusedEstimate[i].Item2.Mean, infcov, 1.0));
 			MessagesFromFuture[i] = Tuple.Create(FusedEstimate[i].Item1, new Gaussian(FusedEstimate[i].Item2.Mean, infcov, 1.0));
 		});

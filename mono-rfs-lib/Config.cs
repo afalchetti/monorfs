@@ -38,6 +38,10 @@ namespace monorfs
 /// </summary>
 public static class Config
 {
+	// General
+	public static int NParallel = 8;  // number of permitted threads
+
+
 	// Manipulator
 	public static double AxisLimit = 10.0;
 

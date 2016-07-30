@@ -328,7 +328,8 @@ public class PHDNavigator : Navigator
 	public override void SlamUpdate(GameTime time, List<double[]> measurements)
 	{
 		// map update
-		Parallel.For(0, VehicleParticles.Length, i => {
+		Parallel.For(0, VehicleParticles.Length,
+		             new ParallelOptions { MaxDegreeOfParallelism = Config.NParallel}, i => {
 			Map predicted, corrected;
 
 			predicted = PredictConditional(measurements, VehicleParticles[i], MapModels[i], toexplore[i]);
