@@ -84,12 +84,12 @@ public abstract class Navigator : IDisposable
 	/// <summary>
 	/// Most accurate estimate of the current vehicle pose.
 	/// </summary>
-	public abstract TrackVehicle BestEstimate { get; set; }
+	public abstract TrackVehicle BestEstimate { get; }
 
 	/// <summary>
 	/// Most accurate estimate model of the map.
 	/// </summary>
-	public abstract Map BestMapModel { get; set; }
+	public abstract Map BestMapModel { get; }
 
 	/// <summary>
 	/// True if the localization of the vehicle is perfectly known.

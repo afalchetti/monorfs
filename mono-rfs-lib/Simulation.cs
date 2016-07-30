@@ -325,6 +325,8 @@ public class Simulation : Manipulator
 				navigator = new LoopyPHDNavigator(explorer, commands,
 				                                  new PHDNavigator(explorer, particlecount, onlymapping));
 			}
+
+			explorer = new FakeVehicle();
 			Console.WriteLine("Loopy PHD initialized");
 
 			break;

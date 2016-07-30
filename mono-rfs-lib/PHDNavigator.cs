@@ -144,10 +144,6 @@ public class PHDNavigator : Navigator
 		{
 			return VehicleParticles[BestParticle];
 		}
-		set
-		{
-			VehicleParticles[BestParticle] = value;
-		}
 	}
 
 	/// <summary>
@@ -158,10 +154,6 @@ public class PHDNavigator : Navigator
 		get
 		{
 			return MapModels[BestParticle];
-		}
-		set
-		{
-			MapModels[BestParticle] = value;
 		}
 	}
 

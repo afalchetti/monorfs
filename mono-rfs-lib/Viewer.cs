@@ -56,6 +56,12 @@ namespace monorfs
 public class Viewer : Manipulator
 {
 	/// <summary>
+	/// Reference to the inherited navigator, but using the derived FakeNavigator type,
+	/// which exposes the estimates for direct external modification.
+	/// </summary>
+	private FakeNavigator xnavigator;
+
+	/// <summary>
 	/// Recorded vehicle trajectory indexed by time.
 	/// The first entry of each tuple is a time point in seconds; the second is the state.
 	/// </summary>
@@ -150,8 +156,9 @@ public class Viewer : Manipulator
 	public Viewer(string title, SimulatedVehicle explorer, TimedState trajectory, TimedTrajectory estimate,
 	              TimedMapModel map, TimedMeasurements measurements, TimedMessage tags,
 	              double fps, string sidebarfile)
-		: base(title, explorer, new PHDNavigator(explorer, 1, false), false, fps)
+		: base(title, explorer, new FakeNavigator(explorer), false, fps)
 	{
+		xnavigator   = Navigator as FakeNavigator;
 		Trajectory   = trajectory;
 		Estimate     = estimate;
 		Map          = map;
@@ -329,12 +336,13 @@ public class Viewer : Manipulator
 
 		bool speedup = keyboard.IsKeyDown(Keys.LeftShift);
 
-		preframeindex          = FrameIndex;
-		Explorer .WayPoints    = VehicleWaypoints;
-		Explorer .Pose         = new Pose3D(Explorer.WayPoints[Explorer.WayPoints.Count - 1].Item2);
-		Navigator.BestMapModel = Map[mapindices[FrameIndex]].Item2;
-		Navigator.BestEstimate.WayPoints = Estimate[FrameIndex].Item2;
-		Navigator.BestEstimate.Pose      = new Pose3D(Navigator.BestEstimate.WayPoints[Navigator.BestEstimate.WayPoints.Count - 1].Item2);
+		preframeindex        = FrameIndex;
+		Explorer .WayPoints  = VehicleWaypoints;
+		Explorer .Pose       = new Pose3D(Explorer.WayPoints[Explorer.WayPoints.Count - 1].Item2);
+		xnavigator.MapModel  = Map[mapindices[FrameIndex]].Item2;
+		xnavigator.WayTrajectories[0] = Estimate[FrameIndex];
+		xnavigator.Vehicle.WayPoints  = Estimate[FrameIndex].Item2;
+		xnavigator.Vehicle.Pose       = new Pose3D(Navigator.BestEstimate.WayPoints[Navigator.BestEstimate.WayPoints.Count - 1].Item2);
 
 		Explorer.MappedMeasurements.Clear();
 		foreach (double[] z in Measurements[mapindices[FrameIndex]].Item2) {

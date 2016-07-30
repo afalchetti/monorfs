@@ -80,16 +80,20 @@ public class ISAM2Navigator : Navigator
 	private IndexedMap plmodel;
 
 	/// <summary>
+	/// Internal estimate of the current vehicle pose.
+	/// </summary>
+	private TrackVehicle bestestimate;
+
+	/// <summary>
 	/// Most accurate estimate of the current vehicle pose.
 	/// </summary>
-	public override TrackVehicle BestEstimate { get; set; }
+	public override TrackVehicle BestEstimate { get { return bestestimate; } }
 
 	/// <summary>
 	/// Most accurate estimate model of the map.
 	/// </summary>
 	public override Map BestMapModel {
 		get { return new Map(MapModel);         }
-		set { MapModel = new IndexedMap(value); }
 	}
 
 	/// <summary>
@@ -144,7 +148,7 @@ public class ISAM2Navigator : Navigator
 			motionnoise[i] = MotionDt * Math.Sqrt(vehicle.MotionCovariance[i][i]);
 		}
 
-		BestEstimate      = new TrackVehicle();
+		bestestimate      = new TrackVehicle();
 		MapModel          = new IndexedMap();
 		plmodel           = new IndexedMap();
 		CandidateMapModel = new IndexedMap();

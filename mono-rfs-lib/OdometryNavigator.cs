@@ -50,14 +50,24 @@ public class OdometryNavigator : Navigator
 	public static double MergeThreshold { get { return Config.OdometryMergeThreshold; } }
 
 	/// <summary>
+	/// Internal estimate of the current vehicle pose.
+	/// </summary>
+	private TrackVehicle bestestimate;
+
+	/// <summary>
 	/// Most accurate estimate of the current vehicle pose.
 	/// </summary>
-	public override TrackVehicle BestEstimate { get; set; }
+	public override TrackVehicle BestEstimate { get { return bestestimate; } }
+
+	/// <summary>
+	/// Internal estimate of the map.
+	/// </summary>
+	private Map bestmapmodel;
 
 	/// <summary>
 	/// Most accurate estimate model of the map.
 	/// </summary>
-	public override Map BestMapModel { get; set; }
+	public override Map BestMapModel { get { return bestmapmodel; } }
 
 	/// <summary>
 	/// Construct a OdometryNavigator using the indicated vehicle as a reference.
@@ -66,8 +76,8 @@ public class OdometryNavigator : Navigator
 	public OdometryNavigator(Vehicle vehicle)
 		: base(vehicle)
 	{
-		BestEstimate = new TrackVehicle(vehicle, 1, 1, 1, 0);
-		BestMapModel = new Map();
+		bestestimate = new TrackVehicle(vehicle, 1, 1, 1, 0);
+		bestmapmodel = new Map();
 	}
 	
 	/// <summary>
