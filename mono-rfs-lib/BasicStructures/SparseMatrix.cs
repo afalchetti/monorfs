@@ -92,14 +92,22 @@ public class SparseMatrix<T> : IEnumerable<SparseItem<T>>
 	/// </summary>
 	/// <param name="that">Other matrix.</param>
 	public SparseMatrix(SparseMatrix<T> that)
+		: this(that, that.DefaultValue) {}
+
+	/// <summary>
+	/// Construct a SparseMatrix from another (shallow).
+	/// </summary>
+	/// <param name="that">Other matrix.</param>
+	/// <param name="defaultvalue">Unassigned cell value.</param>
+	public SparseMatrix(SparseMatrix<T> that, T defaultvalue)
 	{
 		this.data = new Dictionary<int, Dictionary<int, T>>();
 
 		foreach (SparseItem<T> item in that) {
 			this[item.I, item.K] = item.Value;
 		}
-		
-		this.DefaultValue = that.DefaultValue;
+
+		this.DefaultValue = defaultvalue;
 		this.Width        = that.Width;
 		this.Height       = that.Height;
 	}
@@ -278,7 +286,7 @@ public class SparseMatrix<T> : IEnumerable<SparseItem<T>>
 	/// <returns>Matrix transpose.</returns>
 	public SparseMatrix<T> Transpose()
 	{
-		SparseMatrix<T> transpose = new SparseMatrix<T>(Height, Width);
+		SparseMatrix<T> transpose = new SparseMatrix<T>(Height, Width, DefaultValue);
 
 		foreach (var item in this) {
 			transpose[item.K, item.I] = item.Value;
@@ -578,7 +586,7 @@ public class SparseMatrix<T> : IEnumerable<SparseItem<T>>
 			colset[cols[k]] = k;
 		}
 
-		SparseMatrix<T> compacted = new SparseMatrix<T>(rows.Length, cols.Length);
+		SparseMatrix<T> compacted = new SparseMatrix<T>(rows.Length, cols.Length, DefaultValue);
 
 		foreach (var item in this) {
 			//Console.WriteLine(item + "  " + rows.Length + "  " + cols.Length);

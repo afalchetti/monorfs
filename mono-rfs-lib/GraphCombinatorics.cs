@@ -199,11 +199,13 @@ public static class GraphCombinatorics
 	/// <summary>
 	/// Reduce a profit matrix by eliminating and forcing certain edges.
 	/// </summary>
-	/// <param name="full">Original complete profit.</param>
+	/// <param name="full">Original complete profit. Its default value
+	/// must be -Inf for the output to be valid (although it is possible
+	/// to extend it to non-inf matrices, it becomes inefficient, so won't be done).</param>
 	/// <param name="reducer">Descriptor of the changes that should be done.</param>
 	private static SparseMatrix reduceprofit(SparseMatrix full, MurtyNode reducer)
 	{
-		SparseMatrix reduced    = new SparseMatrix(full);
+		SparseMatrix reduced    = new SparseMatrix(full, double.NegativeInfinity);
 		int[]        removerows = new int[reducer.Forced.Length];
 		int[]        removecols = new int[reducer.Forced.Length];
 
@@ -219,11 +221,13 @@ public static class GraphCombinatorics
 		reduced.RemoveColumns(removecols);
 		
 		foreach (MatrixKey force in reducer.Forced) {
-			reduced[force.I, force.K] = 1;  // "infinity" against removed edges
+			reduced[force.I, force.K] = 1;
+			// always bigger than the removed edges, hence will always be picked
 		}
 
-		foreach (MatrixKey force in reducer.Eliminated) {
-			reduced.RemoveAt(force.I, force.K);
+		foreach (MatrixKey eliminate in reducer.Eliminated) {
+			reduced.RemoveAt(eliminate.I, eliminate.K);
+			//reduced[eliminate.I, eliminate.K] = double.NegativeInfinity;
 		}
 
 		return reduced;
@@ -363,7 +367,7 @@ public static class GraphCombinatorics
 			bool[] rowvisited = new bool[complete.Height];
 			bool[] colvisited = new bool[complete.Width];
 
-			SparseMatrix component = new SparseMatrix(complete.Width, complete.Height);
+			SparseMatrix component = new SparseMatrix(complete.Width, complete.Height, original.DefaultValue);
 			SparseItem   element   = complete.Any;
 			rowstack.Add(element.I);
 			colstack.Add(element.K);

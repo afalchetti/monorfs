@@ -449,6 +449,8 @@ public class PHDNavigator : Navigator
 			SparseMatrix component = connectedfull[i].Compact(out rows, out cols);
 
 			// fill the (Misdetection x Clutter) quadrant of the matrix with zeros (don't contribute)
+			// NOTE this is filled after the connected components partition because
+			//      otherwise everything would be connected through this quadrant
 			for (int k = 0; k < rows.Length; k++) {
 				if (rows[k] >= map.Count) {
 					for (int h = 0; h < cols.Length; h++) {
