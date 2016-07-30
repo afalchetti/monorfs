@@ -405,7 +405,19 @@ public class PHDNavigator : Navigator
 	/// <param name="map">Map model.</param>
 	/// <param name="pose">Vehicle pose.</param>
 	/// <returns>Set likelihood.</returns>
-	public double SetLikelihood(List<double[]> measurements, IMap map, SimulatedVehicle pose)
+	public static double SetLikelihood(List<double[]> measurements, IMap map, SimulatedVehicle pose)
+	{
+		return Math.Exp(SetLogLikelihood(measurements, map, pose));
+	}
+
+	/// <summary>
+	/// Generate a log-likelihood matrix relating each measurement with each landmark.
+	/// </summary>
+	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
+	/// <param name="map">Map model.</param>
+	/// <param name="pose">Vehicle pose.</param>
+	/// <returns>Set log-likelihood matrix.</returns>
+	public static SparseMatrix SetLogLikeMatrix(List<double[]> measurements, IMap map, SimulatedVehicle pose)
 	{
 		// exact calculation if there are few components/measurements;
 		// use the most probable components approximation otherwise
@@ -424,7 +436,7 @@ public class PHDNavigator : Navigator
 		for (int i = 0; i < zprobs.Length;      i++) {
 		for (int k = 0; k < measurements.Count; k++) {
 			double d = zprobs[i].Mahalanobis(measurements[k]);
-			if (d < 3) {
+			if (d < 5) {
 				// prob = log (pD * zprob(measurement))
 				// this way multiplying probabilities equals to adding (negative) profits
 				logprobs[i, k] = logPD + Math.Log(zprobs[i].Multiplier) - 0.5 * d * d;
@@ -440,8 +452,26 @@ public class PHDNavigator : Navigator
 			logprobs[map.Count + i, i] = logclutter;
 		}
 
-		List<SparseMatrix> connectedfull = GraphCombinatorics.ConnectedComponents(logprobs);
-		List<SparseMatrix> components    = new List<SparseMatrix>();
+		return logprobs;
+	}
+
+	/// <summary>
+	/// Calculate the set log-likelihood log(P(Z|X, M)).
+	/// </summary>
+	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
+	/// <param name="map">Map model.</param>
+	/// <param name="pose">Vehicle pose.</param>
+	/// <returns>Set log-likelihood.</returns>
+	public static double SetLogLikelihood(List<double[]> measurements, IMap map, SimulatedVehicle pose)
+	{
+		// exact calculation if there are few components/measurements;
+		// use the most probable components approximation otherwise
+		
+		SparseMatrix       logprobs      = SetLogLikeMatrix(measurements, map, pose);
+		List<SparseMatrix> connectedfull = GraphCombinatorics.ConnectedComponents(llmatrix);
+		
+		double[] logcomp = new double[200];
+		double   total   = 0;
 
 		for (int i = 0; i < connectedfull.Count; i++) {
 			int[]        rows;
@@ -460,12 +490,6 @@ public class PHDNavigator : Navigator
 					}
 				}
 			}
-			
-			components.Add(component);
-		}
-
-		double total = 1.0;
-		foreach (SparseMatrix component in components) {
 
 			IEnumerable<Tuple<int[], double>> assignments;
 			if (component.Rows.Count <= 8) {
@@ -476,21 +500,21 @@ public class PHDNavigator : Navigator
 				assignments = GraphCombinatorics.MurtyPairing(component);
 			}
 
-			int    h         = 0;
-			double comptotal = 0;
-			double prev      = 0;
+			int    m       = 0;
+			double maxcomp = double.NegativeInfinity;
+			double prev    = 0;
 			foreach (Tuple<int[], double> assignment in assignments) {
-				comptotal += Math.Exp(GraphCombinatorics.AssignmentValue(component, assignment));
-
-				if (h >= 200 || comptotal / prev < 1.001) {
+				if (m >= logcomp.Length || prev / maxcomp < 0.001) {
 					break;
 				}
 
-				prev = comptotal;
-				h++;
+				logcomp[m] = assignment.Item2;
+				maxcomp    = Math.Max(maxcomp, logcomp[m]);
+				
+				m++;
 			}
 
-			total *= comptotal;
+			total += logcomp.LogSumExp(0, m);
 		}
 
 		return total;
