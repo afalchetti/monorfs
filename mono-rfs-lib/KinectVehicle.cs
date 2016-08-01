@@ -520,27 +520,32 @@ public class KinectVehicle : Vehicle
 			this.matches    = new IntPoint[2][];
 			this.matches[0] = new IntPoint[0];
 
-			if (matches[0].Length > 4) {
-				ransac.Estimate(matches);
-				int[] inliers = ransac.Inliers;
-
-				filtered = new List<IFeaturePoint>();
-
-				this.matches    = new IntPoint[2][];
-				this.matches[0] = new IntPoint[inliers.Length];
-				this.matches[1] = new IntPoint[inliers.Length];
-
-				for (int i = 0; i < inliers.Length; i++) {
-					int x = matches[1][inliers[i]].X;
-					int y = matches[1][inliers[i]].Y;
-
-					this.matches[0][i] = matches[0][inliers[i]];
-					this.matches[1][i] = matches[1][inliers[i]];
-
-					if (depth[x][y] > 0) {
-						filtered.Add(descriptors[matches[1][inliers[i]]]);
+			try {
+				if (matches[0].Length > 4) {
+					ransac.Estimate(matches);
+					int[] inliers = ransac.Inliers;
+					
+					filtered = new List<IFeaturePoint>();
+					
+					this.matches    = new IntPoint[2][];
+					this.matches[0] = new IntPoint[inliers.Length];
+					this.matches[1] = new IntPoint[inliers.Length];
+					
+					for (int i = 0; i < inliers.Length; i++) {
+						int x = matches[1][inliers[i]].X;
+						int y = matches[1][inliers[i]].Y;
+						
+						this.matches[0][i] = matches[0][inliers[i]];
+						this.matches[1][i] = matches[1][inliers[i]];
+						
+						if (depth[x][y] > 0) {
+							filtered.Add(descriptors[matches[1][inliers[i]]]);
+						}
 					}
 				}
+			}
+			catch (Accord.ConvergenceException) {
+				// just continue, like if not enough points were found
 			}
 		}
 		else {
