@@ -54,6 +54,7 @@ class Program
 		string   file      = "data.zip";
 		double   ospac     = 1;
 		double   ospap     = 1;
+		double   reftime   = 0;
 		HistMode histmode  = HistMode.Timed;
 		bool     showhelp  = false;
 
@@ -61,6 +62,7 @@ class Program
 			{ "f|file=",    "Recording file.",                                               f          => file      = f },
 			{ "c=",         "OSPA C parameter.",                                             (double c) => ospac     = c },
 			{ "p=",         "OSPA P parameter",                                              (double p) => ospap     = p },
+			{ "t=",         "Reference time",                                                (double t) => reftime   = t },
 			{ "H|history=", "Trajectory history mode: either 'filter', 'smooth' or 'timed'", h          => histmode  = (h == "filter") ? HistMode.Filter : (h == "smooth") ? HistMode.Smooth : HistMode.Timed },
 			{ "h|help",     "Show this message and exit",                                    h          => showhelp  = h != null }
 		};
@@ -80,7 +82,7 @@ class Program
 			return;
 		}
 
-		Plot plot = Plot.FromFiles(file, histmode, ospac, ospap);
+		Plot plot = Plot.FromFiles(file, histmode, ospac, ospap, reftime);
 
 		File.WriteAllText(file + ".loc.data",         plot.SerializedLocationError);
 		File.WriteAllText(file + ".rot.data",         plot.SerializedRotationError);

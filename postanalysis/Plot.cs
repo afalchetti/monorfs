@@ -65,6 +65,7 @@ public class Plot
 
 	public double C { get; set; }
 	public double P { get; set; }
+	public int    RefTime { get; set; }
 
 	/// <summary>
 	/// Construct a visualization from its components.
@@ -73,7 +74,7 @@ public class Plot
 	/// <param name="estimate">Recorded estimated vehicle trajectory.</param>
 	/// <param name="map">Recorded maximum-a-posteriori estimate for the map.</param>
 	public Plot(TimedState trajectory, TimedTrajectory estimate, TimedMapModel map,
-	            TimedMapModel visiblelandmarks, Map landmarks, double c, double p,
+	            TimedMapModel visiblelandmarks, Map landmarks, double c, double p, double reftime,
 	            HistMode histmode, TimedMessage tags)
 	{
 		Trajectory       = trajectory;
@@ -85,15 +86,18 @@ public class Plot
 		Tags             = tags;
 		C                = c;
 		P                = p;
+		RefTime          = Trajectory.BinarySearch(Tuple.Create(reftime, new double[0]), new ComparisonComparer<Tuple<double, double[]>>(
+		                                          (Tuple<double, double[]> a, Tuple<double, double[]> b) => Math.Sign(a.Item1 - b.Item1)));
+		RefTime          = (RefTime != ~Trajectory.Count) ? RefTime : 0;
 	}
 
 	/// <summary>
 	/// Create a visualization object from a pair of formatted description files.
 	/// </summary>
+	/// <remarks>All file must be previously sorted by time value. This property is assumed.</remarks>
 	/// <param name="datafile">Compressed prerecorded data file.</param>
 	/// <returns>Prepared visualization object.</returns>
-	/// <remarks>All file must be previously sorted by time value. This property is assumed.</remarks>
-	public static Plot FromFiles(string datafile, HistMode histmode, double c, double p)
+	public static Plot FromFiles(string datafile, HistMode histmode, double c, double p, double t)
 	{
 		string tmpdir  = Util.TemporaryDir();
 		string datadir = Path.Combine(tmpdir, "data");
@@ -165,7 +169,7 @@ public class Plot
 			tags = new TimedMessage();
 		}
 
-		return new Plot(trajectory, estimate, map, vislandmarks, landmarks, c, p, histmode, tags);
+		return new Plot(trajectory, estimate, map, vislandmarks, landmarks, c, p, t, histmode, tags);
 	}
 
 	/// <summary>
@@ -228,7 +232,7 @@ public class Plot
 			lengths.Add(Tuple.Create(Trajectory[0].Item1, arclength));
 
 			for (int i = 1; i < Trajectory.Count; i++) {
-				arclength += diffloc(Trajectory[i].Item2, Trajectory[i - 1].Item2);
+				arclength += diffloc(new Pose3D(Trajectory[i].Item2), new Pose3D(Trajectory[i - 1].Item2));
 				lengths.Add(Tuple.Create(Trajectory[i].Item1, arclength));
 			}
 
@@ -320,7 +324,13 @@ public class Plot
 		TimedValue error = new TimedValue();
 
 		for (int i = 0; i < estimate.Count; i++) {
-			error.Add(Tuple.Create(groundtruth[i].Item1, diffloc(groundtruth[i].Item2, estimate[i].Item2)));
+			int    reftime = Math.Min(i, RefTime);
+			Pose3D gpose   = Pose3D.Identity.FromOdometry(new Pose3D(groundtruth[i].Item2).Subtract(
+			                                              new Pose3D(groundtruth[reftime].Item2)));
+			Pose3D epose   = Pose3D.Identity.FromOdometry(new Pose3D(estimate[i].Item2).Subtract(
+			                                              new Pose3D(estimate[reftime].Item2)));
+			
+			error.Add(Tuple.Create(groundtruth[i].Item1, diffloc(gpose, epose)));
 		}
 
 		return error;
@@ -331,7 +341,13 @@ public class Plot
 		TimedValue error = new TimedValue();
 
 		for (int i = 0; i < estimate.Count; i++) {
-			error.Add(Tuple.Create(groundtruth[i].Item1, diffrot(groundtruth[i].Item2, estimate[i].Item2)));
+			int    reftime = Math.Min(i, RefTime);
+			Pose3D gpose   = Pose3D.Identity.FromOdometry(new Pose3D(groundtruth[i].Item2).Subtract(
+			                                              new Pose3D(groundtruth[reftime].Item2)));
+			Pose3D epose   = Pose3D.Identity.FromOdometry(new Pose3D(estimate[i].Item2).Subtract(
+			                                              new Pose3D(estimate[reftime].Item2)));
+			
+			error.Add(Tuple.Create(groundtruth[i].Item1, diffrot(gpose, epose)));
 		}
 
 		return error;
@@ -343,11 +359,13 @@ public class Plot
 
 		error.Add(Tuple.Create(groundtruth[0].Item1, 0.0));
 
-		for (int i = 1; i < estimate.Count; i++) {
-			Pose3D godo = Pose3D.Identity.FromOdometry(groundtruth[i].Item2.Subtract(groundtruth[i-1].Item2));
-			Pose3D eodo = Pose3D.Identity.FromOdometry(estimate[i].Item2.Subtract(estimate[i-1].Item2));
+		for (int i = 10; i < estimate.Count; i++) {
+			Pose3D godo = Pose3D.Identity.FromOdometry(new Pose3D(groundtruth[i].Item2).Subtract(
+			                                           new Pose3D(groundtruth[i-10].Item2)));
+			Pose3D eodo = Pose3D.Identity.FromOdometry(new Pose3D(estimate[i].Item2).Subtract(
+			                                           new Pose3D(estimate[i-10].Item2)));
 
-			error.Add(Tuple.Create(groundtruth[i].Item1, diffloc(godo.State, eodo.State)));
+			error.Add(Tuple.Create(groundtruth[i].Item1, diffloc(godo, eodo)));
 		}
 
 		return error;
@@ -359,30 +377,26 @@ public class Plot
 
 		error.Add(Tuple.Create(groundtruth[0].Item1, 0.0));
 
-		for (int i = 1; i < estimate.Count; i++) {
-			Pose3D godo = Pose3D.Identity.FromOdometry(groundtruth[i].Item2.Subtract(groundtruth[i-1].Item2));
-			Pose3D eodo = Pose3D.Identity.FromOdometry(estimate[i].Item2.Subtract(estimate[i-1].Item2));
+		for (int i = 10; i < estimate.Count; i++) {
+			Pose3D godo = Pose3D.Identity.FromOdometry(new Pose3D(groundtruth[i].Item2).Subtract(
+			                                           new Pose3D(groundtruth[i-10].Item2)));
+			Pose3D eodo = Pose3D.Identity.FromOdometry(new Pose3D(estimate[i].Item2).Subtract(
+			                                           new Pose3D(estimate[i-10].Item2)));
 
-			error.Add(Tuple.Create(groundtruth[i].Item1, diffrot(godo.State, eodo.State)));
+			error.Add(Tuple.Create(groundtruth[i].Item1, diffrot(godo, eodo)));
 		}
 
 		return error;
 	}
 
-	private double diffloc(double[] a, double[] b)
+	private double diffloc(Pose3D a, Pose3D b)
 	{
-		Pose3D A = new Pose3D(a);
-		Pose3D B = new Pose3D(b);
-
-		return Pose3D.Identity.FromOdometry(A.DiffOdometry(B)).Location.Euclidean();
+		return Pose3D.Identity.FromOdometry(a.Subtract(b)).Location.Euclidean();
 	}
 
-	private double diffrot(double[] a, double[] b)
+	private double diffrot(Pose3D a, Pose3D b)
 	{
-		Pose3D A = new Pose3D(a);
-		Pose3D B = new Pose3D(b);
-
-		return Math.Abs(Pose3D.Identity.FromOdometry(A.DiffOdometry(B)).Angle);
+		return Math.Abs(Pose3D.Identity.FromOdometry(a.Subtract(b)).Angle);
 	}
 
 	private double difflandmark(double[] a, double[] b)
