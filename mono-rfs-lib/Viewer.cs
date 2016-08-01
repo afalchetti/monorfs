@@ -447,8 +447,7 @@ public class Viewer : Manipulator
 	{
 		List<Texture2D> frames = new List<Texture2D>();
 
-		using (FileCapture reader = new FileCapture(filename)) {
-			reader.Open();
+		using (FileCapture reader = FileCaptureX.CaptureLocalFile(filename)) {
 			Console.WriteLine("reading file " + filename);
 
 			foreach (Image<Bgr<byte>> image in reader) {

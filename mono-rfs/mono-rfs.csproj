@@ -22,7 +22,7 @@
     <Externalconsole>true</Externalconsole>
     <CustomCommands>
       <CustomCommands>
-        <Command type="AfterBuild" command="cp -ru ${ProjectDir}/additional/* ${SolutionDir}/isam2/bin/Debug/libisam2.so ${SolutionDir}/kpextractor/bin/Debug/libkpextractor.so ${SolutionDir}/postanalysis/bin/Debug/postanalysis.exe ${TargetDir}" workingdir="${ProjectDir}" externalConsole="True" />
+        <Command type="AfterBuild" command="cp -ru ${SolutionDir}/isam2/bin/Debug/libisam2.so ${SolutionDir}/kpextractor/bin/Debug/libkpextractor.so ${SolutionDir}/postanalysis/bin/Debug/postanalysis.exe ${TargetDir}" workingdir="${ProjectDir}" externalConsole="True" />
       </CustomCommands>
     </CustomCommands>
     <ConsolePause>false</ConsolePause>
@@ -38,7 +38,7 @@
     <Externalconsole>true</Externalconsole>
     <CustomCommands>
       <CustomCommands>
-        <Command type="AfterBuild" command="cp -ru ${ProjectDir}/additional/* ${SolutionDir}/isam2/bin/Release/libisam2.so ${SolutionDir}/kpextractor/bin/Release/libkpextractor.so ${SolutionDir}/postanalysis/bin/Release/postanalysis.exe ${TargetDir}" workingdir="${ProjectDir}" externalConsole="True" />
+        <Command type="AfterBuild" command="cp -ru ${SolutionDir}/isam2/bin/Release/libisam2.so ${SolutionDir}/kpextractor/bin/Release/libkpextractor.so ${SolutionDir}/postanalysis/bin/Release/postanalysis.exe ${TargetDir}" workingdir="${ProjectDir}" externalConsole="True" />
       </CustomCommands>
     </CustomCommands>
   </PropertyGroup>
@@ -53,17 +53,17 @@
     <Reference Include="MonoGame.Framework">
       <HintPath>..\packages\MonoGame.Framework.Linux.3.5.0.1678\lib\net40\MonoGame.Framework.dll</HintPath>
     </Reference>
-    <Reference Include="DotImaging.IO">
-      <HintPath>..\packages\DotImaging.IO.4.7.6\lib\net45\DotImaging.IO.dll</HintPath>
-    </Reference>
-    <Reference Include="DotImaging.Primitives2D">
-      <HintPath>..\packages\DotImaging.Primitives2D.4.7.6\lib\net45\DotImaging.Primitives2D.dll</HintPath>
-    </Reference>
-    <Reference Include="DotImaging.GenericImage">
-      <HintPath>..\packages\DotImaging.GenericImage.4.7.6\lib\net45\DotImaging.GenericImage.dll</HintPath>
-    </Reference>
     <Reference Include="System.IO.Compression.FileSystem" />
     <Reference Include="Mono.Posix" />
+    <Reference Include="DotImaging.Primitives2D">
+      <HintPath>..\packages\DotImaging.Primitives2D.4.8.1\lib\net45\DotImaging.Primitives2D.dll</HintPath>
+    </Reference>
+    <Reference Include="DotImaging.GenericImage">
+      <HintPath>..\packages\DotImaging.GenericImage.4.8.1\lib\net45\DotImaging.GenericImage.dll</HintPath>
+    </Reference>
+    <Reference Include="DotImaging.IO">
+      <HintPath>..\packages\DotImaging.IO.4.8.1\lib\net45\DotImaging.IO.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
@@ -167,8 +167,10 @@
     <None Include="plots\scripts\chap4\nopreprocessing.cfg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <Import Project="..\packages\DotImaging.IO.4.8.1\build\DotImaging.IO.targets" Condition="Exists('..\packages\DotImaging.IO.4.8.1\build\DotImaging.IO.targets')" />
   <ItemGroup>
     <ProjectReference Include="..\mono-rfs-lib\mono-rfs-lib.csproj">
       <Project>{4CDBBDE8-05E3-4F78-A4EC-2945427BDD7B}</Project>
