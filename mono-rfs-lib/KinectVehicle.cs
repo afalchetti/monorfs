@@ -373,15 +373,6 @@ public class KinectVehicle : Vehicle
 			colorframe = ColorFrameToArray(frameref);
 		}
 
-		// remove one frame from each stream to compensate for duplication
-		// (this happens because each stream creates a frame index and there are two streams)
-		// note that now double-stream is mandatory as the features are extracted from the color space
-		// and used with depth information so the system will always double the framerate (unless
-		// the timestamps are perfectly aligned)
-		// FIXME generalize this to handle perfectly aligned streams
-		using (VideoFrameRef frameref = depth.ReadFrame()) {}
-		using (VideoFrameRef frameref = color.ReadFrame()) {}
-
 		interest = ExtractKeypoints(colorframe, depthframe, (int) ResX, (int) ResY, 20);
 	}
 
