@@ -547,7 +547,10 @@ public class Simulation : Manipulator
 			forcemapping = !Navigator.OnlyMapping;
 		}
 		
-		if (!Paused) {
+		if (Paused) {
+			Explorer.Pose = Explorer.Pose.Add(new double[6] {dlocx, dlocy, dlocz, dpitch, dyaw, droll});
+		}
+		else {
 			if (commandindex < Commands.Count) {
 				double[] autocmd = Commands[commandindex];
 		
@@ -628,15 +631,15 @@ public class Simulation : Manipulator
 
 				lastnavigationupdate = new GameTime(time.TotalGameTime, time.ElapsedGameTime);
 			}
+		}
 
-			if (forcehistoryreset) {
-				Navigator.ResetHistory();
-				Explorer .ResetHistory();
-			}
+		if (forcehistoryreset) {
+			Navigator.ResetHistory();
+			Explorer .ResetHistory();
+		}
 
-			if (forcereset) {
-				Navigator.ResetMapModel();
-			}
+		if (forcereset) {
+			Navigator.ResetMapModel();
 		}
 	}
 	
