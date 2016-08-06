@@ -44,7 +44,10 @@ namespace monorfs
 /// <summary>
 /// SLAM solver. It uses the iSAM2 iterative algorithm.
 /// </summary>
-public class ISAM2Navigator : Navigator
+public class ISAM2Navigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT, PoseT, MeasurementT>
+	where PoseT        : IPose<PoseT>, new()
+	where MeasurementT : IMeasurement<MeasurementT>, new()
+	where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
 {
 	/// <summary>
 	/// Maximum distance at which a match is considered valid; otherwise a new landmark is generated.
@@ -82,12 +85,12 @@ public class ISAM2Navigator : Navigator
 	/// <summary>
 	/// Internal estimate of the current vehicle pose.
 	/// </summary>
-	private TrackVehicle bestestimate;
+	private TrackVehicle<MeasurerT, PoseT, MeasurementT> bestestimate;
 
 	/// <summary>
 	/// Most accurate estimate of the current vehicle pose.
 	/// </summary>
-	public override TrackVehicle BestEstimate { get { return bestestimate; } }
+	public override TrackVehicle<MeasurerT, PoseT, MeasurementT> BestEstimate { get { return bestestimate; } }
 
 	/// <summary>
 	/// Most accurate estimate model of the map.
@@ -125,14 +128,14 @@ public class ISAM2Navigator : Navigator
 	/// <param name="vehicle">Vehicle to track.</param>
 	/// <param name="onlymapping">If true, don't do SLAM, but mapping
 	/// (i.e. the localization is assumed known). Currently not used.</param>
-	public ISAM2Navigator(Vehicle vehicle, bool onlymapping = false)
+	public ISAM2Navigator(Vehicle<MeasurerT, PoseT, MeasurementT> vehicle, bool onlymapping = false)
 		: base(vehicle, onlymapping)
 	{
 		int      nmeasurement     = vehicle.MeasurementCovariance.Length;
 		int      nmotion          = vehicle.MotionCovariance.Length;
 		double[] measurementnoise = new double[nmeasurement];
 		double[] motionnoise      = new double[nmotion];
-		double   focal            = vehicle.VisionFocal;
+		double[] mparams          = vehicle.Measurer.ToLinear();
 
 		// NOTE the iSAM2 interface assumes independent noise in each component,
 		//      discarding every entry that's not in the diagonal;
@@ -146,14 +149,14 @@ public class ISAM2Navigator : Navigator
 			motionnoise[i] = MotionDt * Math.Sqrt(vehicle.MotionCovariance[i][i]);
 		}
 
-		bestestimate      = new TrackVehicle();
+		bestestimate      = new TrackVehicle<MeasurerT, PoseT, MeasurementT>();
 		MapModel          = new IndexedMap();
 		plmodel           = new IndexedMap();
 		CandidateMapModel = new IndexedMap();
 
-		BestEstimate.Pose     = new Pose3D(vehicle.Pose);
+		BestEstimate.Pose = vehicle.Pose.DClone();
 
-		handle    = NewNavigator(vehicle.Pose.State, measurementnoise, motionnoise, focal);
+		handle    = NewNavigator(vehicle.Pose.State, measurementnoise, motionnoise, mparams);
 		nextlabel = 0;
 	}
 
@@ -171,7 +174,7 @@ public class ISAM2Navigator : Navigator
 	public override void Update(GameTime time, double[] reading)
 	{
 		if (OnlyMapping) {
-			BestEstimate.Pose      = new Pose3D(RefVehicle.Pose);
+			BestEstimate.Pose      = RefVehicle.Pose.DClone();
 			BestEstimate.WayPoints = new TimedState(RefVehicle.WayPoints);
 		}
 		else {
@@ -186,7 +189,7 @@ public class ISAM2Navigator : Navigator
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
-	public override void SlamUpdate(GameTime time, List<double[]> measurements)
+	public override void SlamUpdate(GameTime time, List<MeasurementT> measurements)
 	{
 		List<int> labels   = FindLabels(measurements);
 
@@ -199,19 +202,21 @@ public class ISAM2Navigator : Navigator
 			}
 		}
 
-		double[] marshalmeasurements = new double[3 * measurements.Count];
+		double[] marshalmeasurements = new double[MeasureSize * measurements.Count];
 
 		for (int i = 0, h = 0; i < measurements.Count; i++) {
-			marshalmeasurements[h++] = measurements[i][0];
-			marshalmeasurements[h++] = measurements[i][1];
-			marshalmeasurements[h++] = measurements[i][2];
+			double[] mlinear = measurements[i].ToLinear();
+
+			for (int k = 0; k < MeasureSize; k++) {
+				marshalmeasurements[h++] = mlinear[k];
+			}
 		}
 
 		int status = Update(BestEstimate.Pose.State, marshalmeasurements, labels.ToArray(), measurements.Count);
 
 		// updates the estimated complete path to show the batch nature of the algorithm
 		List<double[]> trajectory = GetTrajectory();
-		BestEstimate.Pose         = new Pose3D(trajectory[trajectory.Count - 1]);
+		BestEstimate.Pose         = new PoseT().FromState(trajectory[trajectory.Count - 1]);
 		MapModel                  = GetMapModel(out plmodel);
 
 		// copy the new estimated trajectory (given by iSAM2) into the BestEstimate
@@ -248,7 +253,7 @@ public class ISAM2Navigator : Navigator
 	/// </summary>
 	/// <param name="measurements">New measurements.</param>
 	/// <returns>Association labels.</returns>
-	public List<int> FindLabels(List<double[]> measurements)
+	public List<int> FindLabels(List<MeasurementT> measurements)
 	{
 		if (DAAlgorithm == DataAssociationAlgorithm.Perfect) {
 			if (!RefVehicle.HasDataAssociation) {
@@ -267,9 +272,9 @@ public class ISAM2Navigator : Navigator
 		Gaussian[] q;
 		Gaussian[] qcandidate;
 
-		SimulatedVehicle pose             = BestEstimate;
-		IndexedMap       visible          = new IndexedMap();
-		List<int>        visibleLandmarks = new List<int>();
+		var        pose             = BestEstimate;
+		IndexedMap visible          = new IndexedMap();
+		List<int>  visibleLandmarks = new List<int>();
 
 		for (int i = 0; i < MapModel.Count; i++) {
 			if (pose.Visible(MapModel[i].Mean)) {
@@ -301,7 +306,7 @@ public class ISAM2Navigator : Navigator
 			Gaussian component = visible[i];
 
 			if (DAAlgorithm == DataAssociationAlgorithm.Mahalanobis) {
-				q[i] = new Gaussian(pose.MeasurePerfect(component.Mean),
+				q[i] = new Gaussian(pose.Measurer.MeasurePerfect(pose.Pose, component.Mean).ToLinear(),
 				                    plmodel[visibleLandmarks[i]].Covariance,
 				                    1.0);
 			}
@@ -317,7 +322,8 @@ public class ISAM2Navigator : Navigator
 				// assume the covariance is zero, since there's nothing better to assume here
 				// note that this is more stringent on the unproven data, as they are given
 				// less leeway for noise than the already associated landmark
-				qcandidate[i] = new Gaussian(pose.MeasurePerfect(component.Mean), R, component.Weight);
+				qcandidate[i] = new Gaussian(pose.Measurer.MeasurePerfect(pose.Pose, component.Mean).ToLinear(),
+				                             R, component.Weight);
 			}
 			else {
 				qcandidate[i] = new Gaussian(component.Mean, I, 1.0);
@@ -331,10 +337,10 @@ public class ISAM2Navigator : Navigator
 				double distance2;
 
 				if (DAAlgorithm == DataAssociationAlgorithm.Mahalanobis) {
-					distance2 = vlandmarks[i].SquareMahalanobis(measurements[k]);
+					distance2 = vlandmarks[i].SquareMahalanobis(measurements[k].ToLinear());
 				}
 				else {
-					distance2 = vlandmarks[i].Mean.SquareEuclidean(pose.MeasureToMap(measurements[k]));
+					distance2 = vlandmarks[i].Mean.SquareEuclidean(pose.Measurer.MeasureToMap(pose.Pose, measurements[k]));
 				}
 
 				if (distance2 < MatchThreshold * MatchThreshold) {
@@ -387,7 +393,7 @@ public class ISAM2Navigator : Navigator
 				double w = CandidateMapModel[k].Weight;
 				CandidateMapModel[k] =
 					new Gaussian((CandidateMapModel[k].Mean.Multiply(w).Add(
-					                 BestEstimate.MeasureToMap(measurements[assignments[i]]))).Divide(w + 1),
+					                 BestEstimate.Measurer.MeasureToMap(BestEstimate.Pose, measurements[assignments[i]]))).Divide(w + 1),
 					             I,
 					             w + 1);
 				
@@ -414,7 +420,7 @@ public class ISAM2Navigator : Navigator
 				// if far from everything, generate a new candidate at the measured point
 				// note that the covariance is assumed zero, though that would throw an exception,
 				// as it doesn't have an inverse, so the identity is used instead (dummy value)
-				CandidateMapModel.Add(new Gaussian(BestEstimate.MeasureToMap(measurements[i]), I, 1));
+				CandidateMapModel.Add(new Gaussian(BestEstimate.Measurer.MeasureToMap(BestEstimate.Pose, measurements[i]), I, 1));
 
 				if (NewLandmarkThreshold <= 1) {
 					CandidateMapModel.RemoveAt(CandidateMapModel.Count - 1);
@@ -440,7 +446,7 @@ public class ISAM2Navigator : Navigator
 	public override void Dispose()
 	{
 		if (handle.Handle != IntPtr.Zero) {
-			deletenavigator(handle);
+			ISAM2Lib.deletenavigator(handle);
 			handle = new HandleRef(this, IntPtr.Zero);
 		}
 	}
@@ -451,18 +457,20 @@ public class ISAM2Navigator : Navigator
 	/// <param name="initPose">Initial pose.</param>
 	/// <param name="measurementNoise">Vectorized measurement noise.</param>
 	/// <param name="motionNoise">Vectorized motion noise.</param>
-	/// <param name="focal">Focal length.</param>
+	/// <param name="mparams">Measurer configuration parameters.</param>
 	/// <returns>New navigator.</returns>
 	private unsafe HandleRef NewNavigator(double[] initPose, double[] measurementNoise,
-	                                      double[] motionNoise, double focal)
+	                                      double[] motionNoise, double[] mparams)
 	{
 		IntPtr ptr = IntPtr.Zero;
 
 		fixed(double* ptrInitPose         = initPose) {
 		fixed(double* ptrMeasurementNoise = measurementNoise) {
 		fixed(double* ptrMotionNoise      = motionNoise) {
-			ptr = newnavigator((IntPtr) ptrInitPose, (IntPtr) ptrMeasurementNoise,
-			                   (IntPtr) ptrMotionNoise, focal);
+		fixed(double* ptrMParams          = mparams) {
+			ptr = ISAM2Lib.newnavigator((IntPtr) ptrInitPose, (IntPtr) ptrMeasurementNoise,
+			                            (IntPtr) ptrMotionNoise, (IntPtr) ptrMParams);
+		}
 		}
 		}
 		}
@@ -484,7 +492,7 @@ public class ISAM2Navigator : Navigator
 		fixed(double* ptrNewState     = newstate) {
 		fixed(double* ptrMeasurements = measurements) {
 		fixed(int*    ptrLabels       = labels) {
-			retvalue = update(handle, (IntPtr) ptrNewState, (IntPtr) ptrMeasurements, (IntPtr) ptrLabels, nmeasurements, OnlyMapping);
+			retvalue = ISAM2Lib.update(handle, (IntPtr) ptrNewState, (IntPtr) ptrMeasurements, (IntPtr) ptrLabels, nmeasurements, OnlyMapping);
 		}
 		}
 		}
@@ -501,18 +509,14 @@ public class ISAM2Navigator : Navigator
 		int            length;
 		List<double[]> trajectory = new List<double[]>();
 
-		double* ptrtrajectory = (double*) gettrajectory(handle, out length);
+		double* ptrtrajectory = (double*) ISAM2Lib.gettrajectory(handle, out length);
 
-		for (int i = 0, k = 0; i < length; i++, k += 7) {
-			double[] point = new double[7];
+		for (int i = 0, k = 0; i < length; i++) {
+			double[] point = new double[StateSize];
 
-			point[0] = ptrtrajectory[k + 0];
-			point[1] = ptrtrajectory[k + 1];
-			point[2] = ptrtrajectory[k + 2];
-			point[3] = ptrtrajectory[k + 3];
-			point[4] = ptrtrajectory[k + 4];
-			point[5] = ptrtrajectory[k + 5];
-			point[6] = ptrtrajectory[k + 6];
+			for (int h = 0; h < StateSize; k++) {
+				point[h] = ptrtrajectory[k];
+			}
 
 			trajectory.Add(point);
 		}
@@ -539,9 +543,9 @@ public class ISAM2Navigator : Navigator
 
 		plmodel  = new IndexedMap();
 
-		double* ptrmapmodel = (double*) getmapmodel      (handle, out length);
-		double* ptrmapcov   = (double*) getmapcovariances(handle, out length);
-		double* ptrplcov    = (double*) getplcovariances (handle, out length);
+		double* ptrmapmodel = (double*) ISAM2Lib.getmapmodel      (handle, out length);
+		double* ptrmapcov   = (double*) ISAM2Lib.getmapcovariances(handle, out length);
+		double* ptrplcov    = (double*) ISAM2Lib.getplcovariances (handle, out length);
 
 		// main model: mean and covariance
 		for (int i = 0, k = 0, h = 0; i < length; i++, k += 3, h += 9) {
@@ -587,27 +591,34 @@ public class ISAM2Navigator : Navigator
 
 		return mapmodel;
 	}
+}
+
+/// <summary>
+/// External symbols for the ISAM2 class (separate non-generic class since DllImport doesn't work
+/// inside generic types).
+/// </summary>
+public class ISAM2Lib
+{
+	[DllImport("libisam2.so")]
+	public extern static IntPtr newnavigator(IntPtr initstate, IntPtr measurementnoise, IntPtr motionnoise, IntPtr mparams);
 
 	[DllImport("libisam2.so")]
-	private extern static IntPtr newnavigator(IntPtr initstate, IntPtr measurementnoise, IntPtr motionnoise, double focal);
+	public extern static void deletenavigator(HandleRef navigator);
 
 	[DllImport("libisam2.so")]
-	private extern static void deletenavigator(HandleRef navigator);
+	public extern static int update(HandleRef navigator, IntPtr newstate, IntPtr measurements, IntPtr labels, int nmeasurements, [MarshalAs(UnmanagedType.U1)] bool onlymapping);
 
 	[DllImport("libisam2.so")]
-	private extern static int update(HandleRef navigator, IntPtr newstate, IntPtr measurements, IntPtr labels, int nmeasurements, [MarshalAs(UnmanagedType.U1)] bool onlymapping);
+	public extern static IntPtr gettrajectory(HandleRef navigator, out int length);
 
 	[DllImport("libisam2.so")]
-	private extern static IntPtr gettrajectory(HandleRef navigator, out int length);
+	public extern static IntPtr getmapmodel(HandleRef navigator, out int length);
 
 	[DllImport("libisam2.so")]
-	private extern static IntPtr getmapmodel(HandleRef navigator, out int length);
+	public extern static IntPtr getmapcovariances(HandleRef navigator, out int length);
 
 	[DllImport("libisam2.so")]
-	private extern static IntPtr getmapcovariances(HandleRef navigator, out int length);
-
-	[DllImport("libisam2.so")]
-	private extern static IntPtr getplcovariances(HandleRef navigator, out int length);
+	public extern static IntPtr getplcovariances(HandleRef navigator, out int length);
 }
 
 /// <summary>

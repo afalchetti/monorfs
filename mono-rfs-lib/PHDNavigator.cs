@@ -45,7 +45,10 @@ namespace monorfs
 /// <summary>
 /// SLAM solver. It uses the PHD filter.
 /// </summary>
-public class PHDNavigator : Navigator
+public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT, PoseT, MeasurementT>
+	where PoseT        : IPose<PoseT>, new()
+	where MeasurementT : IMeasurement<MeasurementT>, new()
+	where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
 {
 	/// <summary>
 	/// Landmark density expected on unexplored areas.
@@ -117,7 +120,7 @@ public class PHDNavigator : Navigator
 	/// <summary>
 	/// Particle filter representation of the vehicle pose.
 	/// </summary>
-	public TrackVehicle[] VehicleParticles { get; private set; }
+	public TrackVehicle<MeasurerT, PoseT, MeasurementT>[] VehicleParticles { get; private set; }
 
 	/// <summary>
 	/// Weight associated to each vehicle particle.
@@ -138,7 +141,7 @@ public class PHDNavigator : Navigator
 	/// <summary>
 	/// Most accurate estimate of the current vehicle pose.
 	/// </summary>
-	public override TrackVehicle BestEstimate
+	public override TrackVehicle<MeasurerT, PoseT, MeasurementT> BestEstimate
 	{
 		get
 		{
@@ -186,7 +189,7 @@ public class PHDNavigator : Navigator
 	/// <param name="vehicle">Vehicle to track.</param>
 	/// <param name="particlecount">Number of particles for the Montecarlo filter.</param>
 	/// <param name="onlymapping">If true, don't do SLAM, but mapping (i.e. the localization is assumed known).</param>
-	public PHDNavigator(Vehicle vehicle, int particlecount, bool onlymapping = false)
+	public PHDNavigator(Vehicle<MeasurerT, PoseT, MeasurementT> vehicle, int particlecount, bool onlymapping = false)
 		: base(vehicle, onlymapping)
 	{
 		ParticleCount = particlecount;
@@ -239,13 +242,13 @@ public class PHDNavigator : Navigator
 	/// <param name="model">New map model estimate.</param>
 	/// <param name="explore">New queued measurements to explore.</param>
 	/// <param name="particlecount">Number of particles for the Montecarlo filter.</param>
-	private void reset(Vehicle vehicle, Map model, List<double[]> explore, int particlecount)
+	private void reset(Vehicle<MeasurerT, PoseT, MeasurementT> vehicle, Map model, List<double[]> explore, int particlecount)
 	{
 		// do a deep copy, so no real info flows
 		// into the navigator, only estimates, in SLAM
 		// (this avoid bugs where the user unknowingly uses
 		// the groundtruth to estimate the groundtruth itself)
-		VehicleParticles = new TrackVehicle  [particlecount];
+		VehicleParticles = new TrackVehicle<MeasurerT, PoseT, MeasurementT>[particlecount];
 		MapModels        = new Map           [particlecount];
 		VehicleWeights   = new double        [particlecount];
 		toexplore        = new List<double[]>[particlecount];
@@ -292,7 +295,7 @@ public class PHDNavigator : Navigator
 	public override void Update(GameTime time, double[] reading)
 	{
 		if (OnlyMapping) {
-			VehicleParticles[0].Pose = new Pose3D(RefVehicle.Pose);
+			VehicleParticles[0].Pose = RefVehicle.Pose.DClone();
 			VehicleParticles[0].WayPoints = new TimedState(RefVehicle.WayPoints);
 		}
 		else {
@@ -317,7 +320,7 @@ public class PHDNavigator : Navigator
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
-	public override void SlamUpdate(GameTime time, List<double[]> measurements)
+	public override void SlamUpdate(GameTime time, List<MeasurementT> measurements)
 	{
 		// map update
 		Parallel.For(0, VehicleParticles.Length,
@@ -372,7 +375,8 @@ public class PHDNavigator : Navigator
 	/// <param name="corrected">Corrected map model.</param>
 	/// <param name="pose">Vehicle pose.</param>
 	/// <returns>Total weight update factor.</returns>
-	public double WeightAlpha(List<double[]> measurements, Map predicted, Map corrected, SimulatedVehicle pose)
+	public double WeightAlpha(List<MeasurementT> measurements, Map predicted, Map corrected,
+	                          SimulatedVehicle<MeasurerT, PoseT, MeasurementT> pose)
 	{
 		IMap cvisible = corrected.FindAll(g => pose.Visible(g.Mean) && g.Weight > 0.8);
 
@@ -405,7 +409,8 @@ public class PHDNavigator : Navigator
 	/// <param name="map">Map model.</param>
 	/// <param name="pose">Vehicle pose.</param>
 	/// <returns>Set likelihood.</returns>
-	public static double SetLikelihood(List<double[]> measurements, IMap map, SimulatedVehicle pose)
+	public static double SetLikelihood(List<MeasurementT> measurements, IMap map,
+	                                   SimulatedVehicle<MeasurerT, PoseT, MeasurementT> pose)
 	{
 		return Math.Exp(SetLogLikelihood(measurements, map, pose));
 	}
@@ -417,7 +422,8 @@ public class PHDNavigator : Navigator
 	/// <param name="map">Map model.</param>
 	/// <param name="pose">Vehicle pose.</param>
 	/// <returns>Set log-likelihood matrix.</returns>
-	public static SparseMatrix SetLogLikeMatrix(List<double[]> measurements, IMap map, SimulatedVehicle pose)
+	public static SparseMatrix SetLogLikeMatrix(List<MeasurementT> measurements, IMap map,
+	                                            SimulatedVehicle<MeasurerT, PoseT, MeasurementT> pose)
 	{
 		// exact calculation if there are few components/measurements;
 		// use the most probable components approximation otherwise
@@ -428,14 +434,15 @@ public class PHDNavigator : Navigator
 
 		int n = 0;
 		foreach (Gaussian landmark in map) {
-			double[] m = pose.MeasurePerfect(landmark.Mean);
-			zprobs[n]  = new Gaussian(m, pose.MeasurementCovariance, pose.DetectionProbabilityM(m));
+			MeasurementT m       = pose.Measurer.MeasurePerfect(pose.Pose, landmark.Mean);
+			double[]     mlinear = m.ToLinear();
+			zprobs[n] = new Gaussian(mlinear, pose.MeasurementCovariance, pose.DetectionProbabilityM(m));
 			n++;
 		}
 
 		for (int i = 0; i < zprobs.Length;      i++) {
 		for (int k = 0; k < measurements.Count; k++) {
-			double d = zprobs[i].Mahalanobis(measurements[k]);
+			double d = zprobs[i].Mahalanobis(measurements[k].ToLinear());
 			if (d < 5) {
 				// prob = log (pD * zprob(measurement))
 				// this way multiplying probabilities equals to adding (negative) profits
@@ -462,7 +469,8 @@ public class PHDNavigator : Navigator
 	/// <param name="map">Map model.</param>
 	/// <param name="pose">Vehicle pose.</param>
 	/// <returns>Set log-likelihood.</returns>
-	public static double SetLogLikelihood(List<double[]> measurements, IMap map, SimulatedVehicle pose)
+	public static double SetLogLikelihood(List<MeasurementT> measurements, IMap map,
+	                                      SimulatedVehicle<MeasurerT, PoseT, MeasurementT> pose)
 	{
 		// exact calculation if there are few components/measurements;
 		// use the most probable components approximation otherwise
@@ -526,13 +534,14 @@ public class PHDNavigator : Navigator
 	/// <param name="pose">Vehicle pose.</param>
 	/// <param name="gradient">Log-likelihood gradient wrt. the pose.</param>
 	/// <returns>Set log-likelihood.</returns>
-	public static double QuasiSetLogLikelihood(List<double[]> measurements, IMap map,
-	                                           SimulatedVehicle pose, out double[] gradient)
+	public static double QuasiSetLogLikelihood(List<MeasurementT> measurements, IMap map,
+	                                           SimulatedVehicle<MeasurerT, PoseT, MeasurementT> pose,
+	                                           out double[] gradient)
 	{
 		// exact calculation if there are few components/measurements;
 		// use the most probable components approximation otherwise
 		SparseMatrix llmatrix = new SparseMatrix(map.Count + measurements.Count, map.Count + measurements.Count, double.NegativeInfinity);
-		var          dlldp    = new SparseMatrix<double[]>(map.Count + measurements.Count, map.Count + measurements.Count, new double[6]);
+		var          dlldp    = new SparseMatrix<double[]>(map.Count + measurements.Count, map.Count + measurements.Count, new double[OdoSize]);
 
 		double       logPD      = Math.Log(pose.PD);
 		double       log1PD     = Math.Log(1 - pose.PD);
@@ -542,20 +551,22 @@ public class PHDNavigator : Navigator
 
 		int n = 0;
 		foreach (Gaussian landmark in map) {
-			double[] m    = pose.MeasurePerfect(landmark.Mean);
-			zprobs[n]     = new Gaussian(m, pose.MeasurementCovariance, 1);
-			zjacobians[n] = pose.MeasurementJacobianP(landmark.Mean);
+			MeasurementT m       = pose.Measurer.MeasurePerfect(pose.Pose, landmark.Mean);
+			double[]     mlinear = m.ToLinear();
+			zprobs[n]     = new Gaussian(mlinear, pose.MeasurementCovariance, 1);
+			zjacobians[n] = pose.Measurer.MeasurementJacobianP(pose.Pose, landmark.Mean);
 			n++;
 		}
 		
 		for (int i = 0; i < zprobs.Length;      i++) {
 		for (int k = 0; k < measurements.Count; k++) {
-			double d = zprobs[i].Mahalanobis(measurements[k]);
+			double[] m = measurements[k].ToLinear();
+			double   d = zprobs[i].Mahalanobis(m);
 			if (d < 5) {
 				// prob = log (pD * zprob(measurement))
 				// this way multiplying probabilities equals to adding (negative) profits
 				llmatrix[i, k] = logPD + Math.Log(zprobs[i].Multiplier) - 0.5 * d * d;
-				dlldp  [i, k]  = (measurements[k].Subtract(zprobs[i].Mean)).Transpose().
+				dlldp   [i, k] = (m.Subtract(zprobs[i].Mean)).Transpose().
 				                     Multiply(zprobs[i].CovarianceInverse).
 				                     Multiply(zjacobians[i]).
 				                     GetRow(0);
@@ -577,7 +588,7 @@ public class PHDNavigator : Navigator
 		double[][] dlogcompdp = new double[200][];
 		double     total      = 0;
 		
-		gradient = new double[6];
+		gradient = new double[OdoSize];
 		
 		for (int i = 0; i < connectedfull.Count; i++) {
 			int[]        rows;
@@ -616,7 +627,7 @@ public class PHDNavigator : Navigator
 				}
 
 				logcomp   [m] = assignment.Item2;
-				dlogcompdp[m] = new double[6];
+				dlogcompdp[m] = new double[OdoSize];
 
 				for (int p = 0; p < assignment.Item1.Length; p++) {
 					dlogcompdp[m] = dlogcompdp[m].Add(dcomp[p, assignment.Item1[p]]);
@@ -644,11 +655,11 @@ public class PHDNavigator : Navigator
 	/// </summary>
 	public void ResampleParticles()
 	{
-		double         random    = (double) Util.Uniform.Next() / VehicleWeights.Length;
-		double[]       weights   = new double[VehicleWeights.Length];
-		TrackVehicle[] particles = new TrackVehicle[VehicleParticles.Length];
-		Map[]          models    = new Map[MapModels.Length];
-		double         maxweight = 0;
+		var      particles = new TrackVehicle<MeasurerT, PoseT, MeasurementT>[VehicleParticles.Length];
+		double   random    = (double) Util.Uniform.Next() / VehicleWeights.Length;
+		double[] weights   = new double[VehicleWeights.Length];
+		Map[]    models    = new Map[MapModels.Length];
+		double   maxweight = 0;
 
 		for (int i = 0, k = 0; i < weights.Length; i++) {
 			// k should never be out of range, but because of floating point arithmetic,
@@ -711,7 +722,9 @@ public class PHDNavigator : Navigator
 	/// To diminish the computational time, only the areas near the new measurements are
 	/// used (i.e. the same measurements). This is equivalent to artificially increasing
 	/// belief on the new measurements (when in a new area).</remarks>
-	public Map PredictConditional(List<double[]> measurements, SimulatedVehicle pose, Map model, List<double[]> unexplored)
+	public Map PredictConditional(List<MeasurementT> measurements,
+	                              SimulatedVehicle<MeasurerT, PoseT, MeasurementT> pose,
+	                              Map model, List<double[]> unexplored)
 	{
 		// gaussian are born on any unexplored areas,
 		// as something is expected to be there,
@@ -727,8 +740,8 @@ public class PHDNavigator : Navigator
 
 		unexplored.Clear();
 
-		foreach (double[] measurement in measurements) {
-			double[] candidate = pose.MeasureToMap(measurement);
+		foreach (MeasurementT measurement in measurements) {
+			double[] candidate = pose.Measurer.MeasureToMap(pose.Pose, measurement);
 			if (!Explored(model, candidate)) {
 				unexplored.Add(candidate);
 			}
@@ -745,7 +758,9 @@ public class PHDNavigator : Navigator
 	/// <param name="pose">Vehicle pose that conditions the mapping.</param>
 	/// <param name="model">Associated map model.</param>
 	/// <returns>Corrected map model.</returns>
-	public Map CorrectConditional(List<double[]> measurements, SimulatedVehicle pose, Map model)
+	public Map CorrectConditional(List<MeasurementT> measurements,
+	                              SimulatedVehicle<MeasurerT, PoseT, MeasurementT> pose,
+	                              Map model)
 	{
 		Map corrected = new Map();
 
@@ -774,8 +789,8 @@ public class PHDNavigator : Navigator
 		int n = 0;
 		foreach (Gaussian component in model) {
 			m [n] = component.Mean;
-			mp[n] = pose.MeasurePerfect(m[n]);
-			H [n] = pose.MeasurementJacobianL(m[n]);
+			mp[n] = pose.Measurer.MeasurePerfect(pose.Pose, m[n]).ToLinear();
+			H [n] = pose.Measurer.MeasurementJacobianL(pose.Pose, m[n]);
 			P [n] = component.Covariance;
 			PH[n] = P[n].MultiplyByTranspose(H[n]);
 			S [n] = H[n].Multiply(PH[n]).Add(R);
@@ -796,21 +811,22 @@ public class PHDNavigator : Navigator
 		// q(z) = N(z, h(m), H P H^T + R)
 		// R is the measurement covariance
 		// H is the measurement linear operator (jacobian) from the model
-		foreach (double[] measurement in measurements) {
+		foreach (MeasurementT measurement in measurements) {
 			double PD = pose.DetectionProbabilityM(measurement);
 
-			Map    near      = model.Near(pose.MeasureToMap(measurement), 1.2);
-			double weightsum = q.Evaluate(measurement);
+			Map      near      = model.Near(pose.Measurer.MeasureToMap(pose.Pose, measurement), 1.2);
+			double[] mlinear   = measurement.ToLinear();
+			double   weightsum = q.Evaluate(mlinear);
 
 			foreach (var landmark in near) {
 				int i = qindex[landmark];
 
 				// double[][] gain       = PH[i].Multiply(S[i].Inverse());
 				double[][] gain       = PH[i].Multiply(mc[i].CovarianceInverse);
-				double[]   mean       = m[i].Add(gain.Multiply(measurement.Subtract(mp[i])));
+				double[]   mean       = m[i].Add(gain.Multiply(mlinear.Subtract(mp[i])));
 				double[][] covariance = I.Subtract(gain.Multiply(H[i])).Multiply(P[i]);
 
-				double weight = PD * landmark.Weight * mc[i].Evaluate(measurement) / (pose.ClutterDensity + PD * weightsum);
+				double weight = PD * landmark.Weight * mc[i].Evaluate(measurement.ToLinear()) / (pose.ClutterDensity + PD * weightsum);
 
 				corrected.Add(new Gaussian(mean, covariance, weight));
 			}

@@ -53,13 +53,16 @@ namespace monorfs
 /// consistently re-analyze an experiment, as well as to present such results to a third party.
 /// It is also useful as a cache for long simulations, e.g. when using thousands of particles.
 /// </summary>
-public class Viewer : Manipulator
+public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, PoseT, MeasurementT>
+	where PoseT        : IPose<PoseT>, new()
+	where MeasurementT : IMeasurement<MeasurementT>, new()
+	where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
 {
 	/// <summary>
 	/// Reference to the inherited navigator, but using the derived FakeNavigator type,
 	/// which exposes the estimates for direct external modification.
 	/// </summary>
-	private FakeNavigator xnavigator;
+	private FakeNavigator<MeasurerT, PoseT, MeasurementT> xnavigator;
 
 	/// <summary>
 	/// Recorded vehicle trajectory indexed by time.
@@ -153,12 +156,14 @@ public class Viewer : Manipulator
 	/// <param name="tags">Tags in the timeline.</param>
 	/// <param name="fps">Frame rate.</param>
 	/// <param name="sidebarfile">Sidebar video filename.</param>
-	public Viewer(string title, SimulatedVehicle explorer, TimedState trajectory, TimedTrajectory estimate,
+	public Viewer(string title,
+	              SimulatedVehicle<MeasurerT, PoseT, MeasurementT> explorer,
+	              TimedState trajectory, TimedTrajectory estimate,
 	              TimedMapModel map, TimedMeasurements measurements, TimedMessage tags,
 	              double fps, string sidebarfile)
-		: base(title, explorer, new FakeNavigator(explorer), false, fps)
+		: base(title, explorer, new FakeNavigator<MeasurerT, PoseT, MeasurementT>(explorer), false, fps)
 	{
-		xnavigator   = Navigator as FakeNavigator;
+		xnavigator   = Navigator as FakeNavigator<MeasurerT, PoseT, MeasurementT>;
 		Trajectory   = trajectory;
 		Estimate     = estimate;
 		Map          = map;
@@ -190,8 +195,8 @@ public class Viewer : Manipulator
 
 		// override base class behavior (that is based on explorer HasSidebar)
 		if (!string.IsNullOrEmpty(sidebarfile)) {
-			SidebarWidth  = Explorer.FilmArea.Width;
-			SidebarHeight = 2 * Explorer.FilmArea.Height;
+			SidebarWidth  = 640;
+			SidebarHeight = 2 * 480;
 			ScreenCut     = 0.7;
 		}
 	}
@@ -208,7 +213,8 @@ public class Viewer : Manipulator
 	/// <param name="tmpdir">Temporary data directory, to be removed after use.</param>
 	/// <returns>Prepared visualization object.</returns>
 	/// <remarks>All file must be previously sorted by time value. This property is assumed.</remarks>
-	public static Viewer FromFiles(string datafile, bool filterhistory, out string tmpdir)
+	public static Viewer<MeasurerT, PoseT, MeasurementT> FromFiles(string datafile, bool filterhistory,
+	                                                               out string tmpdir)
 	{
 		tmpdir         = Util.TemporaryDir();
 		string datadir = Path.Combine(tmpdir, "data");
@@ -239,19 +245,22 @@ public class Viewer : Manipulator
 			sidebarfile = "";
 		}
 
-		SimulatedVehicle  explorer;
+		SimulatedVehicle<MeasurerT, PoseT, MeasurementT> explorer;
 		TimedState        trajectory;
 		TimedTrajectory   estimate;
 		TimedMapModel     map;
 		TimedMeasurements measurements;
 		TimedMessage      tags;
 
-		trajectory   = FP.TimedArrayFromDescriptor       (File.ReadAllLines(vehiclefile),  7);
-		estimate     = FP.TrajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), 7, filterhistory);
-		map          = FP.MapHistoryFromDescriptor       (File.ReadAllText(mapfile));
+		PoseT        dummyP = new PoseT();
+		MeasurementT dummyM = new MeasurementT();
+
+		trajectory   = FP.TimedArrayFromDescriptor       (File.ReadAllLines(vehiclefile), dummyP.StateSize);
+		estimate     = FP.TrajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), dummyP.StateSize, filterhistory);
+		map          = FP.MapHistoryFromDescriptor       (File.ReadAllText(mapfile), 3);
 
 		if (!string.IsNullOrEmpty(measurefile)) {
-			measurements = FP.MeasurementsFromDescriptor(File.ReadAllText(measurefile));
+			measurements = FP.MeasurementsFromDescriptor(File.ReadAllText(measurefile), dummyM.Size);
 		}
 		else {
 			measurements = new TimedMeasurements();
@@ -265,13 +274,14 @@ public class Viewer : Manipulator
 		}
 
 		if (!string.IsNullOrEmpty(scenefile)) {
-			explorer = FP.VehicleFromSimFile(File.ReadAllText(scenefile));
+			explorer = SimulatedVehicle<MeasurerT, PoseT, MeasurementT>.
+			               FromFile(File.ReadAllText(scenefile));
 		}
 		else {
-			explorer = new SimulatedVehicle(Pose3D.Identity, new List<double[]>());
+			explorer = new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>(new PoseT().IdentityP(), new List<double[]>());
 		}
 
-		return new Viewer("monorfs - viewing " + datafile, explorer, trajectory, estimate, map, measurements, tags, 30, sidebarfile);
+		return new Viewer<MeasurerT, PoseT, MeasurementT>("monorfs - viewing " + datafile, explorer, trajectory, estimate, map, measurements, tags, 30, sidebarfile);
 	}
 
 	/// <summary>
@@ -338,15 +348,17 @@ public class Viewer : Manipulator
 
 		preframeindex        = FrameIndex;
 		Explorer .WayPoints  = VehicleWaypoints;
-		Explorer .Pose       = new Pose3D(Explorer.WayPoints[Explorer.WayPoints.Count - 1].Item2);
+		Explorer .Pose       = new PoseT().FromState(Explorer.WayPoints[Explorer.WayPoints.Count - 1].Item2);
 		xnavigator.MapModel  = Map[mapindices[FrameIndex]].Item2;
 		xnavigator.WayTrajectories[0] = Estimate[FrameIndex];
 		xnavigator.Vehicle.WayPoints  = Estimate[FrameIndex].Item2;
-		xnavigator.Vehicle.Pose       = new Pose3D(Navigator.BestEstimate.WayPoints[Navigator.BestEstimate.WayPoints.Count - 1].Item2);
+		xnavigator.Vehicle.Pose       = new PoseT().FromState(Navigator.BestEstimate.WayPoints[Navigator.BestEstimate.WayPoints.Count - 1].Item2);
+
+		MeasurementT dummy = new MeasurementT();
 
 		Explorer.MappedMeasurements.Clear();
 		foreach (double[] z in Measurements[mapindices[FrameIndex]].Item2) {
-			Explorer.MappedMeasurements.Add(Explorer.MeasureToMap(z));
+			Explorer.MappedMeasurements.Add(Explorer.Measurer.MeasureToMap(Explorer.Pose, dummy.FromLinear(z)));
 		}
 
 		if (!taggone) {

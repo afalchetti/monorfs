@@ -66,6 +66,14 @@ public class Quaternion
 	}
 
 	/// <summary>
+	/// Angle in angle-axis representation.
+	/// </summary>
+	public double Angle
+	{
+		get { return 2 * Math.Acos(W); }
+	}
+
+	/// <summary>
 	/// Gets the identity.
 	/// </summary>
 	/// <value>The identity.</value>
@@ -202,7 +210,7 @@ public class Quaternion
 		double   mag    = vector.Euclidean();
 
 		if (mag < 1e-12) {
-			return new double[] {0, 0, 0};
+			return new double[3] {0, 0, 0};
 		}
 
 		double[] unit = vector.Normalize();

@@ -412,7 +412,7 @@ public static class MatrixExtensions
 		}
 
 		if (double.IsNegativeInfinity(max)) {
-			return new double[6];
+			return value;
 		}
 
 		for (int i = begin; i < end; i++) {

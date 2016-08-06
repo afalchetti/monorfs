@@ -29,6 +29,7 @@
 using System;
 using NDesk.Options;
 using System.IO;
+using monorfs;
 
 namespace postanalysis
 {
@@ -82,7 +83,8 @@ class Program
 			return;
 		}
 
-		Plot plot = Plot.FromFiles(file, histmode, ospac, ospap, reftime);
+		var plot = Plot<PRM3DMeasurer, Pose3D, PixelRangeMeasurement>.
+		               FromFiles(file, histmode, ospac, ospap, reftime);
 
 		File.WriteAllText(file + ".loc.data",         plot.SerializedLocationError);
 		File.WriteAllText(file + ".rot.data",         plot.SerializedRotationError);

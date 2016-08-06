@@ -38,6 +38,9 @@ using TimedArray        = System.Collections.Generic.List<System.Tuple<double, d
 using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
 using TimedGaussian     = System.Collections.Generic.List<System.Tuple<double, monorfs.Gaussian>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
+using PHDNavigator      = monorfs.PHDNavigator<monorfs.PRM3DMeasurer, monorfs.Pose3D, monorfs.PixelRangeMeasurement>;
+using LoopyPHDNavigator = monorfs.LoopyPHDNavigator<monorfs.PRM3DMeasurer, monorfs.Pose3D, monorfs.PixelRangeMeasurement>;
+using SimulatedVehicle  = monorfs.SimulatedVehicle<monorfs.PRM3DMeasurer, monorfs.Pose3D, monorfs.PixelRangeMeasurement>;
 
 namespace monorfs.Test
 {
@@ -68,10 +71,10 @@ class LoopyPHDNavigatorTest
 	[Test]
 	public void FitGaussianNoMap()
 	{
-		Pose3D         linearpoint  = new Pose3D();
-		double[]       estimate     = new double[6];
-		List<double[]> measurements = new List<double[]>();
-		Map            map          = new Map();
+		Pose3D   linearpoint  = new Pose3D();
+		double[] estimate     = new double[6];
+		Map      map          = new Map();
+		var      measurements = new List<PixelRangeMeasurement>();
 
 		double[][] covariance = MatrixExtensions.Zero(6).SingularInverse();
 		Gaussian   expected   = new Gaussian(new double[6] {0, 0, 0, 0, 0, 0}, covariance, 1.0);
@@ -84,12 +87,12 @@ class LoopyPHDNavigatorTest
 	[Test]
 	public void FitGaussian()
 	{
-		Pose3D         linearpoint  = new Pose3D();
-		double[]       estimate     = new double[6];
-		List<double[]> measurements = new List<double[]>();
-		Map            map          = new Map();
+		Pose3D   linearpoint  = new Pose3D();
+		double[] estimate     = new double[6];
+		Map      map          = new Map();
+		var      measurements = new List<PixelRangeMeasurement>();
 
-		measurements.Add(new double[3] {0, 0, 1});
+		measurements.Add(new PixelRangeMeasurement(0, 0, 1));
 
 		map.Add(new Gaussian(new double[3] {0, 0, 1}, identitycov, 1.0));
 
@@ -98,7 +101,7 @@ class LoopyPHDNavigatorTest
 		double a  = 1.0/dummy.MeasurementCovariance[0][0];
 		double b  = 1.0/dummy.MeasurementCovariance[1][1];
 		double c  = 1.0/dummy.MeasurementCovariance[2][2];
-		double f2 = dummy.VisionFocal * dummy.VisionFocal;
+		double f2 = dummy.Measurer.VisionFocal * dummy.Measurer.VisionFocal;
 
 		double[][] expinfo = new double[6][] { new double[6] {a*f2,     0, 0,     0, a*f2, 0},
 		                                       new double[6] {   0,  b*f2, 0, -b*f2,    0, 0},
@@ -117,13 +120,13 @@ class LoopyPHDNavigatorTest
 	[Test]
 	public void FitGaussianWrongLocation()
 	{
-		Pose3D         linearpoint  = new Pose3D();
-		double[]       estimate     = new double[6];
-		List<double[]> measurements = new List<double[]>();
-		Map            map          = new Map();
+		Pose3D   linearpoint  = new Pose3D();
+		double[] estimate     = new double[6];
+		Map      map          = new Map();
+		var      measurements = new List<PixelRangeMeasurement>();
 
 		estimate[2] = -0.05;
-		measurements.Add(new double[3] {0, 0, 1});
+		measurements.Add(new PixelRangeMeasurement(0, 0, 1));
 
 		map.Add(new Gaussian(new double[3] {0, 0, 1.05}, identitycov, 1.0));
 
@@ -132,7 +135,7 @@ class LoopyPHDNavigatorTest
 		double a  = 1.0/dummy.MeasurementCovariance[0][0];
 		double b  = 1.0/dummy.MeasurementCovariance[1][1];
 		double c  = 1.0/dummy.MeasurementCovariance[2][2];
-		double f2 = dummy.VisionFocal * dummy.VisionFocal;
+		double f2 = dummy.Measurer.VisionFocal * dummy.Measurer.VisionFocal;
 		
 		double[]   expstate = new double[7] {0, 0, 0.05, 1, 0, 0, 0};
 		double[][] expinfo  = new double[6][] { new double[6] {a*f2,     0, 0,     0, a*f2, 0},
@@ -155,14 +158,14 @@ class LoopyPHDNavigatorTest
 	[Test]
 	public void FitGaussianMultipleLandmarks()
 	{
-		Pose3D         linearpoint  = new Pose3D();
-		double[]       estimate     = new double[6] {-0.002, 0.003, 0.001, 0, 0, 0};
-		List<double[]> measurements = new List<double[]>();
-		Map            map          = new Map();
+		Pose3D   linearpoint  = new Pose3D();
+		double[] estimate     = new double[6] {-0.002, 0.003, 0.001, 0, 0, 0};
+		Map      map          = new Map();
+		var      measurements = new List<PixelRangeMeasurement>();
 
-		measurements.Add(new double[3] {115.16312, 0, 1.019803903});
-		measurements.Add(new double[3] {0,  57.58156, 1.004987562});
-		measurements.Add(new double[3] {28.79078,  0, 2.002498439});
+		measurements.Add(new PixelRangeMeasurement(115.16312, 0, 1.019803903));
+		measurements.Add(new PixelRangeMeasurement(0,  57.58156, 1.004987562));
+		measurements.Add(new PixelRangeMeasurement(28.79078,  0, 2.002498439));
 
 		map.Add(new Gaussian(new double[3] {0.2, 0, 1}, identitycov, 1.0));
 		map.Add(new Gaussian(new double[3] {0, 0.1, 1}, identitycov, 1.0));
@@ -188,13 +191,13 @@ class LoopyPHDNavigatorTest
 	[Test]
 	public void FitMeasurementAlreadyFine()
 	{
-		SimulatedVehicle pose0 = new SimulatedVehicle();
-		pose0.Pose             = Pose3D.Identity;
+		PRM3DMeasurer measurer = new PRM3DMeasurer();
+		Pose3D        pose0    = Pose3D.Identity;
 
-		double[] measurement = new double[3] {0, 0, 1};
+		var      measurement = new PixelRangeMeasurement(0, 0, 1);
 		double[] landmark    = new double[3] {0, 0, 1};
 
-		Pose3D fitted = LoopyPHDNavigator.FitToMeasurement(pose0, measurement, landmark);
+		Pose3D fitted = measurer.FitToMeasurement(pose0, measurement, landmark);
 
 		Pose3D expected = new Pose3D(new double[3] {0, 0, 0}, Quaternion.Identity);
 
@@ -204,13 +207,13 @@ class LoopyPHDNavigatorTest
 	[Test]
 	public void FitMeasurementOnlyTranslation()
 	{
-		SimulatedVehicle pose0 = new SimulatedVehicle();
-		pose0.Pose             = Pose3D.Identity;
+		PRM3DMeasurer measurer = new PRM3DMeasurer();
+		Pose3D        pose0    = Pose3D.Identity;
 
-		double[] measurement = new double[3] {0, 0, 1};
+		var      measurement = new PixelRangeMeasurement(0, 0, 1);
 		double[] landmark    = new double[3] {0, 0, 2.5};
 
-		Pose3D fitted = LoopyPHDNavigator.FitToMeasurement(pose0, measurement, landmark);
+		Pose3D fitted = measurer.FitToMeasurement(pose0, measurement, landmark);
 
 		Pose3D expected = new Pose3D(new double[3] {0, 0, 1.5}, Quaternion.Identity);
 
@@ -220,13 +223,13 @@ class LoopyPHDNavigatorTest
 	[Test]
 	public void FitMeasurementOnlyRotation()
 	{
-		SimulatedVehicle pose0 = new SimulatedVehicle();
-		pose0.Pose             = Pose3D.Identity;
+		PRM3DMeasurer measurer = new PRM3DMeasurer();
+		Pose3D        pose0    = Pose3D.Identity;
 
-		double[] measurement = new double[3] {0, 0, 1};
+		var      measurement = new PixelRangeMeasurement(0, 0, 1);
 		double[] landmark    = new double[3] {0, 1/Math.Sqrt(2), 1/Math.Sqrt(2)};
 
-		Pose3D fitted = LoopyPHDNavigator.FitToMeasurement(pose0, measurement, landmark);
+		Pose3D fitted = measurer.FitToMeasurement(pose0, measurement, landmark);
 
 		Quaternion rotation = new Quaternion(Math.Cos(Math.PI / 4 / 2),
 		                                     (-Math.Sin(Math.PI / 4 / 2)).Multiply(new double[3] {1, 0, 0}));
@@ -239,13 +242,13 @@ class LoopyPHDNavigatorTest
 	[Test]
 	public void FitMeasurementUnmeasurableLandmark()
 	{
-		SimulatedVehicle pose0 = new SimulatedVehicle();
-		pose0.Pose             = Pose3D.Identity;
+		PRM3DMeasurer measurer = new PRM3DMeasurer();
+		Pose3D        pose0    = Pose3D.Identity;
 
-		double[] measurement = new double[3] {0, 0, 1};
+		var      measurement = new PixelRangeMeasurement(0, 0, 1);
 		double[] landmark    = new double[3] {0, 1, 0};
 
-		Pose3D fitted   = LoopyPHDNavigator.FitToMeasurement(pose0, measurement, landmark);
+		Pose3D fitted   = measurer.FitToMeasurement(pose0, measurement, landmark);
 
 		Quaternion rotation = new Quaternion(Math.Cos(Math.PI / 2 / 2),
 		                                     (-Math.Sin(Math.PI / 2 / 2)).Multiply(new double[3] {1, 0, 0}));
@@ -258,30 +261,27 @@ class LoopyPHDNavigatorTest
 	[Test]
 	public void FitMeasurementGeneral()
 	{
-		SimulatedVehicle pose0 = new SimulatedVehicle();
-		pose0.Pose             = new Pose3D(new double[3] {2.0, 0.2, 0.1},
+		PRM3DMeasurer measurer = new PRM3DMeasurer();
+		Pose3D        pose0    = new Pose3D(new double[3] {2.0, 0.2, 0.1},
 		                                    new Quaternion(1, 2, 3, 4).Normalize());
 
-		double[] measurement = new double[3] {-120, 50, 1.3};
+		var      measurement = new PixelRangeMeasurement(-120, 50, 1.3);
 		double[] landmark    = new double[3] {0.1, -1.0, 1.2};
 
-		Pose3D fpose = LoopyPHDNavigator.FitToMeasurement(pose0, measurement, landmark);
+		Pose3D fpose = measurer.FitToMeasurement(pose0, measurement, landmark);
 
-		SimulatedVehicle fitted = new SimulatedVehicle();
-		fitted.Pose             = fpose;
+		var measured = measurer.MeasurePerfect(fpose, landmark);
 
-		double[] measured = fitted.MeasurePerfect(landmark);
-
-		Assert.IsTrue(measurement.IsEqual(measured, 1e-5));
+		Assert.IsTrue(measurement.ToLinear().IsEqual(measured.ToLinear(), 1e-5));
 	}
 
 	public void LogLike()
 	{
 		SimulatedVehicle estimate     = new SimulatedVehicle();
-		List<double[]>   measurements = new List<double[]>();
 		Map              map          = new Map();
+		var              measurements = new List<PixelRangeMeasurement>();
 
-		measurements.Add(new double[3] {0, 0, 1});
+		measurements.Add(new PixelRangeMeasurement(0, 0, 1));
 
 		map.Add(new Gaussian(new double[3] {0, 0, 1}, identitycov, 1.0));
 		

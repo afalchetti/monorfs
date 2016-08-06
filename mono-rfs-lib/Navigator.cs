@@ -44,8 +44,26 @@ namespace monorfs
 /// <summary>
 /// Abstract SLAM solver.
 /// </summary>
-public abstract class Navigator : IDisposable
+public abstract class Navigator<MeasurerT, PoseT, MeasurementT> : IDisposable
+	where PoseT        : IPose<PoseT>, new()
+	where MeasurementT : IMeasurement<MeasurementT>, new()
+	where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
 {
+	/// <summary>
+	/// Saved odometry vector length.
+	/// </summary>
+	protected static int OdoSize;
+
+	/// <summary>
+	/// Saved state vector length.
+	/// </summary>
+	protected static int StateSize;
+
+	/// <summary>
+	/// Saved measurement vector length.
+	/// </summary>
+	protected static int MeasureSize;
+
 	/// <summary>
 	/// If true, the component rendering distinguishes between visible/nonvisible
 	/// instead of their weight.
@@ -61,7 +79,7 @@ public abstract class Navigator : IDisposable
 	/// <summary>
 	/// Reference vehicle. Only used if mapping mode is enabled (no localization).
 	/// </summary>
-	public Vehicle RefVehicle { get; private set; }
+	public Vehicle<MeasurerT, PoseT, MeasurementT> RefVehicle { get; private set; }
 
 	/// <summary>
 	/// Estimated trajectory history.
@@ -84,7 +102,7 @@ public abstract class Navigator : IDisposable
 	/// <summary>
 	/// Most accurate estimate of the current vehicle pose.
 	/// </summary>
-	public abstract TrackVehicle BestEstimate { get; }
+	public abstract TrackVehicle<MeasurerT, PoseT, MeasurementT> BestEstimate { get; }
 
 	/// <summary>
 	/// Most accurate estimate model of the map.
@@ -115,11 +133,21 @@ public abstract class Navigator : IDisposable
 	private double[][] pinterval;
 
 	/// <summary>
+	/// Calculate global constants.
+	/// </summary>
+	static Navigator()
+	{
+		OdoSize     = new PoseT().OdometrySize;
+		StateSize   = new PoseT().StateSize;
+		MeasureSize = new MeasurementT().Size;
+	}
+
+	/// <summary>
 	/// Construct a Navigator using the indicated vehicle as a reference.
 	/// </summary>
 	/// <param name="vehicle">Vehicle to track.</param>
 	/// <param name="onlymapping">If true, don't do SLAM, but mapping (i.e. the localization is assumed known).</param>
-	protected Navigator(Vehicle vehicle, bool onlymapping = false)
+	protected Navigator(Vehicle<MeasurerT, PoseT, MeasurementT> vehicle, bool onlymapping = false)
 	{
 		OnlyMapping = onlymapping;
 
@@ -206,7 +234,7 @@ public abstract class Navigator : IDisposable
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
-	public abstract void SlamUpdate(GameTime time, List<double[]> measurements);
+	public abstract void SlamUpdate(GameTime time, List<MeasurementT> measurements);
 	
 	/// <summary>
 	/// Update the trajectory history with the
@@ -261,7 +289,7 @@ public abstract class Navigator : IDisposable
 	/// <param name="camera">Camera 4d transform matrix.</param>
 	public void RenderTrajectory(double[][] camera)
 	{
-		DrawUtils.DrawTrajectory(Graphics, WayPoints, Color.Blue, camera);
+		DrawUtils.DrawTrajectory<PoseT>(Graphics, WayPoints, Color.Blue, camera);
 	}
 
 	/// <summary>

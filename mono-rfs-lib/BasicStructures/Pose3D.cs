@@ -63,7 +63,6 @@ public class Pose3D : IPose<Pose3D>
 	public double[] Location
 	{
 		get { return new double[3] { X, Y, Z }; }
-		//set { X = value[0]; Y = value[1]; Z = value[2]; }
 	}
 
 	/// <summary>
@@ -76,7 +75,6 @@ public class Pose3D : IPose<Pose3D>
 	/// </summary>
 	public double W {
 		get { return Orientation.W; }
-		//set { Orientation = new Quaternion(value, Orientation.X, Orientation.Y, Orientation.Z); }
 	}
 
 	/// <summary>
@@ -84,7 +82,6 @@ public class Pose3D : IPose<Pose3D>
 	/// </summary>
 	public double[] K {
 		get { return new double[3] { Orientation.X, Orientation.Y, Orientation.Z }; }
-		//set { Orientation = new Quaternion(Orientation.W, value[0], value[1], value[2]); }
 	}
 
 	/// <summary>
@@ -92,7 +89,7 @@ public class Pose3D : IPose<Pose3D>
 	/// </summary>
 	public double Angle
 	{
-		get { return 2 * Math.Acos(Orientation.W); }
+		get { return Orientation.Angle; }
 	}
 
 	/// <summary>
@@ -115,6 +112,19 @@ public class Pose3D : IPose<Pose3D>
 		get { return new double[7] {X, Y, Z, Orientation.W, Orientation.X, Orientation.Y, Orientation.Z}; }
 	}
 
+	/// <summary>
+	/// Number of state coordinates.
+	/// </summary>
+	public int StateSize { get { return 7; } }
+
+	/// <summary>
+	/// Number of odometry coordinates.
+	/// </summary>
+	public int OdometrySize { get { return 6; } }
+
+	/// <summary>
+	/// Global constants initialization.
+	/// </summary>
 	static Pose3D() {
 		Identity = new Pose3D();
 	}
@@ -151,24 +161,6 @@ public class Pose3D : IPose<Pose3D>
 	/// <param name="orientation">Orientation.</param>
 	public Pose3D(double[] location, Quaternion orientation)
 	{
-		/*for (int i = 0; i < location.Length; i++) {
-			if (double.IsNaN(location[i])) {
-				throw new ArgumentException("State can't be NaN");
-			}
-		}
-		if (double.IsNaN(orientation.W)) {
-			throw new ArgumentException("State can't be NaN");
-		}
-		if (double.IsNaN(orientation.X)) {
-			throw new ArgumentException("State can't be NaN");
-		}
-		if (double.IsNaN(orientation.Y)) {
-			throw new ArgumentException("State can't be NaN");
-		}
-		if (double.IsNaN(orientation.Z)) {
-			throw new ArgumentException("State can't be NaN");
-		}*/
-
 		X = location[0];
 		Y = location[1];
 		Z = location[2];
@@ -182,6 +174,39 @@ public class Pose3D : IPose<Pose3D>
 	/// <param name="that">Copied pose.</param>
 	public Pose3D(Pose3D that)
 		: this(that.State) {}
+
+
+	/// <summary>
+	/// Create a pose from its state.
+	/// </summary>
+	/// <param name="state">State.</param>
+	/// <returns>Pose.</returns>
+	public Pose3D FromState(double[] state)
+	{
+		if (state.Length != 7) {
+			throw new ArgumentException("State should have exactly seven parameters.");
+		}
+
+		return new Pose3D(state);
+	}
+
+	/// <summary>
+	/// Deep clone.
+	/// </summary>
+	/// <returns>Pose clone.</returns>
+	public Pose3D DClone()
+	{
+		return new Pose3D(this);
+	}
+
+	/// <summary>
+	/// Get the identity pose, with loc = 0 and rot = I.
+	/// </summary>
+	/// <returns>Identity pose.</returns>
+	public Pose3D IdentityP()
+	{
+		return Identity;
+	}
 
 	/// <summary>
 	/// Obtain a local odometry representation for the pose around unity.
@@ -374,7 +399,6 @@ public class Pose3D : IPose<Pose3D>
 		Quaternion dorientation = Quaternion.Identity.Add(new double[3] {delta[3], delta[4], delta[5]});
 		Quaternion sqrt         = dorientation.Sqrt();
 
-		// double[][] Crot   = Orientation.ToMatrix();
 		double[][] Cmid   = (Orientation * sqrt).ToMatrix();
 		double[][] Cdelta = dorientation.ToMatrix();
 		double[][] Csqrt  = sqrt.ToMatrix();
@@ -389,18 +413,23 @@ public class Pose3D : IPose<Pose3D>
 
 		return identity                .Concatenate(dxdq).VConcatenate(
 		       MatrixExtensions.Zero(3).Concatenate(Cdelta.Transpose()));
+	}
 
-		//double[][] Jsqrt = identity.Add(Csqrt.Transpose()).PseudoInverse();
-		//double[][] dxdq1 = (-1.0).Multiply(Crot).Multiply(crossdX);
-		//double[][] dxdq2 = (-1.0).Multiply(Cmid).Multiply(crossdX).Multiply(Jsqrt);
-
-		// (AddJacobian)
-		//return identity                .Concatenate(dxdq1).VConcatenate(
-		//       MatrixExtensions.Zero(3).Concatenate(Cdelta.Transpose()));
-
-		// (AddOdometryJacobian wrt delta)
-		//return Cmid                    .Concatenate(dxdq2).VConcatenate(
-		//       MatrixExtensions.Zero(3).Concatenate(identity));
+	/// <summary>
+	/// Add the keyboard input to an odometry reading.
+	/// </summary>
+	/// <param name="odometry">Original odometry reading.</param>
+	/// <param name="keyboard">Keyboard input in canonical 6-axis representation:
+	/// (dlocx, dlocy, dlocz, dpitch, dyaw, droll).</param>
+	/// <returns>Modified odometry reading.</returns>
+	public double[] AddKeyboardInput(double[] odometry, double[] keyboard)
+	{
+		return new double[6] {odometry[0] + 0.02 * keyboard[0],
+		                      odometry[1] + 0.02 * keyboard[1],
+		                      odometry[2] + 0.02 * keyboard[2],
+		                      odometry[3] - 0.1  * keyboard[3],
+		                      odometry[4] - 0.1  * keyboard[4],
+		                      odometry[5] + 0.1  * keyboard[5]};
 	}
 
 	/// <summary>
@@ -420,22 +449,22 @@ public class Pose3D : IPose<Pose3D>
 		};
 	}
 
-	/// <param name="a">First quaternion.</param>
-	/// <param name="b">Second quaternion.</param>
+	/// <param name="a">First pose.</param>
+	/// <param name="b">Second pose.</param>
 	public static bool operator ==(Pose3D a, Pose3D b)
 	{
 		return a.Equals(b);
 	}
 
-	/// <param name="a">First quaternion.</param>
-	/// <param name="b">Second quaternion.</param>
+	/// <param name="a">First pose.</param>
+	/// <param name="b">Second pose.</param>
 	public static bool operator !=(Pose3D a, Pose3D b)
 	{
 		return !(a == b);
 	}
 
 	/// <summary>
-	/// Efficient equality comparer with another 3d pose.
+	/// Efficient equality comparer with another 3D pose.
 	/// </summary>
 	/// <param name="that">Compared pose.</param>
 	/// <param name="epsilon">Maximum deviation between components.</param>
@@ -457,7 +486,7 @@ public class Pose3D : IPose<Pose3D>
 	}
 
 	/// <summary>
-	/// Get a unique code that is equal for any two equal 3d poses.
+	/// Get a unique code that is equal for any two equal 3D poses.
 	/// </summary>
 	/// <returns>Hash code.</returns>
 	public override int GetHashCode()
@@ -471,10 +500,10 @@ public class Pose3D : IPose<Pose3D>
 	}
 
 	/// <summary>
-	/// Get a string representation of the pose.
+	/// Create a vehicle descriptor string.
 	/// </summary>
-	/// <param name="format">Double formatting descriptor.</param>
-	/// <returns>String representation.</returns>
+	/// <param name="format">String format for double values.</param>
+	/// <returns>Simulated vehicle descriptor string.</returns>
 	public string ToString(string format)
 	{
 		return "[(" + X.ToString(format) + ", " + Y.ToString(format) + ", " + Z.ToString(format) + "); " +
@@ -482,9 +511,9 @@ public class Pose3D : IPose<Pose3D>
 	}
 
 	/// <summary>
-	/// Get a string representation of the pose.
+	/// Create a vehicle descriptor string.
 	/// </summary>
-	/// <returns>String representation.</returns>
+	/// <returns>Simulated vehicle descriptor string.</returns>
 	public override string ToString()
 	{
 		return ToString("f3");

@@ -142,7 +142,7 @@ Matrix getcovariance(Noise noise)
 // all its necessary context
 // the motion noise format is [sx, sy, sz, syaw, spitch, sroll] (in local coords)
 // the measurement noise format is [sx, sy, srange]
-ISAM2Navigator* newnavigator(double* initstate, double* measurementnoise, double* motionnoise, double focal)
+ISAM2Navigator* newnavigator(double* initstate, double* measurementnoise, double* motionnoise, double* mparams)
 {
 	Vector3 measurementsigma;
 	Vector6 motionsigma;
@@ -156,6 +156,7 @@ ISAM2Navigator* newnavigator(double* initstate, double* measurementnoise, double
 
 	nonoise = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3::Constant(1e-8), Vector3::Constant(1e-8)));
 
+	double          focal     = mparams[0];
 	ISAM2Navigator* navigator = new ISAM2Navigator(focal,
 	                                               noiseModel::Diagonal::Sigmas(measurementsigma),
 	                                               noiseModel::Diagonal::Sigmas(motionsigma));

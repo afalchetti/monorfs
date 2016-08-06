@@ -42,7 +42,10 @@ namespace monorfs
 /// "SLAM" solver. It uses the odometry data
 /// directly with no major intelligence.
 /// </summary>
-public class OdometryNavigator : Navigator
+public class OdometryNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT, PoseT, MeasurementT>
+	where PoseT        : IPose<PoseT>, new()
+	where MeasurementT : IMeasurement<MeasurementT>, new()
+	where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
 {
 	/// <summary>
 	/// Maximum euclidean distance for which two landmarks are considered the same and merged.
@@ -52,12 +55,12 @@ public class OdometryNavigator : Navigator
 	/// <summary>
 	/// Internal estimate of the current vehicle pose.
 	/// </summary>
-	private TrackVehicle bestestimate;
+	private TrackVehicle<MeasurerT, PoseT, MeasurementT> bestestimate;
 
 	/// <summary>
 	/// Most accurate estimate of the current vehicle pose.
 	/// </summary>
-	public override TrackVehicle BestEstimate { get { return bestestimate; } }
+	public override TrackVehicle<MeasurerT, PoseT, MeasurementT> BestEstimate { get { return bestestimate; } }
 
 	/// <summary>
 	/// Internal estimate of the map.
@@ -73,10 +76,10 @@ public class OdometryNavigator : Navigator
 	/// Construct a OdometryNavigator using the indicated vehicle as a reference.
 	/// </summary>
 	/// <param name="vehicle">Vehicle to track.</param>
-	public OdometryNavigator(Vehicle vehicle)
+	public OdometryNavigator(Vehicle<MeasurerT, PoseT, MeasurementT> vehicle)
 		: base(vehicle)
 	{
-		bestestimate = new TrackVehicle(vehicle, 1, 1, 1, 0);
+		bestestimate = new TrackVehicle<MeasurerT, PoseT, MeasurementT>(vehicle, 1, 1, 1, 0);
 		bestmapmodel = new Map();
 	}
 	
@@ -96,7 +99,7 @@ public class OdometryNavigator : Navigator
 	public override void Update(GameTime time, double[] reading)
 	{
 		if (OnlyMapping) {
-			BestEstimate.Pose      = new Pose3D(RefVehicle.Pose);
+			BestEstimate.Pose      = RefVehicle.Pose.DClone();
 			BestEstimate.WayPoints = new TimedState(RefVehicle.WayPoints);
 		}
 		else {
@@ -113,9 +116,9 @@ public class OdometryNavigator : Navigator
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
-	public override void SlamUpdate(GameTime time, List<double[]> measurements)
+	public override void SlamUpdate(GameTime time, List<MeasurementT> measurements)
 	{
-		List<double[]> landmarks = measurements.ConvertAll(m => BestEstimate.MeasureToMap(m));
+		List<double[]> landmarks = measurements.ConvertAll(m => BestEstimate.Measurer.MeasureToMap(BestEstimate.Pose, m));
 		double MT2 = MergeThreshold * MergeThreshold;
 		double[][] dummycov = 0.001.Multiply(Accord.Math.Matrix.Identity(3).ToArray());
 

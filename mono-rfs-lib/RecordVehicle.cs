@@ -28,13 +28,14 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
 
 using AForge;
 
 using Microsoft.Xna.Framework;
 
-using U  = monorfs.Util;
-using ME = monorfs.MatrixExtensions;
+using FP = monorfs.FileParser;
 
 using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedArray        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
@@ -60,7 +61,10 @@ namespace monorfs
 /// recorded data size and shouldn't be a problem anyway, since
 /// comparing different algorithms should always be performed
 /// on exactly the same input anyway if any bias is to be avoided.</remarks>
-public class RecordVehicle : Vehicle
+public class RecordVehicle<MeasurerT, PoseT, MeasurementT> : Vehicle<MeasurerT, PoseT, MeasurementT>
+	where PoseT        : IPose<PoseT>, new()
+	where MeasurementT : IMeasurement<MeasurementT>, new()
+	where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
 {
 	/// <summary>
 	/// Prerecorded trajectory.
@@ -101,13 +105,11 @@ public class RecordVehicle : Vehicle
 	/// <param name="measurements">Prerecorded measurements.</param>
 	/// <param name="tags">Prerecorded tags.</param>
 	/// <param name="landmarks">Landmark 3d locations against which the measurements were performed.</param>
-	/// <param name="focal">Focal lenghth.</param>
-	/// <param name="film">Film area.</param>
-	/// <param name="clip">Range clipping area.</param>
+	/// <param name="measurer">Measuring config and methods.</param>
 	public RecordVehicle(TimedState trajectory, TimedArray odometry,
 	                     TimedMeasurements measurements, TimedMessage tags,
-	                     List<double[]> landmarks, double focal, Rectangle film, Range clip)
-		: base(Pose3D.Identity, focal, film, clip)
+	                     List<double[]> landmarks, MeasurerT measurer)
+		: base(new PoseT().IdentityP(), measurer)
 	{
 		if (trajectory.Count != measurements.Count + 1) {
 			throw new ArgumentException("Measurements length must be one short of the trajectory length.");
@@ -126,7 +128,7 @@ public class RecordVehicle : Vehicle
 		Measurements = new TimedMeasurements(measurements);
 		Tags         = tags;
 
-		Odometry    .Insert(0, Tuple.Create(0.0, new double[6] {0, 0, 0, 0, 0, 0}));
+		Odometry    .Insert(0, Tuple.Create(0.0, new double[OdoSize]));
 		Measurements.Insert(0, Tuple.Create(0.0, new List<double[]>()));
 
 		RecLength  = Trajectory.Count;
@@ -136,7 +138,7 @@ public class RecordVehicle : Vehicle
 		FrameIndex = 1;
 
 		Landmarks = landmarks;
-		Pose      = new Pose3D(Trajectory[0].Item2);
+		Pose      = new PoseT().FromState(Trajectory[0].Item2);
 
 		WayPoints.Clear();
 		WayPoints.Add(Tuple.Create(0.0, Util.SClone(Pose.State)));
@@ -177,7 +179,7 @@ public class RecordVehicle : Vehicle
 	/// <param name="reading">Odometry reading (dx, dy, dz, dpitch, dyaw, droll).</param>
 	public override void Update(GameTime time, double[] reading)
 	{
-		Pose = new Pose3D(Trajectory[FrameIndex].Item2);
+		Pose = new PoseT().FromState(Trajectory[FrameIndex].Item2);
 		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(Pose.State)));
 	}
 
@@ -204,9 +206,9 @@ public class RecordVehicle : Vehicle
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <returns>Pixel-range measurements.</returns>
-	public override List<double[]> Measure(GameTime time)
+	public override List<MeasurementT> Measure(GameTime time)
 	{
-		List<double[]> measurements = Measurements[FrameIndex].Item2;
+		List<double[]> mlinear = Measurements[FrameIndex].Item2;
 
 		if (FrameIndex < RecLength - 1) {
 			updateWants();
@@ -216,12 +218,108 @@ public class RecordVehicle : Vehicle
 			WantsToStop = true;
 		}
 
+		List<MeasurementT> measurements = new List<MeasurementT>();
+		MeasurementT       dummy = new MeasurementT();
+
 		MappedMeasurements.Clear();
-		foreach (double[] z in measurements) {
-			MappedMeasurements.Add(MeasureToMap(z));
+		foreach (double[] z in mlinear) {
+			MeasurementT measurement = dummy.FromLinear(z);
+			measurements.Add(measurement);
+			MappedMeasurements.Add(Measurer.MeasureToMap(Pose, measurement));
 		}
 
 		return measurements;
+	}
+
+	/// <summary>
+	/// Create a vehicle from a record file.
+	/// </summary>
+	/// <param name="datafile">Vehicle descriptor file.</param>
+	/// <param name="extrainfo">If true, provide additional information through output parameters;
+	/// otherwise, they output null.</param>
+	/// <param name="estimate">Trajectory estimate.</param>
+	/// <param name="xodometry">Odometry readings.</param>
+	/// <param name="xmeasurements">Measurement readings.</param>
+	/// <returns>Prerecorded vehicle parsed from file.</returns>
+	public static RecordVehicle<MeasurerT, PoseT, MeasurementT>
+	                  FromFile(string datafile, bool extrainfo, out TimedState estimate,
+	                           out TimedArray xodometry, out TimedMeasurements xmeasurements)
+	{
+		string tmpdir  = Util.TemporaryDir();
+		string datadir = Path.Combine(tmpdir, "data");
+
+		ZipFile.ExtractToDirectory(datafile, datadir);
+
+		string scenefile      = Path.Combine(datadir, "scene.world");
+		string trajectoryfile = Path.Combine(datadir, "trajectory.out");
+		string estimatefile   = Path.Combine(datadir, "estimate.out");
+		string odometryfile   = Path.Combine(datadir, "odometry.out");
+		string measurefile    = Path.Combine(datadir, "measurements.out");
+		string tagfile        = Path.Combine(datadir, "tags.out");
+
+		if (!File.Exists(scenefile)) {
+			throw new ArgumentException("Missing scene file");
+		}
+
+		if (extrainfo && !File.Exists(estimatefile)) {
+			throw new ArgumentException("Missing estimate file");
+		}
+
+		if (!File.Exists(trajectoryfile)) {
+			throw new ArgumentException("Missing trajectory file");
+		}
+
+		if (!File.Exists(odometryfile)) {
+			throw new ArgumentException("Missing odometry file");
+		}
+
+		if (!File.Exists(measurefile)) {
+			throw new ArgumentException("Missing measurement file");
+		}
+
+		if (!File.Exists(tagfile)) {
+			tagfile = "";
+		}
+
+		RecordVehicle<MeasurerT, PoseT, MeasurementT> explorer;
+		TimedState        trajectory;
+		TimedArray        odometry;
+		TimedMeasurements measurements;
+		TimedMessage      tags;
+
+		var template = SimulatedVehicle<MeasurerT, PoseT, MeasurementT>.
+		                   FromFile(File.ReadAllText(scenefile));
+
+		trajectory   = FP.TimedArrayFromDescriptor  (File.ReadAllLines(trajectoryfile), StateSize);
+		odometry     = FP.TimedArrayFromDescriptor  (File.ReadAllLines(odometryfile), OdoSize);
+		measurements = FP.MeasurementsFromDescriptor(File.ReadAllText(measurefile), MeasureSize);
+
+		if (!string.IsNullOrEmpty(tagfile)) {
+			tags = FP.TimedMessageFromDescriptor(File.ReadAllLines(tagfile));
+		}
+		else {
+			tags = new TimedMessage();
+		}
+
+		explorer = new RecordVehicle<MeasurerT, PoseT, MeasurementT>(trajectory, odometry, measurements, tags, template.Landmarks,
+			template.Measurer);
+
+		if (extrainfo) {
+			TimedTrajectory fullestimate = FP.TrajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), 7, false);
+
+			estimate      = fullestimate[fullestimate.Count - 1].Item2;
+			xodometry     = odometry;
+			xmeasurements = measurements;
+		}
+		else {
+			estimate      = null;
+			xodometry     = null;
+			xmeasurements = null;
+		}
+
+		Directory.Delete(tmpdir, true);
+
+		return explorer;
 	}
 }
 }

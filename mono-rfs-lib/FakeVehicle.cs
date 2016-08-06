@@ -33,21 +33,21 @@ using AForge;
 
 using Microsoft.Xna.Framework;
 
-using U  = monorfs.Util;
-using ME = monorfs.MatrixExtensions;
-
 namespace monorfs
 {
 /// <summary>
 /// Fake vehicle model (does nothing).
 /// </summary>
-public class FakeVehicle : Vehicle
+public class FakeVehicle<MeasurerT, PoseT, MeasurementT> : Vehicle<MeasurerT, PoseT, MeasurementT>
+	where PoseT        : IPose<PoseT>, new()
+	where MeasurementT : IMeasurement<MeasurementT>, new()
+	where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
 {
 	/// <summary>
 	/// Construct a new dummy vehicle.
 	/// </summary>
 	public FakeVehicle()
-		: base(Pose3D.Identity, 1, new Rectangle(), new Range()) {}
+		: base(new PoseT().IdentityP(), new MeasurerT()) {}
 	
 	/// <summary>
 	/// Apply the motion model to the vehicle. It does nothing.
@@ -63,9 +63,9 @@ public class FakeVehicle : Vehicle
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <returns>Pixel-range measurements.</returns>
-	public override List<double[]> Measure(GameTime time)
+	public override List<MeasurementT> Measure(GameTime time)
 	{
-		return new List<double[]>();
+		return new List<MeasurementT>();
 	}
 }
 }

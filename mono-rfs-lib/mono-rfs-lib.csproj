@@ -120,6 +120,11 @@
     <Compile Include="BasicStructures\Quaternion.cs" />
     <Compile Include="BasicStructures\Pose3D.cs" />
     <Compile Include="BasicStructures\IPose.cs" />
+    <Compile Include="BasicStructures\IMeasurer.cs" />
+    <Compile Include="BasicStructures\IMeasurement.cs" />
+    <Compile Include="BasicStructures\PixelRangeMeasurement.cs" />
+    <Compile Include="BasicStructures\PRM3DMeasurer.cs" />
+    <Compile Include="BasicStructures\KinectMeasurer.cs" />
     <Compile Include="LoopyPHDNavigator.cs" />
     <Compile Include="DrawUtils.cs" />
     <Compile Include="Test\QuaternionTest.cs" />

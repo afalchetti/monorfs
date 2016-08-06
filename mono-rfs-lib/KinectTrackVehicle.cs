@@ -38,41 +38,15 @@ namespace monorfs
 /// Similar to SimulatedVehicle, but adds
 /// a better visibility model for Kinect.
 /// </summary>
-public class KinectTrackVehicle : TrackVehicle
+public class KinectTrackVehicle : TrackVehicle<KinectMeasurer, Pose3D, PixelRangeMeasurement>
 {
-	/// <summary>
-	/// Horizontal resolution of the real vehicle.
-	/// </summary>
-	private float resx;
-
-	/// <summary>
-	/// Vertical resolution of the real vehicle.
-	/// </summary>
-	private float resy;
-
-	/// <summary>
-	/// Image border where no keypoint can be found (because of incomplete patches).
-	/// </summary>
-	private int border;
-
-	/// <summary>
-	/// Kinect real vehicle depth map accesor.
-	/// </summary>
-	private Func<float[][]> getdepth;
-
 	/// <summary>
 	/// Copy constructor. Perform a deep copy of another simulated vehicle.
 	/// </summary>
 	/// <param name="that">Copied simulated vehicle.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
 	public KinectTrackVehicle(KinectTrackVehicle that, bool copytrajectory = false)
-		: base(that, copytrajectory)
-	{
-		this.resx     = that.resx;
-		this.resy     = that.resy;
-		this.border   = that.border;
-		this.getdepth = that.getdepth;
-	}
+		: base(that, copytrajectory) {}
 
 	/// <summary>
 	/// Perform a deep copy of another general vehicle,
@@ -87,71 +61,18 @@ public class KinectTrackVehicle : TrackVehicle
 	public KinectTrackVehicle(KinectVehicle that, double motioncovmultiplier, double measurecovmultiplier, double pdetection, double clutter, bool copytrajectory = false)
 		: base(that, motioncovmultiplier, measurecovmultiplier, pdetection, clutter, copytrajectory)
 	{
-		this.resx     = that.ResX;
-		this.resy     = that.ResY;
-		this.border   = that.Border;
-		this.getdepth = () => that.DepthFrame;
-
 		// Since FilmArea is a property (and Rectangle a struct)
 		// Inflate won't work (will occur on the temporary return value)
 		// so a local copy is needed
-		var tmp = this.FilmArea;
-		tmp.Inflate(-this.border, -this.border);
-		this.FilmArea = tmp;
-	}
+		var newfilm = this.Measurer.FilmArea;
+		newfilm.Inflate(-that.Border, -that.Border);
 
-	/// <summary>
-	/// Find if a given ladmark is visible from the current pose of the vehicle
-	/// using pixel-range coordinates to express the landmark.
-	/// </summary>
-	/// <param name="measurement">Queried landmark in pixel-range coordinates.</param>
-	/// <returns>True if the landmark is visible; false otherwise.</returns>
-	public override bool VisibleM(double[] measurement)
-	{
-		int   x     = (int) (measurement[0] + resx / 2);
-		int   y     = (int) (measurement[1] + resy / 2);
-		float range = (float) measurement[2];
+		this.Measurer = new KinectMeasurer(this.Measurer.VisionFocal,
+		                                   newfilm,
+		                                   this.Measurer.RangeClip,
+		                                   that.ResX, that.ResY, that.Border,
+		                                   () => that.DepthFrame);
 
-		if (!base.VisibleM(measurement)) {
-			return false;
-		}
-
-		float[][] depth = getdepth();
-
-		// the point is inbounds (redundant with base implementation, but
-		// floating point errors could make it necessary
-		if (y < 0 || y >= depth.Length || x < 0 || x >= depth[0].Length) {
-			return false;
-		}
-
-		// the point is in front of the depth map (i.e. not occluded)
-		return range <= depth[x][y];
-	}
-
-	/// <summary>
-	/// Find if a landmark is visible in measurement space and
-	/// return a fuzzy value for points near the border of the visible region.
-	/// </summary>
-	/// <param name="measurement">Queried landmark in pixel-range coordinates.</param>
-	/// <returns>True if the landmark is visible; false otherwise.</returns>
-	public override double FuzzyVisibleM(double[] measurement)
-	{
-		int   x     = (int)  (measurement[0] + resx / 2);
-		int   y     = (int)  (measurement[1] + resy / 2);
-		float range = (float) measurement[2];
-
-		double    minwdistance = base.FuzzyVisibleM(measurement);
-
-		if (minwdistance == 0) {  // outside of image region, can't obtain depth
-			return 0;
-		}
-
-		float[][] depth = getdepth();
-
-		minwdistance = Math.Min(minwdistance, (range - RangeClip.Min)  / VisibilityRamp[2]);
-		minwdistance = Math.Min(minwdistance, (depth[x][y]  - range) / VisibilityRamp[2]);
-
-		return Math.Max(0, Math.Min(1, minwdistance));
 	}
 }
 }

@@ -43,11 +43,6 @@ namespace monorfs
 public class Program
 {
 	/// <summary>
-	/// Main processor.
-	/// </summary>
-	public static Manipulator manipulator;
-
-	/// <summary>
 	/// Thread that listens to SIGINT for graceful termination.
 	/// </summary>
 	public static Thread signalthread;
@@ -64,28 +59,27 @@ public class Program
 		Console.WriteLine("Options:");
 		options.WriteOptionDescriptions(Console.Out);
 	}
-
-	public static void abort()
-	{
-		if (manipulator != null && !manipulator.Abort) {
-			manipulator.Abort = true;
-		}
-		else {
-			Environment.Exit(1);
-		}
-	}
-
 	/// <summary>
 	/// Set a handler for SIGINT, so they system can exit gracefully.
 	/// </summary>
-	public static void setSignalHandler()
+	public static void setSignalHandler<MeasurerT, PoseT, MeasurementT>(
+	                        Manipulator<MeasurerT, PoseT, MeasurementT> manipulator)
+		where PoseT        : IPose<PoseT>, new()
+		where MeasurementT : IMeasurement<MeasurementT>, new()
+		where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
 	{
 		UnixSignal sigint = new UnixSignal(Mono.Unix.Native.Signum.SIGINT);
 
 		signalthread = new Thread(() => {
 			while (true) {
 				sigint.WaitOne();
-				abort();
+
+				if (manipulator != null && !manipulator.Abort) {
+					manipulator.Abort = true;
+				}
+				else {
+					Environment.Exit(1);
+				}
 			}
 		});
 
@@ -114,6 +108,7 @@ public class Program
 
 		VehicleType         input     = VehicleType.Simulation;
 		NavigationAlgorithm algorithm = NavigationAlgorithm.PHD;
+		DynamicsModel       model     = DynamicsModel.PRM3D;
 
 		OptionSet options = new OptionSet {
 			{ "f|scene=",      "Scene description file. Simulated, recorded or device id.",     f       => scenefile     = f },
@@ -121,6 +116,7 @@ public class Program
 			{ "c|command=",    "Auto-command file (simulates user input).",                     c       => commandfile   = c },
 			{ "g|config=",     "Configuration file. Contains global constants",                 g       => configfile    = g },
 			{ "a|algorithm=",  "SLAM solver algorithm ('odometry', 'phd', 'loopy' or 'isam2')", a       => algorithm     = (a == "isam2") ? NavigationAlgorithm.ISAM2 : (a == "odometry") ? NavigationAlgorithm.Odometry : (a == "loopy") ? NavigationAlgorithm.LoopyPHD : NavigationAlgorithm.PHD },
+			{ "m|model=",      "Motion and measuremet models ('prm3d' or 'linear2d')",          m       => model         = (m == "linear2d") ? DynamicsModel.Linear2D : DynamicsModel.PRM3D },
 			{ "p|particles=",  "Number of particles used for the RB-PHD",                       (int p) => particlecount = p },
 			{ "y|onlymap",     "Only do mapping, assuming known localization.",                 y       => onlymapping   = y != null },
 			{ "i|input=",      "Vehicle input stream: 'kinect', 'simulation' or 'record'",      i       => input         = (i == "kinect") ? VehicleType.Kinect : (i == "record") ? VehicleType.Record : VehicleType.Simulation },
@@ -159,13 +155,41 @@ public class Program
 			Config.FromFile(configfile);
 		}
 
-		setSignalHandler();
+		if (model == DynamicsModel.PRM3D) {
+			Run<PRM3DMeasurer, Pose3D, PixelRangeMeasurement>(
+			    recfile, scenefile, commandfile, configfile,
+			    particlecount, onlymapping, realtime, viewer,
+			    filterhistory, headless, noterminate,
+				input, algorithm);
+		}
+		else {
+			Run<PRM3DMeasurer, Pose3D, PixelRangeMeasurement>(
+				recfile, scenefile, commandfile, configfile,
+				particlecount, onlymapping, realtime, viewer,
+				filterhistory, headless, noterminate,
+			    input, algorithm);
+		}
+	}
+
+	/// <summary>
+	/// Run the simulation or viewer.
+	/// </summary>
+	public static void Run<MeasurerT, PoseT, MeasurementT>(
+	                       string recfile, string scenefile, string commandfile, string configfile,
+	                       int particlecount, bool onlymapping, bool realtime, bool viewer,
+	                       bool filterhistory, bool headless, bool noterminate,
+	                       VehicleType input, NavigationAlgorithm algorithm)
+		where PoseT        : IPose<PoseT>, new()
+		where MeasurementT : IMeasurement<MeasurementT>, new()
+		where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
+	{
 
 		if (viewer) {
 			string tmpdir;
 
-			using (Viewer sim = Viewer.FromFiles(recfile, filterhistory, out tmpdir)) {
-				manipulator = sim;
+			using (var sim = Viewer<MeasurerT, PoseT, MeasurementT>.
+			                     FromFiles(recfile, filterhistory, out tmpdir)) {
+				setSignalHandler(sim);
 				sim.Run();
 
 				if (sim.TagChanged) {
@@ -191,9 +215,11 @@ public class Program
 			}
 		}
 		else {
-			using (Simulation sim = Simulation.FromFiles(scenefile, commandfile, particlecount, input, algorithm, onlymapping, realtime, !headless, noterminate)) {
+			using (var sim = Simulation<MeasurerT, PoseT, MeasurementT>.
+			                     FromFiles(scenefile, commandfile, particlecount, input,
+			                               algorithm, onlymapping, realtime, !headless, noterminate)) {
 				sim.CheckpointFile = recfile;
-				manipulator        = sim;
+				setSignalHandler(sim);
 
 				if (headless) {
 					Stopwatch timer = new Stopwatch();

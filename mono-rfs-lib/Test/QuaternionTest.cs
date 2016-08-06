@@ -100,8 +100,8 @@ class QuaternionTest
 	[Test]
 	public void VectorRotator()
 	{
-		double[] from = new double[] {1, 2.3, 3}.Normalize();
-		double[] to   = new double[] {4.8, 3, 2}.Normalize();
+		double[] from = new double[3] {1, 2.3, 3}.Normalize();
+		double[] to   = new double[3] {4.8, 3, 2}.Normalize();
 
 		Quaternion rotator = Quaternion.VectorRotator(from, to);
 
@@ -116,8 +116,8 @@ class QuaternionTest
 	[Test]
 	public void VectorRotatorNone()
 	{
-		double[] from = new double[] {1, 2.3, 3}.Normalize();
-		double[] to   = new double[] {1, 2.3, 3}.Normalize();
+		double[] from = new double[3] {1, 2.3, 3}.Normalize();
+		double[] to   = new double[3] {1, 2.3, 3}.Normalize();
 
 		Quaternion rotator = Quaternion.VectorRotator(from, to);
 

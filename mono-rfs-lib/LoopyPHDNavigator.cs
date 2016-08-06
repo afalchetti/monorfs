@@ -40,7 +40,6 @@ using TimedState        = System.Collections.Generic.List<System.Tuple<double, d
 using TimedArray        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
 using TimedGaussian     = System.Collections.Generic.List<System.Tuple<double, monorfs.Gaussian>>;
-using TimedPose         = System.Collections.Generic.List<System.Tuple<double, monorfs.Pose3D>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
 
 namespace monorfs
@@ -48,7 +47,10 @@ namespace monorfs
 /// <summary>
 /// SLAM solver. It uses the PHD loopy belief propagator.
 /// </summary>
-public class LoopyPHDNavigator : Navigator
+public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT, PoseT, MeasurementT>
+	where PoseT        : IPose<PoseT>, new()
+	where MeasurementT : IMeasurement<MeasurementT>, new()
+	where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
 {
 	/// <summary>
 	/// Internal motion model covariance matrix. Lie algebra representation.
@@ -68,7 +70,7 @@ public class LoopyPHDNavigator : Navigator
 	/// <summary>
 	/// Inner PHD filter algorithm.
 	/// </summary>
-	public PHDNavigator InnerFilter { get; private set; }
+	public PHDNavigator<MeasurerT, PoseT, MeasurementT> InnerFilter { get; private set; }
 
 	/// <summary>
 	/// Messages from pose[k-1] to pose[k].
@@ -97,7 +99,7 @@ public class LoopyPHDNavigator : Navigator
 	/// <summary>
 	/// Linearization point for each pose in the trajectory.
 	/// </summary>
-	public TimedPose LinearizationPoints { get; private set; }
+	public List<Tuple<double, PoseT>> LinearizationPoints { get; private set; }
 
 	/// <summary>
 	/// Measurement sets for RFS map update delta factors.
@@ -117,12 +119,12 @@ public class LoopyPHDNavigator : Navigator
 	/// <summary>
 	/// Internal representation of the pose trajectory for RFS map update delta factors.
 	/// </summary>
-	private TimedPose mapMessages;
+	private List<Tuple<double, PoseT>> mapMessages;
 
 	/// <summary>
 	/// Pose trajectory for RFS map update delta factors.
 	/// </summary>
-	public TimedPose MapMessages
+	public List<Tuple<double, PoseT>> MapMessages
 	{
 		get
 		{
@@ -139,11 +141,11 @@ public class LoopyPHDNavigator : Navigator
 	/// <summary>
 	/// Most accurate estimate of the current vehicle pose.
 	/// </summary>
-	public override TrackVehicle BestEstimate
+	public override TrackVehicle<MeasurerT, PoseT, MeasurementT> BestEstimate
 	{
 		get
 		{
-			TrackVehicle maxlike = new TrackVehicle();
+			var maxlike = new TrackVehicle<MeasurerT, PoseT, MeasurementT>();
 
 			maxlike.WayPoints = new TimedState();
 
@@ -151,7 +153,7 @@ public class LoopyPHDNavigator : Navigator
 				maxlike.WayPoints.Add(Tuple.Create(pose.Item1, Util.SClone(pose.Item2.Mean)));
 			}
 
-			maxlike.Pose = new Pose3D(maxlike.WayPoints[maxlike.WayPoints.Count - 1].Item2);
+			maxlike.Pose = new PoseT().FromState(maxlike.WayPoints[maxlike.WayPoints.Count - 1].Item2);
 
 			return maxlike;
 		}
@@ -208,10 +210,12 @@ public class LoopyPHDNavigator : Navigator
 	/// <param name="vehicle">Vehicle to track.</param>
 	/// <param name="commands">List of commands given to the vehicle.</param>
 	/// <param name="initialestimate">Navigation algorithm used to get an initial estimate.</param>
-	public LoopyPHDNavigator(Vehicle vehicle, List<double[]> commands, Navigator initialestimate)
+	public LoopyPHDNavigator(Vehicle<MeasurerT, PoseT, MeasurementT> vehicle,
+	                         List<double[]> commands,
+	                         Navigator<MeasurerT, PoseT, MeasurementT> initialestimate)
 		: base(vehicle, false)
 	{
-		InnerFilter   = new PHDNavigator(vehicle, 1, true);
+		InnerFilter   = new PHDNavigator<MeasurerT, PoseT, MeasurementT>(vehicle, 1, true);
 
 		TimedArray        odometry;
 		TimedMeasurements measurements;
@@ -231,16 +235,16 @@ public class LoopyPHDNavigator : Navigator
 	/// <param name="trajectory">Initial trajectory estimate.</param>
 	/// <param name="odometry">Odometry readings.</param>
 	/// <param name="measurements">Measurement readings.</param>
-	public LoopyPHDNavigator(Vehicle vehicle, TimedState trajectory,
+	public LoopyPHDNavigator(Vehicle<MeasurerT, PoseT, MeasurementT> vehicle, TimedState trajectory,
 	                         TimedArray odometry, TimedMeasurements measurements)
 		: base(vehicle, false)
 	{
-		InnerFilter  = new PHDNavigator(vehicle, 1, true);
+		InnerFilter  = new PHDNavigator<MeasurerT, PoseT, MeasurementT>(vehicle, 1, true);
 		Odometry     = odometry;
 		Measurements = measurements;
 		clock        = 0;
 
-		Odometry    .Add(Tuple.Create(double.PositiveInfinity, new double[6]));
+		Odometry    .Add(Tuple.Create(double.PositiveInfinity, new double[OdoSize]));
 		Measurements.Insert(0, Tuple.Create(double.PositiveInfinity, new List<double[]>()));
 
 		initMessages(trajectory);
@@ -252,15 +256,15 @@ public class LoopyPHDNavigator : Navigator
 	/// <param name="initial">Initial estimation of the trajectory.</param>
 	private void initMessages(TimedState initial)
 	{
-		LinearizationPoints = new TimedPose();
+		LinearizationPoints = new List<Tuple<double, PoseT>>();
 		MessagesFromPast    = new TimedGaussian();
 		MessagesFromFuture  = new TimedGaussian();
 		MessagesFromMap     = new TimedGaussian();
 
-		double[][] infcov = Util.InfiniteCovariance(6);
+		double[][] infcov = Util.InfiniteCovariance(OdoSize);
 
 		for (int i = 0; i < initial.Count; i++) {
-			LinearizationPoints.Add(Tuple.Create(0.0, Pose3D.Identity));
+			LinearizationPoints.Add(Tuple.Create(0.0, new PoseT().IdentityP()));
 			MessagesFromPast   .Add(Tuple.Create(0.0, (Gaussian) null));
 			MessagesFromFuture .Add(Tuple.Create(0.0, (Gaussian) null));
 			MessagesFromMap    .Add(Tuple.Create(0.0, (Gaussian) null));
@@ -268,13 +272,13 @@ public class LoopyPHDNavigator : Navigator
 
 		Parallel.For(0, initial.Count,
 		             new ParallelOptions { MaxDegreeOfParallelism = Config.NParallel}, i => {
-			LinearizationPoints[i] = Tuple.Create(initial[i].Item1, new Pose3D(initial[i].Item2));
-			MessagesFromPast   [i] = Tuple.Create(initial[i].Item1, new Gaussian(new double[6] {0, 0, 0, 0, 0, 0}, infcov, 1.0));
-			MessagesFromFuture [i] = Tuple.Create(initial[i].Item1, new Gaussian(new double[6] {0, 0, 0, 0, 0, 0}, infcov, 1.0));
-			MessagesFromMap    [i] = Tuple.Create(initial[i].Item1, new Gaussian(new double[6] {0, 0, 0, 0, 0, 0}, infcov, 1.0));
+			LinearizationPoints[i] = Tuple.Create(initial[i].Item1, new PoseT().FromState(initial[i].Item2));
+			MessagesFromPast   [i] = Tuple.Create(initial[i].Item1, new Gaussian(new double[OdoSize], infcov, 1.0));
+			MessagesFromFuture [i] = Tuple.Create(initial[i].Item1, new Gaussian(new double[OdoSize], infcov, 1.0));
+			MessagesFromMap    [i] = Tuple.Create(initial[i].Item1, new Gaussian(new double[OdoSize], infcov, 1.0));
 		});
 
-		MessagesFromPast[0] = Tuple.Create(MessagesFromPast[0].Item1, Util.DiracDelta(new double[6] {0, 0, 0, 0, 0, 0}));
+		MessagesFromPast[0] = Tuple.Create(MessagesFromPast[0].Item1, Util.DiracDelta(new double[OdoSize]));
 
 		FusedEstimate = GetFusedEstimate();
 		MapMessages   = GetMapMessages();
@@ -305,10 +309,12 @@ public class LoopyPHDNavigator : Navigator
 	/// <param name="odometry">Odometry readings.</param>
 	/// <param name="measurements">Measurement readings.</param>
 	/// <returns>Initial estimate.</returns>
-	public TimedState InitialEstimate(Vehicle vehicle, List<double[]> commands, Navigator initnav,
-	                                    out TimedArray odometry, out TimedMeasurements measurements)
+	public TimedState InitialEstimate(Vehicle<MeasurerT, PoseT, MeasurementT> vehicle,
+	                                  List<double[]> commands,
+	                                  Navigator<MeasurerT, PoseT, MeasurementT> initnav,
+	                                  out TimedArray odometry, out TimedMeasurements measurements)
 	{
-		Simulation sim = new Simulation("", vehicle, initnav, commands, true, false);
+		var sim = new Simulation<MeasurerT, PoseT, MeasurementT>("", vehicle, initnav, commands, true, false);
 
 		sim.RunHeadless();
 
@@ -332,7 +338,7 @@ public class LoopyPHDNavigator : Navigator
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <param name="measurements">Sensor measurements in pixel-range form. Not used.</param>
-	public override void SlamUpdate(GameTime time, List<double[]> measurements)
+	public override void SlamUpdate(GameTime time, List<MeasurementT> measurements)
 	{
 		if (clock % 2 == 0) {
 			MessagesFromPast = GetMessagesFromPast();
@@ -356,7 +362,7 @@ public class LoopyPHDNavigator : Navigator
 	{
 		TimedGaussian messages = new TimedGaussian();
 
-		messages.Add(Tuple.Create(MessagesFromPast[0].Item1, Util.DiracDelta(new double[6] {0, 0, 0, 0, 0, 0})));
+		messages.Add(Tuple.Create(MessagesFromPast[0].Item1, Util.DiracDelta(new double[OdoSize])));
 
 		for (int i = 1; i < MessagesFromPast.Count; i++) {
 			//messages.Add(Tuple.Create(0.0, (Gaussian) null));
@@ -366,14 +372,14 @@ public class LoopyPHDNavigator : Navigator
 		for (int i = 1; i < MessagesFromPast.Count; i++) {
 		//Parallel.For(1, MessagesFromPast.Count,
 		//             new ParallelOptions { MaxDegreeOfParallelism = Config.NParallel}, i => {
-			Pose3D   linearpoint     = LinearizationPoints[i]    .Item2;
-			Pose3D   prevlinearpoint = LinearizationPoints[i - 1].Item2;
+			PoseT   linearpoint     = LinearizationPoints[i]    .Item2;
+			PoseT   prevlinearpoint = LinearizationPoints[i - 1].Item2;
 			Gaussian fusedF     = FusedEstimate     [i - 1].Item2;
 			Gaussian futureF    = MessagesFromFuture[i - 1].Item2;
 			Gaussian halffusedF = Gaussian.Unfuse(fusedF, futureF);
 			
-			Pose3D hfpose  = prevlinearpoint.Add(halffusedF.Mean);
-			Pose3D estpose = hfpose.AddOdometry(Odometry[i - 1].Item2);
+			PoseT hfpose  = prevlinearpoint.Add(halffusedF.Mean);
+			PoseT estpose = hfpose.AddOdometry(Odometry[i - 1].Item2);
 			
 			double[][] jacobian = MotionJacobian(prevlinearpoint, linearpoint,
 			                                     halffusedF.Mean, Odometry[i-1].Item2);
@@ -413,19 +419,19 @@ public class LoopyPHDNavigator : Navigator
 
 		var lastpose = FusedEstimate[FusedEstimate.Count - 1];
 		messages.Add(Tuple.Create(lastpose.Item1,
-		                          new Gaussian(lastpose.Item2.Mean, Util.InfiniteCovariance(6), 1.0)));
+		                          new Gaussian(lastpose.Item2.Mean, Util.InfiniteCovariance(OdoSize), 1.0)));
 
 		for (int i = MessagesFromFuture.Count - 2; i >= 0 ; i--) {
 		//Parallel.For(0, MessagesFromFuture.Count - 1,
 		//             new ParallelOptions { MaxDegreeOfParallelism = Config.NParallel}, i => {
-			Pose3D   linearpoint     = LinearizationPoints[i]    .Item2;
-			Pose3D   nextlinearpoint = LinearizationPoints[i + 1].Item2;
+			PoseT   linearpoint     = LinearizationPoints[i]    .Item2;
+			PoseT   nextlinearpoint = LinearizationPoints[i + 1].Item2;
 			Gaussian fusedG     = FusedEstimate   [i + 1].Item2;
 			Gaussian pastG      = MessagesFromPast[i + 1].Item2;
 			Gaussian halffusedG = Gaussian.Unfuse(fusedG, pastG);
 			
-			Pose3D hfpose  = nextlinearpoint.Add(halffusedG.Mean);
-			Pose3D estpose = hfpose.AddOdometry((-1.0).Multiply(Odometry[i].Item2));
+			PoseT hfpose  = nextlinearpoint.Add(halffusedG.Mean);
+			PoseT estpose = hfpose.AddOdometry((-1.0).Multiply(Odometry[i].Item2));
 			
 			double[][] jacobian = MotionJacobian(linearpoint, nextlinearpoint,
 			                                     estpose.Subtract(linearpoint), Odometry[i].Item2)
@@ -463,7 +469,9 @@ public class LoopyPHDNavigator : Navigator
 			messages.Add(Tuple.Create(0.0, (Gaussian) null));
 		}
 
-		double[][] infcovariance = Util.InfiniteCovariance(6);
+		double[][] infcovariance = Util.InfiniteCovariance(OdoSize);
+
+		MeasurementT dummy = new MeasurementT();
 
 		for (int i = 0; i < MessagesFromMap.Count; i++) {
 		//Parallel.For(0, MessagesFromMap.Count,
@@ -472,7 +480,7 @@ public class LoopyPHDNavigator : Navigator
 
 			if (Measurements[i].Item2.Count > 0) {
 				Map dMap = FilterMissing(MapMessages, Measurements, i);
-				estimate = GuidedFitGaussian(FusedEstimate[i].Item2.Mean, Measurements[i].Item2,
+				estimate = GuidedFitGaussian(FusedEstimate[i].Item2.Mean, Measurements[i].Item2.ConvertAll(m => dummy.FromLinear(m)),
 				                       dMap, LinearizationPoints[i].Item2);
 			}
 			else {
@@ -494,18 +502,18 @@ public class LoopyPHDNavigator : Navigator
 	/// Get messages to the map given the current estimates.
 	/// </summary>
 	/// <returns>Messages from the poses to the map.</returns>
-	public TimedPose GetMapMessages()
+	public List<Tuple<double, PoseT>> GetMapMessages()
 	{
-		TimedPose     messages = new TimedPose();
+		var           messages = new List<Tuple<double, PoseT>>();
 		TimedGaussian hfused   = FuseGaussians(MessagesFromPast, MessagesFromFuture);
 
 		for (int i = 0; i < hfused.Count; i++) {
-			messages.Add(Tuple.Create(0.0, Pose3D.Identity));
+			messages.Add(Tuple.Create(0.0, new PoseT().IdentityP()));
 		}
 
 		Parallel.For(0, hfused.Count,
 		             new ParallelOptions { MaxDegreeOfParallelism = Config.NParallel}, i => {
-			Pose3D pose = LinearizationPoints[i].Item2.Add(hfused[i].Item2.Mean);
+			PoseT pose  = LinearizationPoints[i].Item2.Add(hfused[i].Item2.Mean);
 			messages[i] = Tuple.Create(hfused[i].Item1, pose);
 		});
 
@@ -519,13 +527,12 @@ public class LoopyPHDNavigator : Navigator
 	/// <param name="prevlinear">Previous linearization point.</param>
 	/// <param name="linear">Linearization point.</param>
 	/// <param name="prevmean">Previous pose mean estimate.</param>
-	/// <param name="mean">Pose mean estimate.</param>
 	/// <param name="odometry">Odometry reading relating both poses.</param>
 	/// <returns>Jacobian.</returns>
-	public double[][] MotionJacobian(Pose3D prevlinear, Pose3D linear, double[] prevmean, double[] odometry)
+	public double[][] MotionJacobian(PoseT prevlinear, PoseT linear, double[] prevmean, double[] odometry)
 	{
 		// In J(p - q), p does not matter as the jacobian does not depend on it (otherwise should be lin + mean)
-		double[][] linjacobian     = Pose3D.Identity.SubtractJacobian(linear);
+		double[][] linjacobian     = new PoseT().IdentityP().SubtractJacobian(linear);
 		double[][] odojacobian     = prevlinear.Add(prevmean).AddOdometryJacobian(odometry);
 		double[][] prevlinjacobian = prevlinear.AddJacobian(prevmean);
 
@@ -566,7 +573,7 @@ public class LoopyPHDNavigator : Navigator
 	/// </summary>
 	/// <param name="trajectory">Trajectory estimate.</param>
 	/// <param name="factors">Map factors.</param>
-	public Map Filter(TimedPose trajectory, TimedMeasurements factors)
+	public Map Filter(List<Tuple<double, PoseT>> trajectory, TimedMeasurements factors)
 	{
 		return FilterMissing(trajectory, factors, -1);
 	}
@@ -578,9 +585,9 @@ public class LoopyPHDNavigator : Navigator
 	/// <param name="factors">Map factors.</param>
 	/// <param name="index">Removed factor index from the filtering;
 	/// if it's outside of the trajectory time boundaries, it will filter normally.</param>
-	public Map FilterMissing(TimedPose trajectory, TimedMeasurements factors, int index)
+	public Map FilterMissing(List<Tuple<double, PoseT>> trajectory, TimedMeasurements factors, int index)
 	{
-		InnerFilter = new PHDNavigator(InnerFilter.RefVehicle, 1, true);
+		InnerFilter = new PHDNavigator<MeasurerT, PoseT, MeasurementT>(InnerFilter.RefVehicle, 1, true);
 
 		if (index < 0) {
 			index = trajectory.Count;
@@ -588,13 +595,15 @@ public class LoopyPHDNavigator : Navigator
 			// the second loop won't do anything, i.e. full filter
 		}
 
+		MeasurementT dummy = new MeasurementT();
+
 		for (int i = 0; i < index; i++) {
 			GameTime time = new GameTime(new TimeSpan((int) (trajectory[i].Item1 * 100000000)), Config.MeasureElapsed);
 
 			InnerFilter.BestEstimate.Pose = trajectory[i].Item2;
 			InnerFilter.BestEstimate.WayPoints.Add(Tuple.Create(trajectory[i].Item1, trajectory[i].Item2.State));
 
-			InnerFilter.SlamUpdate(time, factors[i].Item2);
+			InnerFilter.SlamUpdate(time, factors[i].Item2.ConvertAll(m => dummy.FromLinear(m)));
 		}
 
 		// NOTE the frame consecutive to the missing index should have a
@@ -609,45 +618,10 @@ public class LoopyPHDNavigator : Navigator
 			InnerFilter.BestEstimate.Pose = trajectory[i].Item2;
 			InnerFilter.BestEstimate.WayPoints.Add(Tuple.Create(trajectory[i].Item1, trajectory[i].Item2.State));
 
-			InnerFilter.SlamUpdate(time, factors[i].Item2);
+			InnerFilter.SlamUpdate(time, factors[i].Item2.ConvertAll(m => dummy.FromLinear(m)));
 		}
 
 		return InnerFilter.BestMapModel;
-	}
-
-	/// <summary>
-	/// Given a measurement and a landmark, find the pose that best relates the two.
-	/// The problem is underconstrained, i.e. there is a solution for every rotation.
-	/// The output will be a compromise between rotation and translation distance to
-	/// the initial estimate.
-	/// </summary>
-	/// <param name="pose0">Initial estimate.</param>
-	/// <param name="measurement">Measurement.</param>
-	/// <param name="landmark">Landmark.</param>
-	/// <returns>Best fit for the landmark-measurement pair.</returns>
-	public static Pose3D FitToMeasurement(SimulatedVehicle pose0, double[] measurement, double[] landmark)
-	{
-		Pose3D p0 = pose0.Pose;
-		double[]   diff          = landmark.Subtract(p0.Location);
-		double[][] rotmatrix     = p0.Orientation.Conjugate().ToMatrix();
-		double[]   landmarklocal = rotmatrix.Multiply(diff);
-		double[]   measurelocal  = new double[3];
-		double     invfocal      = 1.0 / pose0.VisionFocal;
-
-		measurelocal[2] = measurement[2] /
-		                  Math.Sqrt(1 + (measurement[0] * measurement[0] + measurement[1] * measurement[1]) *
-		                                invfocal * invfocal);
-		measurelocal[0] = measurement[0] * measurelocal[2] * invfocal;
-		measurelocal[1] = measurement[1] * measurelocal[2] * invfocal;
-
-		double[] normallandmark = landmarklocal.Normalize();
-		double[] normalmeasure  = measurelocal.Normalize();
-
-		Quaternion alignrot = Quaternion.VectorRotator(normallandmark, normalmeasure);
-		Quaternion rotation = alignrot.Conjugate() * p0.Orientation;
-		double[]   location = landmark.Subtract(rotation.ToMatrix().Multiply(measurelocal));
-
-		return new Pose3D(location, rotation);
 	}
 
 	/// <summary>
@@ -662,20 +636,21 @@ public class LoopyPHDNavigator : Navigator
 	/// <param name="map">Fixed map.</param>
 	/// <param name="linearpoint">Linearization point.</param>
 	/// <returns>Fitted gaussian.</returns>
-	public static Gaussian GuidedFitGaussian(double[] pose0, List<double[]> measurements,
-	                                         Map map, Pose3D linearpoint)
+	public static Gaussian GuidedFitGaussian(double[] pose0, List<MeasurementT> measurements,
+	                                         Map map, PoseT linearpoint)
 	{
-		List<double[]>   guesses = new List<double[]>();
-		SimulatedVehicle init    = new SimulatedVehicle();
-		init.Pose                = linearpoint.Add(pose0);
+		List<double[]> guesses  = new List<double[]>();
+		MeasurerT      measurer = new MeasurerT();
+		PoseT          initpose = linearpoint.Add(pose0);
 
-		Map visible = map.FindAll(g => init.Visible(g.Mean) && g.Weight > 0.8);
+		Map visible = map.FindAll(g => measurer.VisibleM(measurer.MeasurePerfect(initpose, g.Mean)) &&
+		                               g.Weight > 0.8);
 
 		guesses.Add(pose0);
 
 		foreach (Gaussian landmark in visible) {
-			foreach (double[] measurement in measurements) {
-				Pose3D   guess = FitToMeasurement(init, measurement, landmark.Mean);
+			foreach (MeasurementT measurement in measurements) {
+				PoseT   guess = measurer.FitToMeasurement(initpose, measurement, landmark.Mean);
 				guesses.Add(guess.Subtract(linearpoint));
 			}
 		}
@@ -707,7 +682,7 @@ public class LoopyPHDNavigator : Navigator
 	/// <param name="map">Fixed map.</param>
 	/// <param name="linearpoint">Linearization point.</param>
 	/// <returns>Fitted gaussian.</returns>
-	public static Gaussian FitGaussian(double[] pose0, List<double[]> measurements, Map map, Pose3D linearpoint)
+	public static Gaussian FitGaussian(double[] pose0, List<MeasurementT> measurements, Map map, PoseT linearpoint)
 	{
 		double     maxvalue;
 		double[]   maxpose    = LogLikeGradientAscent(pose0, measurements, map, linearpoint, out maxvalue);
@@ -725,27 +700,29 @@ public class LoopyPHDNavigator : Navigator
 	/// <param name="map">Fixed map.</param>
 	/// <param name="linearpoint">Linearization point.</param>
 	/// <returns>Gradient.</returns>
-	public static double[] LogLikeGradient(double[] pose, List<double[]> measurements, Map map, Pose3D linearpoint)
+	public static double[] LogLikeGradient(double[] pose, List<MeasurementT> measurements, Map map, PoseT linearpoint)
 	{
 		const double eps      = 1e-5;
-		double[]     gradient = new double[6];
+		double[]     gradient = new double[OdoSize];
 		double[]     gradient2;
-		var          dvehicle = new SimulatedVehicle();
+		var          dvehicle = new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>();
 
 		//dvehicle.Pose = linearpoint.Add(pose);
 
 		//PHDNavigator.QuasiSetLogLikelihood(measurements, map, dvehicle, out gradient);
 
 		for (int i = 0; i < gradient.Length; i++) {
-			double[] ds = new double[6];
+			double[] ds = new double[OdoSize];
 
 			ds[i]         = eps;
 			dvehicle.Pose = linearpoint.Add(pose.Add(ds));
-			double lplus  = PHDNavigator.QuasiSetLogLikelihood(measurements, map, dvehicle, out gradient2);
+			double lplus  = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
+			                    QuasiSetLogLikelihood(measurements, map, dvehicle, out gradient2);
 
 			ds[i]         = -eps;
 			dvehicle.Pose = linearpoint.Add(pose.Add(ds));
-			double lminus = PHDNavigator.QuasiSetLogLikelihood(measurements, map, dvehicle, out gradient2);
+			double lminus = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
+			                    QuasiSetLogLikelihood(measurements, map, dvehicle, out gradient2);
 
 			gradient[i] = (lplus - lminus) / (2 * eps);
 		}
@@ -763,19 +740,20 @@ public class LoopyPHDNavigator : Navigator
 	/// <param name="linearpoint">Linearization point.</param>
 	/// <param name="loglike">Output. Log-likelihood attained at the returned pose.</param>
 	/// <returns>Pose that reaches the maximum local log-likelihood.</returns>
-	public static double[] LogLikeGradientAscent(double[] initial, List<double[]> measurements, Map map,
-	                                             Pose3D linearpoint, out double loglike)
+	public static double[] LogLikeGradientAscent(double[] initial, List<MeasurementT> measurements, Map map,
+	                                             PoseT linearpoint, out double loglike)
 	{
 		const double loglikethreshold = 1e-5;
 
-		double[]         pose        = initial;
-		double[]         nextpose    = pose;
-		SimulatedVehicle nextvehicle = new SimulatedVehicle(linearpoint.Add(nextpose), new List<double[]>());
+		double[] pose        = initial;
+		double[] nextpose    = pose;
+		var      nextvehicle = new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>(linearpoint.Add(nextpose), new List<double[]>());
 
 		double   prevvalue = double.NegativeInfinity;
 		double[] gradient;
 
-		loglike = PHDNavigator.QuasiSetLogLikelihood(measurements, map, nextvehicle, out gradient);
+		loglike = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
+		              QuasiSetLogLikelihood(measurements, map, nextvehicle, out gradient);
 		double nextloglike;
 		double multiplier;
 
@@ -788,7 +766,8 @@ public class LoopyPHDNavigator : Navigator
 			do {
 				nextpose         = pose.Add(multiplier.Multiply(gradient));
 				nextvehicle.Pose = linearpoint.Add(nextpose);
-				nextloglike      = PHDNavigator.QuasiSetLogLikelihood(measurements, map, nextvehicle, out gradient);
+				nextloglike      = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
+				                       QuasiSetLogLikelihood(measurements, map, nextvehicle, out gradient);
 				multiplier      /= 2.0;
 
 				counter++;
@@ -814,14 +793,14 @@ public class LoopyPHDNavigator : Navigator
 	/// <param name="map">Fixed map.</param>
 	/// <param name="linearpoint">Linearization point.</param>
 	/// <returns>Estimated covariance matrix.</returns>
-	public static double[][] LogLikeFitCovariance(double[] pose, List<double[]> measurements,
-	                                              Map map, Pose3D linearpoint)
+	public static double[][] LogLikeFitCovariance(double[] pose, List<MeasurementT> measurements,
+	                                              Map map, PoseT linearpoint)
 	{
 		const double eps      = 1e-5;
-		double[][]   hessian  = new double[6][];
+		double[][]   hessian  = new double[OdoSize][];
 
 		for (int i = 0; i < hessian.Length; i++) {
-			double[] ds = new double[6];
+			double[] ds = new double[OdoSize];
 
 			ds[i]          = eps;
 			double[] lplus = LogLikeGradient(pose.Add(ds), measurements, map, linearpoint);
@@ -842,7 +821,7 @@ public class LoopyPHDNavigator : Navigator
 		}
 
 		if (hessian.HasNaN()) {
-			hessian = MatrixExtensions.Zero(6);
+			hessian = MatrixExtensions.Zero(OdoSize);
 		}
 
 		// any positive eigenvalue corresponds to a maximizable direction
@@ -871,7 +850,7 @@ public class LoopyPHDNavigator : Navigator
 	/// <param name="camera">Camera 4d transform matrix.</param>
 	public override void Render(double[][] camera)
 	{
-		DrawUtils.DrawTrajectory(Graphics, RefVehicle.Groundtruth, Color.Yellow, camera);
+		DrawUtils.DrawTrajectory<PoseT>(Graphics, RefVehicle.Groundtruth, Color.Yellow, camera);
 		RefVehicle.RenderLandmarks(camera);
 		//RefVehicle.RenderBody(camera);
 		//RenderTimedGaussian(MessagesFromPast, Color.Red, camera);
@@ -904,7 +883,7 @@ public class LoopyPHDNavigator : Navigator
 			trajectory.Add(Tuple.Create(gaussians[i].Item1, Util.SClone(LinearizationPoints[i].Item2.Add(gaussians[i].Item2.Mean).State)));
 		}
 
-		DrawUtils.DrawTrajectory(Graphics, trajectory, color, camera);
+		DrawUtils.DrawTrajectory<PoseT>(Graphics, trajectory, color, camera);
 	}
 }
 }

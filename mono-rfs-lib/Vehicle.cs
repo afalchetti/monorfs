@@ -30,12 +30,9 @@ using System;
 using System.Collections.Generic;
 
 using Accord.Math;
-using AForge;
 
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
-
-using U = monorfs.Util;
 
 using TimedState    = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedArray    = System.Collections.Generic.List<System.Tuple<double, double[]>>;
@@ -46,8 +43,26 @@ namespace monorfs
 /// <summary>
 /// Vehicle model.
 /// </summary>
-public abstract class Vehicle : IDisposable
+public abstract class Vehicle<MeasurerT, PoseT, MeasurementT> : IDisposable
+	where PoseT        : IPose<PoseT>, new()
+	where MeasurementT : IMeasurement<MeasurementT>, new()
+	where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
 {
+	/// <summary>
+	/// Saved odometry vector length.
+	/// </summary>
+	protected static int OdoSize;
+
+	/// <summary>
+	/// Saved state vector length.
+	/// </summary>
+	protected static int StateSize;
+
+	/// <summary>
+	/// Saved measurement vector length.
+	/// </summary>
+	protected static int MeasureSize;
+
 	/// <summary>
 	/// Internal motion model covariance matrix. Lie algebra representation.
 	/// </summary>
@@ -66,33 +81,23 @@ public abstract class Vehicle : IDisposable
 	/// <summary>
 	/// Internal vehicle pose state.
 	/// </summary>
-	public Pose3D Pose;
+	public PoseT Pose;
 
 	/// <summary>
 	/// State using the (noisy) odometry data.
 	/// </summary>
-	protected Pose3D OdometryPose;
+	protected PoseT OdometryPose;
 
 	/// <summary>
 	/// Odometry reference state; state at which the odometry started accumulating.
 	/// Every time the system reads the odometry it resets to the correct state.
 	/// </summary>
-	private Pose3D refodometry;
+	private PoseT refodometry;
 
 	/// <summary>
-	/// Vision camera focal length.
+	/// Methods and configuration for the measurement step.
 	/// </summary>
-	public double VisionFocal { get; private set; }
-
-	/// <summary>
-	/// 2D film clipping area (i.e. sensor size and offset) in pixel units.
-	/// </summary>
-	public Rectangle FilmArea { get; protected set; }
-
-	/// <summary>
-	/// Range clipping planes in meters.
-	/// </summary>
-	public Range RangeClip { get; private set; }
+	public MeasurerT Measurer;
 	
 	/// <summary>
 	/// Render output.
@@ -127,7 +132,7 @@ public abstract class Vehicle : IDisposable
 	public List<double[]> MappedMeasurements { get; protected set; }
 
 	/// <summary>
-	/// Landmark 3d locations against which the measurements are performed, if known.
+	/// Landmark locations against which the measurements are performed, if known.
 	/// </summary>
 	public List<double[]> Landmarks { get; protected set; }
 
@@ -174,35 +179,39 @@ public abstract class Vehicle : IDisposable
 	public bool WantsMapping { get; protected set; }
 
 	/// <summary>
+	/// Calculate global constants.
+	/// </summary>
+	static Vehicle()
+	{
+		OdoSize     = new PoseT().OdometrySize;
+		StateSize   = new PoseT().StateSize;
+		MeasureSize = new MeasurementT().Size;
+	}
+
+	/// <summary>
 	/// Construct a vehicle with default constants.
 	/// </summary>
-	protected Vehicle() : this(Pose3D.Identity) {}
+	protected Vehicle() : this(new PoseT().IdentityP()) {}
 
 	/// <summary>
 	/// Construct a new Vehicle object from its initial state.
 	/// </summary>
 	/// <param name="initial">Initial pose.</param>
-	protected Vehicle(Pose3D initial)
-		: this(initial, 575.8156,
-	           new Rectangle(-640 / 2, -480 / 2, 640, 480),
-			   new Range(0.1f, 2f)) {}
+	protected Vehicle(PoseT initial)
+		: this(initial, new MeasurerT()) {}
 
 	/// <summary>
 	/// Construct a new Vehicle object from its initial state and appropiate constants.
 	/// </summary>
 	/// <param name="initial">Initial pose.</param>
-	/// <param name="focal">Focal lenghth.</param>
-	/// <param name="film">Film area.</param>
-	/// <param name="clip">Range clipping area.</param>
-	protected Vehicle(Pose3D initial, double focal, Rectangle film, Range clip)
+	/// <param name="measurer">Measuring config and methods.</param>
+	protected Vehicle(PoseT initial, MeasurerT measurer)
 	{
-		Pose        = new Pose3D(initial);
-		VisionFocal = focal;
-		FilmArea    = film;
-		RangeClip   = clip;
+		Pose     = initial.DClone();
+		Measurer = measurer;
 		
-		OdometryPose = new Pose3D(Pose);
-		refodometry  = new Pose3D(Pose);
+		OdometryPose = Pose.DClone();
+		refodometry  = Pose.DClone();
 
 		HasDataAssociation = false;
 		DataAssociation    = new List<int>();
@@ -230,17 +239,14 @@ public abstract class Vehicle : IDisposable
 	/// </summary>
 	/// <param name="that">Copied general vehicle.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
-	protected Vehicle(Vehicle that, bool copytrajectory = false)
+	protected Vehicle(Vehicle<MeasurerT, PoseT, MeasurementT> that, bool copytrajectory = false)
 		: this(that.Pose)
 	{
-		this.Pose               = new Pose3D(that.Pose);
+		this.Pose               = that.Pose.DClone();
 		this.Graphics           = that.Graphics;
 		this.MappedMeasurements = that.MappedMeasurements;
 		this.Landmarks          = that.Landmarks;
-
-		this.VisionFocal  = that.VisionFocal;
-		this.FilmArea     = that.FilmArea;
-		this.RangeClip    = that.RangeClip;
+		this.Measurer           = that.Measurer;
 
 		this.motionCovariance      = that.motionCovariance.MemberwiseClone();
 		this.MeasurementCovariance = that.MeasurementCovariance.MemberwiseClone();
@@ -269,10 +275,11 @@ public abstract class Vehicle : IDisposable
 	/// <param name="vehicle">Vehicle to clone.</param>
 	/// <param name="copytrajectory">If true, copy the whole trajectory history.</param>
 	/// <returns>The clone.</returns>
-	public virtual TrackVehicle TrackClone(TrackVehicle vehicle,
-	                                       bool         copytrajectory = false)
+	public virtual TrackVehicle<MeasurerT, PoseT, MeasurementT>
+	                   TrackClone(TrackVehicle<MeasurerT, PoseT, MeasurementT> vehicle,
+	                              bool         copytrajectory = false)
 	{
-		return new TrackVehicle(vehicle, copytrajectory);
+		return new TrackVehicle<MeasurerT, PoseT, MeasurementT>(vehicle, copytrajectory);
 	}
 
 	/// <summary>
@@ -287,14 +294,16 @@ public abstract class Vehicle : IDisposable
 	/// <param name="clutter">Clutter density.</param>
 	/// <param name="copytrajectory">If true, copy the whole trajectory history.</param>
 	/// <returns>The clone.</returns>
-	public virtual TrackVehicle TrackClone(double  motioncovmultiplier,
-	                                       double  measurecovmultiplier,
-	                                       double  pdetection,
-	                                       double  clutter,
-	                                       bool    copytrajectory = false)
+	public virtual TrackVehicle<MeasurerT, PoseT, MeasurementT>
+	                   TrackClone(double  motioncovmultiplier,
+	                              double  measurecovmultiplier,
+	                              double  pdetection,
+	                              double  clutter,
+	                              bool    copytrajectory = false)
 	{
-		return new TrackVehicle(this, motioncovmultiplier, measurecovmultiplier,
-		                        pdetection, clutter, copytrajectory);
+		return new TrackVehicle<MeasurerT, PoseT, MeasurementT>(this,
+		               motioncovmultiplier, measurecovmultiplier,
+		               pdetection, clutter, copytrajectory);
 	}
 
 	/// <summary>
@@ -315,8 +324,8 @@ public abstract class Vehicle : IDisposable
 		OdometryPose = OdometryPose.AddOdometry(reading);
 
 		double[] noise = time.ElapsedGameTime.TotalSeconds.Multiply(
-		                     U.RandomGaussianVector(new double[6] {0, 0, 0, 0, 0, 0},
-		                                            MotionCovariance));
+		                     Util.RandomGaussianVector(new double[OdoSize],
+		                                               MotionCovariance));
 		OdometryPose = OdometryPose.AddOdometry(noise);
 
 		WayPoints.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(Pose.State)));
@@ -330,8 +339,8 @@ public abstract class Vehicle : IDisposable
 	{
 		double[] reading = OdometryPose.DiffOdometry(refodometry);
 
-		OdometryPose = new Pose3D(Pose);
-		refodometry  = new Pose3D(Pose);
+		OdometryPose = Pose.DClone();
+		refodometry  = Pose.DClone();
 
 		WayOdometry.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, Util.SClone(reading)));
 
@@ -343,7 +352,7 @@ public abstract class Vehicle : IDisposable
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <returns>Pixel-range measurements.</returns>
-	public abstract List<double[]> Measure(GameTime time);
+	public abstract List<MeasurementT> Measure(GameTime time);
 
 	/// <summary>
 	/// Remove all the localization history and start it again from the current position.
@@ -356,27 +365,6 @@ public abstract class Vehicle : IDisposable
 	}
 
 	/// <summary>
-	/// Transform a measurement vector in measurement space (pixel-range)
-	/// into a map-space vector  (x-y plane).
-	/// </summary>
-	/// <param name="measurement">Measurement expressed as pixel-range.</param>
-	/// <returns>Measurement expressed in x-y plane.</returns>
-	public double[] MeasureToMap(double[] measurement)
-	{
-		double   px    = measurement[0];
-		double   py    = measurement[1];
-		double   range = measurement[2];
-
-		double   alpha = range / Math.Sqrt(VisionFocal * VisionFocal + px * px + py * py);
-		double[] diff  = new double[3] {alpha * px, alpha * py, alpha * VisionFocal};
-
-		Quaternion rotated = Pose.Orientation *
-		                     new Quaternion(0, diff[0], diff[1], diff[2]) * Pose.Orientation.Conjugate();
-
-		return new double[3] {Pose.X + rotated.X, Pose.Y + rotated.Y, Pose.Z + rotated.Z};
-	}
-
-	/// <summary>
 	/// Render the vehicle on the graphics device.
 	/// The graphics device must be ready, otherwise
 	/// the method will throw an exception.
@@ -384,9 +372,9 @@ public abstract class Vehicle : IDisposable
 	/// <param name="camera">Camera 4d transform matrix.</param>
 	public virtual void Render(double[][] camera)
 	{
-		RenderFOV(camera);
+		Measurer.RenderFOV(Graphics, Pose, camera);
 		RenderTrajectory(camera);
-		RenderBody(camera);
+		Measurer.RenderBody(Graphics, Pose, camera);
 		RenderMeasurements(camera);
 		RenderLandmarks(camera);
 	}
@@ -414,174 +402,6 @@ public abstract class Vehicle : IDisposable
 	}
 
 	/// <summary>
-	/// Render the vehicle physical body on the graphics device.
-	/// <param name="camera">Camera 4d transform matrix.</param>
-	/// </summary>
-	public void RenderBody(double[][] camera)
-	{
-		const float halflen = 0.06f;
-		
-		Color innercolor =  Color.LightBlue;
-		Color outercolor =  Color.Blue;
-
-		double[] pos = camera.TransformH(Pose.Location);
-		
-		VertexPositionColor[] invertices  = new VertexPositionColor[4];
-		double[][]            outvertices = new double[4][];
-
-		outvertices[0] = new double[] {pos[0] - halflen, pos[1] - halflen, pos[2]};
-		outvertices[1] = new double[] {pos[0] - halflen, pos[1] + halflen, pos[2]};
-		outvertices[2] = new double[] {pos[0] + halflen, pos[1] + halflen, pos[2]};
-		outvertices[3] = new double[] {pos[0] + halflen, pos[1] - halflen, pos[2]};
-
-		invertices[0] = new VertexPositionColor(outvertices[0].ToVector3(), innercolor);
-		invertices[1] = new VertexPositionColor(outvertices[1].ToVector3(), innercolor);
-		invertices[2] = new VertexPositionColor(outvertices[3].ToVector3(), innercolor);
-		invertices[3] = new VertexPositionColor(outvertices[2].ToVector3(), innercolor);
-
-		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
-		Graphics.DrawUser2DPolygon(outvertices, 0.02f, outercolor, true);
-		
-		Quaternion x = Pose.Orientation * new Quaternion(0, 0.2f, 0, 0) * Pose.Orientation.Conjugate();
-		pos = camera.TransformH(new double[3] {Pose.X + x.X, Pose.Y + x.Y, Pose.Z + x.Z});
-
-		outvertices[0] = new double[] {pos[0] - 0.4*halflen, pos[1] - 0.4*halflen, pos[2]};
-		outvertices[1] = new double[] {pos[0] - 0.4*halflen, pos[1] + 0.4*halflen, pos[2]};
-		outvertices[2] = new double[] {pos[0] + 0.4*halflen, pos[1] + 0.4*halflen, pos[2]};
-		outvertices[3] = new double[] {pos[0] + 0.4*halflen, pos[1] - 0.4*halflen, pos[2]};
-
-		invertices[0] = new VertexPositionColor(outvertices[0].ToVector3(), innercolor);
-		invertices[1] = new VertexPositionColor(outvertices[1].ToVector3(), innercolor);
-		invertices[2] = new VertexPositionColor(outvertices[3].ToVector3(), innercolor);
-		invertices[3] = new VertexPositionColor(outvertices[2].ToVector3(), innercolor);
-
-		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
-		Graphics.DrawUser2DPolygon(outvertices, 0.02f, Color.Blue, true);
-		
-		x   = Pose.Orientation * new Quaternion(0, 0, 0.2f, 0) * Pose.Orientation.Conjugate();
-		pos = camera.TransformH(new double[3] {Pose.X + x.X, Pose.Y + x.Y, Pose.Z + x.Z});
-
-		outvertices[0] = new double[] {pos[0] - 0.2*halflen, pos[1] - 0.2*halflen, pos[2]};
-		outvertices[1] = new double[] {pos[0] - 0.2*halflen, pos[1] + 0.2*halflen, pos[2]};
-		outvertices[2] = new double[] {pos[0] + 0.2*halflen, pos[1] + 0.2*halflen, pos[2]};
-		outvertices[3] = new double[] {pos[0] + 0.2*halflen, pos[1] - 0.2*halflen, pos[2]};
-
-		invertices[0] = new VertexPositionColor(outvertices[0].ToVector3(), innercolor);
-		invertices[1] = new VertexPositionColor(outvertices[1].ToVector3(), innercolor);
-		invertices[2] = new VertexPositionColor(outvertices[3].ToVector3(), innercolor);
-		invertices[3] = new VertexPositionColor(outvertices[2].ToVector3(), innercolor);
-
-		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
-		Graphics.DrawUser2DPolygon(outvertices, 0.02f, Color.Yellow, true);
-		
-		x   = Pose.Orientation * new Quaternion(0, 0, 0, 0.2f) * Pose.Orientation.Conjugate();
-		pos = camera.TransformH(new double[3] {Pose.X + x.X, Pose.Y + x.Y, Pose.Z + x.Z});
-
-		outvertices[0] = new double[] {pos[0] - 0.8*halflen, pos[1] - 0.8*halflen, pos[2]};
-		outvertices[1] = new double[] {pos[0] - 0.8*halflen, pos[1] + 0.8*halflen, pos[2]};
-		outvertices[2] = new double[] {pos[0] + 0.8*halflen, pos[1] + 0.8*halflen, pos[2]};
-		outvertices[3] = new double[] {pos[0] + 0.8*halflen, pos[1] - 0.8*halflen, pos[2]};
-
-		invertices[0] = new VertexPositionColor(outvertices[0].ToVector3(), innercolor);
-		invertices[1] = new VertexPositionColor(outvertices[1].ToVector3(), innercolor);
-		invertices[2] = new VertexPositionColor(outvertices[3].ToVector3(), innercolor);
-		invertices[3] = new VertexPositionColor(outvertices[2].ToVector3(), innercolor);
-
-		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
-		Graphics.DrawUser2DPolygon(outvertices, 0.02f, Color.Red, true);
-	}
-
-	/// <summary>
-	/// Render the Field-of-View cone on the graphics device.
-	/// </summary>
-	/// <param name="camera">Camera 4d transform matrix.</param>
-	public void RenderFOV(double[][] camera)
-	{
-		Color incolorA = Color.LightGreen; incolorA.A = 30;
-		Color incolorB = Color.LightGreen; incolorB.A = 15;
-		Color outcolor = Color.DarkGreen;  outcolor.A = 30;
-
-		double[][] frustum = new double[8][];
-		
-		frustum[0] = new double[3] {RangeClip.Min * FilmArea.Left  / VisionFocal, RangeClip.Min * FilmArea.Top    / VisionFocal, RangeClip.Min};
-		frustum[1] = new double[3] {RangeClip.Min * FilmArea.Right / VisionFocal, RangeClip.Min * FilmArea.Top    / VisionFocal, RangeClip.Min};
-		frustum[2] = new double[3] {RangeClip.Min * FilmArea.Right / VisionFocal, RangeClip.Min * FilmArea.Bottom / VisionFocal, RangeClip.Min};
-		frustum[3] = new double[3] {RangeClip.Min * FilmArea.Left  / VisionFocal, RangeClip.Min * FilmArea.Bottom / VisionFocal, RangeClip.Min};
-		frustum[4] = new double[3] {RangeClip.Max * FilmArea.Left  / VisionFocal, RangeClip.Max * FilmArea.Top    / VisionFocal, RangeClip.Max};
-		frustum[5] = new double[3] {RangeClip.Max * FilmArea.Right / VisionFocal, RangeClip.Max * FilmArea.Top    / VisionFocal, RangeClip.Max};
-		frustum[6] = new double[3] {RangeClip.Max * FilmArea.Right / VisionFocal, RangeClip.Max * FilmArea.Bottom / VisionFocal, RangeClip.Max};
-		frustum[7] = new double[3] {RangeClip.Max * FilmArea.Left  / VisionFocal, RangeClip.Max * FilmArea.Bottom / VisionFocal, RangeClip.Max};
-
-		for (int i = 0; i < frustum.Length; i++) {
-			Quaternion local = Pose.Orientation *
-			                       new Quaternion(0, frustum[i][0], frustum[i][1], frustum[i][2]) * Pose.Orientation.Conjugate();
-			frustum[i] = camera.TransformH(new double[3] {local.X, local.Y, local.Z}.Add(Pose.Location));
-		}
-
-		double[][] wireA = new double[4][];
-		double[][] wireB = new double[4][];
-		double[][] wireC = new double[4][];
-		double[][] wireD = new double[4][];
-
-		wireA[0] = frustum[0];
-		wireA[1] = frustum[1];
-		wireA[2] = frustum[5];
-		wireA[3] = frustum[6];
-
-		wireB[0] = frustum[1];
-		wireB[1] = frustum[2];
-		wireB[2] = frustum[6];
-		wireB[3] = frustum[7];
-		
-		wireC[0] = frustum[2];
-		wireC[1] = frustum[3];
-		wireC[2] = frustum[7];
-		wireC[3] = frustum[4];
-
-		wireD[0] = frustum[3];
-		wireD[1] = frustum[0];
-		wireD[2] = frustum[4];
-		wireD[3] = frustum[5];
-		
-		Graphics.DrawUser2DPolygon(wireA, 0.02f, outcolor, false);
-		Graphics.DrawUser2DPolygon(wireB, 0.02f, outcolor, false);
-		Graphics.DrawUser2DPolygon(wireC, 0.02f, outcolor, false);
-		Graphics.DrawUser2DPolygon(wireD, 0.02f, outcolor, false);
-
-		// colored sides shouldn't get in the way of the visualization,
-		// so put it behind everything else
-		for (int i = 0; i < frustum.Length; i++) {
-			frustum[i][2] = -100;
-		}
-
-		VertexPositionColor[] verticesA = new VertexPositionColor[8];
-		VertexPositionColor[] verticesB = new VertexPositionColor[8];
-
-		verticesA[0] = new VertexPositionColor(frustum[0].ToVector3(), incolorA);
-		verticesA[1] = new VertexPositionColor(frustum[4].ToVector3(), incolorA);
-		verticesA[2] = new VertexPositionColor(frustum[1].ToVector3(), incolorA);
-		verticesA[3] = new VertexPositionColor(frustum[5].ToVector3(), incolorA);
-		verticesA[4] = new VertexPositionColor(frustum[2].ToVector3(), incolorA);
-		verticesA[5] = new VertexPositionColor(frustum[6].ToVector3(), incolorA);
-		verticesA[6] = new VertexPositionColor(frustum[3].ToVector3(), incolorA);
-		verticesA[7] = new VertexPositionColor(frustum[7].ToVector3(), incolorA);
-
-		verticesB[0] = new VertexPositionColor(frustum[1].ToVector3(), incolorB);
-		verticesB[1] = new VertexPositionColor(frustum[5].ToVector3(), incolorB);
-		verticesB[2] = new VertexPositionColor(frustum[2].ToVector3(), incolorB);
-		verticesB[3] = new VertexPositionColor(frustum[6].ToVector3(), incolorB);
-		verticesB[4] = new VertexPositionColor(frustum[3].ToVector3(), incolorB);
-		verticesB[5] = new VertexPositionColor(frustum[7].ToVector3(), incolorB);
-		verticesB[6] = new VertexPositionColor(frustum[0].ToVector3(), incolorB);
-		verticesB[7] = new VertexPositionColor(frustum[4].ToVector3(), incolorB);
-		
-		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, verticesA, 0, 2);
-		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, verticesA, 4, 2);
-		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, verticesB, 0, 2);
-		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, verticesB, 4, 2);
-	}
-
-	/// <summary>
 	/// Render the path that the vehicle has traveled so far.
 	/// </summary>
 	/// <param name="camera">Camera 4d transform matrix.</param>
@@ -597,7 +417,7 @@ public abstract class Vehicle : IDisposable
 	/// <param name="color">Trajectory color.</param>
 	public void RenderTrajectory(double[][] camera, Color color)
 	{
-		DrawUtils.DrawTrajectory(Graphics, WayPoints, color, camera);
+		DrawUtils.DrawTrajectory<PoseT>(Graphics, WayPoints, color, camera);
 	}
 
 	/// <summary>
@@ -615,13 +435,13 @@ public abstract class Vehicle : IDisposable
 		
 		double[][] vertices = new double[2][];
 
-		vertices[0] = new double[] {measurement[0] - halflen, measurement[1] - halflen, measurement[2]};
-		vertices[1] = new double[] {measurement[0] + halflen, measurement[1] + halflen, measurement[2]};
+		vertices[0] = new double[3] {measurement[0] - halflen, measurement[1] - halflen, measurement[2]};
+		vertices[1] = new double[3] {measurement[0] + halflen, measurement[1] + halflen, measurement[2]};
 		
 		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, true);
 
-		vertices[0] = new double[] {measurement[0] - halflen, measurement[1] + halflen, measurement[2]};
-		vertices[1] = new double[] {measurement[0] + halflen, measurement[1] - halflen, measurement[2]};
+		vertices[0] = new double[3] {measurement[0] - halflen, measurement[1] + halflen, measurement[2]};
+		vertices[1] = new double[3] {measurement[0] + halflen, measurement[1] - halflen, measurement[2]};
 
 		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, true);
 	}
@@ -643,10 +463,10 @@ public abstract class Vehicle : IDisposable
 		VertexPositionColor[] invertices  = new VertexPositionColor[4];
 		double[][]            outvertices = new double[4][];
 
-		outvertices[0] = new double[] {landmark[0] - halflen, landmark[1] - halflen, landmark[2]};
-		outvertices[1] = new double[] {landmark[0] - halflen, landmark[1] + halflen, landmark[2]};
-		outvertices[2] = new double[] {landmark[0] + halflen, landmark[1] + halflen, landmark[2]};
-		outvertices[3] = new double[] {landmark[0] + halflen, landmark[1] - halflen, landmark[2]};
+		outvertices[0] = new double[3] {landmark[0] - halflen, landmark[1] - halflen, landmark[2]};
+		outvertices[1] = new double[3] {landmark[0] - halflen, landmark[1] + halflen, landmark[2]};
+		outvertices[2] = new double[3] {landmark[0] + halflen, landmark[1] + halflen, landmark[2]};
+		outvertices[3] = new double[3] {landmark[0] + halflen, landmark[1] - halflen, landmark[2]};
 
 		invertices[0] = new VertexPositionColor(outvertices[0].ToVector3(), innercolor);
 		invertices[1] = new VertexPositionColor(outvertices[1].ToVector3(), innercolor);
@@ -671,5 +491,32 @@ public abstract class Vehicle : IDisposable
 	/// Dispose of any resources.
 	/// </summary>
 	public virtual void Dispose() {}
+
+	/// <summary>
+	/// Create a vehicle descriptor string.
+	/// </summary>
+	/// <returns>Simulated vehicle descriptor string.</returns>
+	public override string ToString()
+	{
+		return ToString("g6");
+	}
+
+	/// <summary>
+	/// Create a vehicle descriptor string.
+	/// </summary>
+	/// <param name="format">String formt for double values.</param>
+	/// <returns>Simulated vehicle descriptor string.</returns>
+	public string ToString(string format)
+	{
+		string descriptor = "";
+
+		descriptor += "pose\n\t"   + Pose.State.ToString(format) + "\n";
+		descriptor += "params\n\t" + Measurer.ToString(format)   + "\n";
+		descriptor += "landmarks\n\t" + string.Join("\n\t",
+		               Landmarks.ConvertAll(l => string.Join(" ",
+		                                        l.Convert(x => x.ToString(format))))) + "\n";
+
+		return descriptor;
+	}
 }
 }

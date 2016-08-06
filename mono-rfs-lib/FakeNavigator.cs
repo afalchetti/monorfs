@@ -39,12 +39,15 @@ namespace monorfs
 /// <summary>
 /// SLAM solver. It does nothing.
 /// </summary>
-public class FakeNavigator : Navigator
+public class FakeNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT, PoseT, MeasurementT>
+	where PoseT        : IPose<PoseT>, new()
+	where MeasurementT : IMeasurement<MeasurementT>, new()
+	where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
 {
 	/// <summary>
 	/// Vehicle pose.
 	/// </summary>
-	public TrackVehicle Vehicle { get; set; }
+	public TrackVehicle<MeasurerT, PoseT, MeasurementT> Vehicle { get; set; }
 
 	/// <summary>
 	/// Map representation as a mixture-of-gaussians.
@@ -54,7 +57,7 @@ public class FakeNavigator : Navigator
 	/// <summary>
 	/// Most accurate estimate of the current vehicle pose.
 	/// </summary>
-	public override TrackVehicle BestEstimate { get { return Vehicle; } }
+	public override TrackVehicle<MeasurerT, PoseT, MeasurementT> BestEstimate { get { return Vehicle; } }
 
 	/// <summary>
 	/// Most accurate estimate model of the map.
@@ -65,7 +68,7 @@ public class FakeNavigator : Navigator
 	/// Construct a PHDNavigator using the indicated vehicle as a reference.
 	/// </summary>
 	/// <param name="vehicle">Vehicle to track.</param>
-	public FakeNavigator(Vehicle vehicle)
+	public FakeNavigator(Vehicle<MeasurerT, PoseT, MeasurementT> vehicle)
 		: base(vehicle, true)
 	{
 		Vehicle  = vehicle.TrackClone(1, 1, 1, 0, false);
@@ -101,7 +104,7 @@ public class FakeNavigator : Navigator
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
-	public override void SlamUpdate(GameTime time, List<double[]> measurements) {}
+	public override void SlamUpdate(GameTime time, List<MeasurementT> measurements) {}
 
 	/// <summary>
 	/// Render the navigation HUD and the trajectory on the graphics device.

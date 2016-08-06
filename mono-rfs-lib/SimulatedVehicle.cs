@@ -35,8 +35,7 @@ using Accord.Statistics.Distributions.Univariate;
 
 using Microsoft.Xna.Framework;
 
-using U  = monorfs.Util;
-using ME = monorfs.MatrixExtensions;
+using FP = monorfs.FileParser;
 
 namespace monorfs
 {
@@ -45,7 +44,10 @@ namespace monorfs
 /// It uses a 3d odometry motion model (yaw-pitch-roll) and
 /// a pixel-range measurement model.
 /// </summary>
-public class SimulatedVehicle : Vehicle
+public class SimulatedVehicle<MeasurerT, PoseT, MeasurementT> : Vehicle<MeasurerT, PoseT, MeasurementT>
+	where PoseT        : IPose<PoseT>, new()
+	where MeasurementT : IMeasurement<MeasurementT>, new()
+	where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
 {
 	/// <summary>
 	/// Internal probability of detection.
@@ -76,13 +78,6 @@ public class SimulatedVehicle : Vehicle
 	public static bool PerfectStill { get { return Config.PerfectStill; } }
 
 	/// <summary>
-	/// Sizes for the visibility ramp, one per measurement-space coordinate;
-	/// the visibility grows linearly from zero at the original border
-	/// to detectionProbability at the configured size.
-	/// </summary>
-	public static double[] VisibilityRamp { get { return Config.VisibilityRamp; } }
-
-	/// <summary>
 	/// Poisson distributed random generator with parameter lambda = ClutterCount.
 	/// </summary>
 	/// <remarks>The type is general distribution to allow for zero clutter (dirac distribution)</remarks>
@@ -93,31 +88,26 @@ public class SimulatedVehicle : Vehicle
 	/// theta = 0 and rotation axis = {1, 0, 0} with no landmarks.
 	/// </summary>
 	public SimulatedVehicle()
-		: this(Pose3D.Identity, new List<double[]>()) {}
+		: this(new PoseT().IdentityP(), new List<double[]>()) {}
 
 	/// <summary>
 	/// Construct a new Vehicle object from its initial state.
 	/// </summary>
 	/// <param name="initial">Initial pose.</param>
 	/// <param name="landmarks">Landmark 3d locations against which the measurements are performed.</param>
-	public SimulatedVehicle(Pose3D initial, List<double[]> landmarks)
-		: this(initial, landmarks, 575.8156,
-		       new Rectangle(-640 / 2, -480 / 2, 640, 480),
-		       new Range(0.1f, 2f)) {}
+	public SimulatedVehicle(PoseT initial, List<double[]> landmarks)
+		: this(initial, landmarks, new MeasurerT()) {}
 
 	/// <summary>
 	/// Construct a new Vehicle object from its initial state.
 	/// </summary>
 	/// <param name="initial">Initial pose.</param>
 	/// <param name="landmarks">Landmark 3d locations against which the measurements are performed.</param>
-	/// <param name="focal">Focal lenghth.</param>
-	/// <param name="film">Film area.</param>
-	/// <param name="clip">Range clipping area.</param>
-	public SimulatedVehicle(Pose3D initial, List<double[]> landmarks,
-	                        double focal, Rectangle film, Range clip)
-		: base(initial, focal, film, clip)
+	/// <param name="measurer">Measuring config and methods.</param>
+	public SimulatedVehicle(PoseT initial, List<double[]> landmarks, MeasurerT measurer)
+		: base(initial, measurer)
 	{
-		ClutterCount = ClutterDensity * FilmArea.Height * FilmArea.Width * RangeClip.Length;
+		ClutterCount = ClutterDensity * measurer.Volume();
 
 		if (ClutterCount > 0) {
 			clutterGen = new PoissonDistribution(ClutterCount);
@@ -137,8 +127,9 @@ public class SimulatedVehicle : Vehicle
 	/// </summary>
 	/// <param name="that">Copied simulated vehicle.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
-	public SimulatedVehicle(SimulatedVehicle that, bool copytrajectory = false)
-		: this((Vehicle) that, copytrajectory)
+	public SimulatedVehicle(SimulatedVehicle<MeasurerT, PoseT, MeasurementT> that,
+	                        bool copytrajectory = false)
+		: this((Vehicle<MeasurerT, PoseT, MeasurementT>) that, copytrajectory)
 	{
 		this.detectionProbability = that.detectionProbability;
 		this.ClutterDensity       = that.ClutterDensity;
@@ -151,7 +142,8 @@ public class SimulatedVehicle : Vehicle
 	/// </summary>
 	/// <param name="that">Copied general vehicle.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
-	public SimulatedVehicle(Vehicle that, bool copytrajectory = false)
+	public SimulatedVehicle(Vehicle<MeasurerT, PoseT, MeasurementT> that,
+	                        bool copytrajectory = false)
 		: this(that, 1, 1, Config.DetectionProbability, Config.ClutterDensity, copytrajectory) {}
 
 	/// <summary>
@@ -164,12 +156,14 @@ public class SimulatedVehicle : Vehicle
 	/// <param name="pdetection">Probability of detection.</param>
 	/// <param name="clutter">Clutter density.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
-	public SimulatedVehicle(Vehicle that, double motioncovmultiplier, double measurecovmultiplier, double pdetection, double clutter, bool copytrajectory = false)
+	public SimulatedVehicle(Vehicle<MeasurerT, PoseT, MeasurementT> that,
+	                        double motioncovmultiplier, double measurecovmultiplier,
+	                        double pdetection, double clutter, bool copytrajectory = false)
 		: base(that, copytrajectory)
 	{
 		this.detectionProbability  = pdetection;
 		this.ClutterDensity        = clutter;
-		this.ClutterCount          = this.ClutterDensity * this.FilmArea.Height * this.FilmArea.Width * this.RangeClip.Length;
+		this.ClutterCount          = this.ClutterDensity * this.Measurer.Volume();
 		this.motionCovariance      = motioncovmultiplier.Multiply(that.MotionCovariance);
 		this.MeasurementCovariance = measurecovmultiplier.Multiply(that.MeasurementCovariance);
 
@@ -196,8 +190,7 @@ public class SimulatedVehicle : Vehicle
 	public override void Update(GameTime time, double[] reading)
 	{
 		// no input, static friction makes the robot stay put (if there is any static friction)
-		if (PerfectStill && reading[0] == 0 && reading[1] == 0 && reading[2] == 0 &&
-			                reading[3] == 0 && reading[4] == 0 && reading[5] == 0) {
+		if (PerfectStill && reading.IsEqual(0)) {
 			Pose         = Pose        .AddOdometry(reading);
 			OdometryPose = OdometryPose.AddOdometry(reading);
 
@@ -207,43 +200,21 @@ public class SimulatedVehicle : Vehicle
 			base.Update(time, reading);
 		}
 	}
-	
+
 	/// <summary>
 	/// Obtain a measurement from the hidden state.
-	/// It does not use any randomness or misdetection.
-	/// </summary>
-	/// <param name="landmark">Landmark 3d location against which the measurement is performed.</param>
-	/// <returns>Pixel-range measurements.</returns>
-	public double[] MeasurePerfect(double[] landmark)
-	{
-		double[]   diff  = landmark.Subtract(Pose.Location);
-		Quaternion local = Pose.Orientation.Conjugate() *
-			                    new Quaternion(0, diff[0], diff[1], diff[2]) * Pose.Orientation;
-
-		double range  = Math.Sign(local.Z) * diff.Euclidean();
-		double px     = VisionFocal * local.X / local.Z;
-		double py     = VisionFocal * local.Y / local.Z;
-
-		return new double[3] {px, py, range};
-	}
-
-	/// <summary>
-	/// Obtain a measurement from the hidden state. It follows a
-	/// pixel-range model where the range and pixel index from a
-	/// map landmark m are:
-	/// 
-	/// [r, px, py] = [|m-x|, (f x/z)L, (f y/z)L] + N(0, R)
-	/// 
-	/// where |a-b| is the euclidean distance between a and b and
-	/// (.)L is performed on the local axis
 	/// This method always detects the landmark (misdetection
 	/// probability is ignored).
 	/// </summary>
 	/// <param name="landmark">Landmark 3d location against which the measurement is performed.</param>
 	/// <returns>Pixel-range measurements.</returns>
-	public double[] MeasureDetected(double[] landmark)
+	public MeasurementT MeasureDetected(double[] landmark)
 	{
-		return MeasurePerfect(landmark).Add(U.RandomGaussianVector(new double[3] {0, 0, 0}, MeasurementCovariance));
+		MeasurementT measurement = Measurer.MeasurePerfect(Pose, landmark);
+		double[]     mlinear     = measurement.ToLinear();
+		double[]     noise       = Util.RandomGaussianVector(new double[mlinear.Length], MeasurementCovariance);
+
+		return measurement.FromLinear(mlinear.Add(noise));
 	}
 
 	/// <summary>
@@ -252,9 +223,9 @@ public class SimulatedVehicle : Vehicle
 	/// probability is ignored).
 	/// </summary>
 	/// <returns>Pixel-range measurements.</returns>
-	public double[][] MeasureDetected()
+	public MeasurementT[] MeasureDetected()
 	{
-		double[][] measurements = new double[Landmarks.Count][];
+		MeasurementT[] measurements = new MeasurementT[Landmarks.Count];
 
 		for (int i = 0; i < Landmarks.Count; i++) {
 			measurements[i] = MeasureDetected(Landmarks[i]);
@@ -269,26 +240,27 @@ public class SimulatedVehicle : Vehicle
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <returns>Pixel-range measurements.</returns>
-	public override List<double[]> Measure(GameTime time)
+	public override List<MeasurementT> Measure(GameTime time)
 	{
-		List<double[]> measurements = new List<double[]>();
-		DataAssociation = new List<int>();
-		Map visible = new Map();
+		List<MeasurementT> measurements = new List<MeasurementT>();
+		Map                visible      = new Map();
+		DataAssociation                 = new List<int>();
 
 		double[][] diraccov = new double[3][] { new double[3] {0.001, 0, 0},
-		                                        new double[3] {0.001, 0, 0},
-		                                        new double[3] {0.001, 0, 0} };
+		                                        new double[3] {0, 0.001, 0},
+		                                        new double[3] {0, 0, 0.001} };
 
 		// add every measurement with probability = DetectionProbability
 		for (int i = 0; i < Landmarks.Count; i++) {
 			if (Visible(Landmarks[i])) {
-				if (U.Uniform.Next() < detectionProbability) {
+				if (Util.Uniform.Next() < detectionProbability) {
 					measurements   .Add(MeasureDetected(Landmarks[i]));
 					DataAssociation.Add(i);
 					visible.Add(new Gaussian(Landmarks[i], diraccov, 1.0));
 				}
 				else {
-					visible.Add(new Gaussian(Landmarks[i], diraccov, 0.0));  // weight indicates visible but not detected
+					visible.Add(new Gaussian(Landmarks[i], diraccov, 0.0)); 
+					// weight indicates visible but not detected
 				}
 			}
 		}
@@ -307,16 +279,13 @@ public class SimulatedVehicle : Vehicle
 		}
 
 		for (int i = 0; i < nclutter; i++) {
-			double px    = U.Uniform.Next() * FilmArea.Width + FilmArea.Left;
-			double py    = U.Uniform.Next() * FilmArea.Height + FilmArea.Top;
-			double range = U.Uniform.Next() * RangeClip.Length + RangeClip.Min;
-			measurements.Add(new double[3] {px, py, range});
+			measurements.Add(Measurer.RandomMeasure());
 			DataAssociation.Add(int.MinValue);
 		}
 
 		MappedMeasurements.Clear();
-		foreach (double[] z in measurements) {
-			MappedMeasurements.Add(MeasureToMap(z));
+		foreach (MeasurementT z in measurements) {
+			MappedMeasurements.Add(Measurer.MeasureToMap(Pose, z));
 		}
 
 		WayVisibleMaps.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, visible));
@@ -336,108 +305,13 @@ public class SimulatedVehicle : Vehicle
 	}
 
 	/// <summary>
-	/// Obtain the jacobian of the measurement model wrt. the landmark.
-	/// Designed to be used with EKF filters.
-	/// </summary>
-	/// <param name="landmark">Landmark 3d location against which the measurement is performed.</param>
-	/// <returns>Measurement model linearization jacobian.</returns>
-	public double[][] MeasurementJacobianL(double[] landmark)
-	{
-		double[]   diff  = landmark.Subtract(Pose.Location);
-		Quaternion local = Pose.Orientation.Conjugate() *
-			                    new Quaternion(0, diff[0], diff[1], diff[2]) * Pose.Orientation;
-
-		// the jacobian of the homography projection part is given by
-		// f/z I 0
-		// sgn(loc.z) X/|X|
-		// (arbitrarily choosing -1 as the sign for zero)
-		double mag = ((local.Z > 0) ? 1 : -1) * Math.Sqrt(local.X * local.X + local.Y * local.Y + local.Z * local.Z);
-		double[][] jprojection = {new double[] {VisionFocal / local.Z, 0,                     -VisionFocal * local.X / (local.Z * local.Z)},
-		                          new double[] {0,                     VisionFocal / local.Z, -VisionFocal * local.Y / (local.Z * local.Z)},
-		                          new double[] {local.X / mag,         local.Y / mag,         local.Z /mag}};
-
-		// the jacobian of the change of coordinates part of
-		// the measurement process is the conjugate of the rotation matrix
-		double[][] jrotation = Pose.Orientation.Conjugate().ToMatrix();
-
-		return jprojection.Multiply(jrotation);
-	}
-
-	/// <summary>
-	/// Obtain the jacobian of the measurement model wrt. the pose.
-	/// Designed to be used with EKF filters.
-	/// </summary>
-	/// <param name="landmark">Landmark 3d location against which the measurement is performed.</param>
-	/// <returns>Measurement model linearization jacobian.</returns>
-	public double[][] MeasurementJacobianP(double[] landmark)
-	{
-		double[]   diff  = landmark.Subtract(Pose.Location);
-		Quaternion local = Pose.Orientation.Conjugate() *
-			                    new Quaternion(0, diff[0], diff[1], diff[2]) * Pose.Orientation;
-
-		// the jacobian of the homography projection part is given by
-		// f/z I 0
-		// sgn(loc.z) X/|X|
-		// (arbitrarily choosing -1 as the sign for zero)
-		double mag = ((local.Z > 0) ? 1 : -1) * Math.Sqrt(local.X * local.X + local.Y * local.Y + local.Z * local.Z);
-		double[][] jprojection = {new double[] {VisionFocal / local.Z, 0,                     -VisionFocal * local.X / (local.Z * local.Z)},
-		                          new double[] {0,                     VisionFocal / local.Z, -VisionFocal * local.Y / (local.Z * local.Z)},
-		                          new double[] {local.X / mag,         local.Y / mag,         local.Z /mag}};
-
-		// the jacobian of the change of coordinates part of
-		// the measurement process is given by
-		// -Prot'    -Prot' [l - Ploc]_x
-		double[][] jlocation = (-1.0).Multiply(Pose.Orientation.Conjugate().ToMatrix());
-		double[][] jrotation = jlocation.Multiply(Util.CrossProductMatrix(diff));
-
-		double[][] jlocal = jlocation.Concatenate(jrotation);
-
-		return jprojection.Multiply(jlocal);
-	}
-
-	/// <summary>
 	/// Find if a given ladmark is visible from the current pose of the vehicle.
 	/// </summary>
 	/// <param name="landmark">Queried landmark.</param>
 	/// <returns>True if the landmark is visible; false otherwise.</returns>
 	public bool Visible(double[] landmark)
 	{
-		return VisibleM(MeasurePerfect(landmark));
-	}
-
-	/// <summary>
-	/// Find if a given ladmark is visible from the current pose of the vehicle
-	/// using pixel-range coordinates to express the landmark.
-	/// </summary>
-	/// <param name="measurement">Queried landmark in pixel-range coordinates.</param>
-	/// <returns>True if the landmark is visible; false otherwise.</returns>
-	public virtual bool VisibleM(double[] measurement)
-	{
-		return FilmArea.Left < measurement[0] && measurement[0] < FilmArea.Right &&
-		       FilmArea.Top  < measurement[1] && measurement[1] < FilmArea.Bottom &&
-		       RangeClip.Min < measurement[2] && measurement[2] < RangeClip.Max;
-	}
-
-	/// <summary>
-	/// Find if a landmark is visible in measurement space and
-	/// return a fuzzy value for points near the border of the visible region.
-	/// </summary>
-	/// <param name="measurement">Queried landmark in pixel-range coordinates.</param>
-	/// <returns>True if the landmark is visible; false otherwise.</returns>
-	public virtual double FuzzyVisibleM(double[] measurement)
-	{
-		double minwdistance = double.PositiveInfinity;
-
-		minwdistance = Math.Min(minwdistance, (measurement[0] - FilmArea.Left)  / VisibilityRamp[0]);
-		minwdistance = Math.Min(minwdistance, (FilmArea.Right - measurement[0]) / VisibilityRamp[0]);
-
-		minwdistance = Math.Min(minwdistance, (measurement[1]  - FilmArea.Top)   / VisibilityRamp[1]);
-		minwdistance = Math.Min(minwdistance, (FilmArea.Bottom - measurement[1]) / VisibilityRamp[1]);
-
-		minwdistance = Math.Min(minwdistance, (measurement[2] - RangeClip.Min)  / VisibilityRamp[2]);
-		minwdistance = Math.Min(minwdistance, (RangeClip.Max  - measurement[2]) / VisibilityRamp[2]);
-
-		return Math.Max(0, Math.Min(1, minwdistance));
+		return Measurer.VisibleM(Measurer.MeasurePerfect(Pose, landmark));
 	}
 
 	/// <summary>
@@ -448,19 +322,65 @@ public class SimulatedVehicle : Vehicle
 	/// <returns></returns>
 	public double DetectionProbability(double[] landmark)
 	{
-		return FuzzyVisibleM(MeasurePerfect(landmark)) * detectionProbability;
+		return Measurer.FuzzyVisibleM(Measurer.MeasurePerfect(Pose, landmark)) * detectionProbability;
 	}
 
 	/// <summary>
 	/// Get the probability of detection of a particular landmark
-	/// using pixel-range coordinates to express the landmark.
+	/// using measurement coordinates to express the landmark.
 	/// It is modelled as a constant if it's on the FOV and zero if not.
 	/// </summary>
-	/// <param name="measurement">Queried landmark in pixel-range coordinates.</param>
+	/// <param name="measurement">Queried landmark in measurmeent coordinates.</param>
 	/// <returns></returns>
-	public double DetectionProbabilityM(double[] measurement)
+	public double DetectionProbabilityM(MeasurementT measurement)
 	{
-		return FuzzyVisibleM(measurement) * detectionProbability;
+		return Measurer.FuzzyVisibleM(measurement) * detectionProbability;
+	}
+
+	/// <summary>
+	/// Create a vehicle from a simulation file.
+	/// </summary>
+	/// <param name="descriptor">Scene descriptor text.</param>
+	/// <returns>Simulated vehicle parsed from file.</returns>
+	public static SimulatedVehicle<MeasurerT, PoseT, MeasurementT> FromFile(string descriptor)
+	{
+		Dictionary<string, List<string>> dict = Util.ParseDictionary(descriptor);
+
+		double[] vehiclepose = FP.ParseDoubleList(dict["pose"][0]);
+
+		double[] measurerdata = null;
+		string   measurerkey  = (dict.ContainsKey("focal")) ? "focal" :
+		                        (dict.ContainsKey("params")) ? "params" : "";
+		// "focal" is deprecated in lieu of "params" which is more global to different kinds of sensors
+
+		if (!string.IsNullOrEmpty(measurerkey)) {
+			measurerdata = FP.ParseDoubleList(dict[measurerkey][0]);
+		}
+
+		PoseT dummy = new PoseT();
+		PoseT pose = dummy.FromState(vehiclepose);
+
+		List<double[]> maploc      = new List<double[]>();
+		List<string>   mapdescript = dict["landmarks"];
+
+		for (int i = 0; i < mapdescript.Count; i++) {
+			double[] landmark = FP.ParseDoubleList(mapdescript[i]);
+
+			if (landmark.Length != 3) {
+				throw new FormatException("Map landmarks must be 3D");
+			}
+
+			maploc.Add(landmark);
+		}
+
+		if (measurerdata != null) {
+			MeasurerT dummyM    = new MeasurerT();
+			MeasurerT measurer = dummyM.FromLinear(measurerdata);
+			return new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>(pose, maploc, measurer);
+		}
+		else {
+			return new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>(pose, maploc);
+		}
 	}
 }
 }

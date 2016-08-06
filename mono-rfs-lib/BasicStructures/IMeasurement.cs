@@ -1,5 +1,5 @@
-﻿// DrawUtils.cs
-// Common rendering routines
+﻿// IMeasurement.cs
+// Measurement structure interface
 // Part of MonoRFS
 //
 // Copyright (c) 2015, Angelo Falchetti
@@ -27,45 +27,50 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
+using System.Collections;
+using System.Collections.Generic;
 
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-
-using TimedState      = System.Collections.Generic.List<System.Tuple<double, double[]>>;
-using TimedTrajectory = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<System.Tuple<double, double[]>>>>;
-using TimedMapModel   = System.Collections.Generic.List<System.Tuple<double, monorfs.Map>>;
-
+using Accord.Math;
+using Accord.MachineLearning.Structures;
 
 namespace monorfs
 {
-
 /// <summary>
-/// Common rendering routines.
+/// Measurement structure.
 /// </summary>
-public static class DrawUtils
+public interface IMeasurement<Measurement>
 {
 	/// <summary>
-	/// Render a path specified in global coordinates.
+	/// Obtain a linear representation for the measurement.
 	/// </summary>
-	/// <param name="graphics">MonoGame graphic context.</param>
-	/// <param name="trajectory">Path to render.</param>
-	/// <param name="color">Line color.</param>
-	/// <param name="camera">Camera 4d transform matrix.</param>
-	public static void DrawTrajectory<PoseT>(GraphicsDevice graphics, TimedState trajectory,
-	                                  Color color, double[][] camera)
-		where PoseT : IPose<PoseT>, new()
-	{
-		double[][] vertices = new double[trajectory.Count][];
+	/// <returns>Linear representation.</returns>
+	double[] ToLinear();
 
-		PoseT dummy = new PoseT();
+	/// <summary>
+	/// Retrieve the measurement from a linear representation.
+	/// </summary>
+	/// <param name="linear">Linear representation.</param>
+	/// <returns>Measurement.</returns>
+	Measurement FromLinear(double[] linear);
 
-		for (int i = 0; i < trajectory.Count; i++) {
-			PoseT w  = dummy.FromState(trajectory[i].Item2);
-			vertices[i] = camera.TransformH(w.Location);
-		}
+	/// <summary>
+	/// Number of measurement coordinates.
+	/// </summary>
+	int Size { get; }
 
-		graphics.DrawUser2DPolygon(vertices, 0.02f, color, false);
-	}
+	/// <summary>
+	/// Get a zero measurement, however it may be defined.
+	/// </summary>
+	/// <remarks>Usually this will be defined as a static property inside the classes;
+	/// this method works if polymorphism is an issue.</remarks>
+	/// <returns>Zero measurement.</returns>
+	Measurement ZeroM();
+
+	/// <summary>
+	/// Create a vehicle descriptor string.
+	/// </summary>
+	/// <param name="format">String format for double values.</param>
+	/// <returns>Simulated vehicle descriptor string.</returns>
+	string ToString(string format);
 }
 }
-

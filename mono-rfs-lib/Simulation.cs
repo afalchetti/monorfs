@@ -49,6 +49,11 @@ namespace monorfs
 public enum NavigationAlgorithm { Odometry, PHD, LoopyPHD, ISAM2 }
 
 /// <summary>
+/// Navigation algorithm.
+/// </summary>
+public enum DynamicsModel { PRM3D, Linear2D }
+
+/// <summary>
 /// Vehicle input type.
 /// </summary>
 public enum VehicleType { Simulation, Kinect, Record }
@@ -56,12 +61,15 @@ public enum VehicleType { Simulation, Kinect, Record }
 /// <summary>
 /// Interactive manipulator for a simulation of vehicle navigation through a landmark map.
 /// </summary>
-public class Simulation : Manipulator
+public class Simulation<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, PoseT, MeasurementT>
+	where PoseT        : IPose<PoseT>, new()
+	where MeasurementT : IMeasurement<MeasurementT>, new()
+	where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
 {
 	/// <summary>
 	/// Initial vehicle pass as argument with initial pose (for saving it at the end).
 	/// </summary>
-	public SimulatedVehicle InitVehicle;
+	public SimulatedVehicle<MeasurerT, PoseT, MeasurementT> InitVehicle;
 
 	/// <summary>
 	/// Automatic simulation command input.
@@ -151,12 +159,7 @@ public class Simulation : Manipulator
 				s => {double time = s.Item1;
 			          double[] r  = s.Item2;
 				      return time.ToString("g6") + " " +
-				             r[0].ToString("g6") + " " +
-				             r[1].ToString("g6") + " " +
-				             r[2].ToString("g6") + " " +
-				             r[3].ToString("g6") + " " +
-				             r[4].ToString("g6") + " " +
-				             r[5].ToString("g6");}
+			                 String.Join(" ", Array.ConvertAll(r, x => x.ToString("g6"))); }
 			));
 		}
 	}
@@ -169,8 +172,9 @@ public class Simulation : Manipulator
 	{
 		get
 		{
-			return string.Join("\n|\n", Navigator.WayTrajectories.ConvertAll(t => t.Item1.ToString("g6") + "\n" + 
-			                                                                      Simulation.SerializeWayPoints(t.Item2)));
+			return string.Join("\n|\n", Navigator.WayTrajectories.ConvertAll(
+			                                t => t.Item1.ToString("g6") + "\n" +
+			                                SerializeWayPoints(t.Item2)));
 		
 		}
 	}
@@ -222,13 +226,7 @@ public class Simulation : Manipulator
 		return string.Join("\n", waypoints.ConvertAll(s => {double time = s.Item1;
 		                                                    double[] p = s.Item2;
 		                                                    return time.ToString("g6") + " " +
-		                                                           p[0].ToString("g6") + " " +
-		                                                           p[1].ToString("g6") + " " +
-		                                                           p[2].ToString("g6") + " " +
-		                                                           p[3].ToString("g6") + " " +
-		                                                           p[4].ToString("g6") + " " +
-		                                                           p[5].ToString("g6") + " " +
-		                                                           p[6].ToString("g6");}));
+		                                                            String.Join(" ", Array.ConvertAll(p, x => x.ToString("g6"))); }));
 	}
 
 	/// <summary>
@@ -243,7 +241,10 @@ public class Simulation : Manipulator
 	/// as it had taken exactly the nominal rate.</param>
 	/// <param name="noterminate"> If true, the simulation will remain active after cues
 	/// like command depletion or vehicle requirements ask to do so.</param>
-	public Simulation(string title, Vehicle explorer, Navigator navigator, List<double[]> commands,
+	public Simulation(string title,
+	                  Vehicle<MeasurerT, PoseT, MeasurementT> explorer,
+	                  Navigator<MeasurerT, PoseT, MeasurementT> navigator,
+	                  List<double[]> commands,
 	                  bool realtime, bool noterminate)
 		: base(title, explorer, navigator, realtime)
 	{
@@ -256,7 +257,7 @@ public class Simulation : Manipulator
 		timer = new Stopwatch();
 		timer.Start();
 
-		InitVehicle     = new SimulatedVehicle(explorer);
+		InitVehicle     = new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>(explorer);
 		SidebarHistory  = new List<Color[]>();
 		WayMeasurements = new TimedMeasurements();
 		// note that WayMeasurements starts empty as measurements are between frames
@@ -282,14 +283,15 @@ public class Simulation : Manipulator
 	/// <param name="noterminate"> If true, the simulation will remain active after cues
 	/// like command depletion or vehicle requirements ask to do so.</param>
 	/// <returns>Prepared simulation object.</returns>
-	public static Simulation FromFiles(string scenefile, string commandfile = "", int particlecount = 5,
-	                                   VehicleType input = VehicleType.Simulation,
-	                                   NavigationAlgorithm algorithm = NavigationAlgorithm.PHD,
-	                                   bool onlymapping = false, bool realtime = false,
-	                                   bool sidebar = true, bool noterminate = false)
+	public static Simulation<MeasurerT, PoseT, MeasurementT>
+	    FromFiles(string scenefile, string commandfile = "", int particlecount = 5,
+	              VehicleType input = VehicleType.Simulation,
+	              NavigationAlgorithm algorithm = NavigationAlgorithm.PHD,
+	              bool onlymapping = false, bool realtime = false,
+	              bool sidebar = true, bool noterminate = false)
 	{
-		Vehicle        explorer;
-		Navigator      navigator;
+		Vehicle<MeasurerT, PoseT, MeasurementT>   explorer;
+		Navigator<MeasurerT, PoseT, MeasurementT> navigator;
 		List<double[]> commands;
 
 		// batch methods extra information
@@ -300,26 +302,37 @@ public class Simulation : Manipulator
 		try {
 			switch (input) {
 			case VehicleType.Kinect:
-				explorer = FP.VehicleFromSensor(scenefile, sidebar);
+				if (typeof(MeasurementT) == typeof(PixelRangeMeasurement) &&
+					typeof(PoseT)        == typeof(Pose3D) &&
+					typeof(MeasurerT)    == typeof(KinectMeasurer)) {
+					explorer = KinectVehicle.FromSensor(scenefile, sidebar) as
+					               Vehicle<MeasurerT, PoseT, MeasurementT>;
+				}
+				else {
+					throw new ArgumentException("KinectVehicle can only handle 3D Pose + PixelRange");
+				}
 				break;
 			case VehicleType.Record:
 				if (algorithm == NavigationAlgorithm.LoopyPHD) {
 					Console.WriteLine("reading Loopy PHD initialization data from file");
-					explorer = FP.VehicleFromRecord(scenefile, true, out estimate, out odometry, out measurements);
+					explorer = RecordVehicle<MeasurerT, PoseT, MeasurementT>.
+					               FromFile(scenefile, true, out estimate, out odometry, out measurements);
 				}
 				else {
-					explorer = FP.VehicleFromRecord(scenefile, false, out estimate, out odometry, out measurements);
+					explorer = RecordVehicle<MeasurerT, PoseT, MeasurementT>.
+					               FromFile(scenefile, false, out estimate, out odometry, out measurements);
 				}
 				break;
 			case VehicleType.Simulation:
 			default:
-				explorer = FP.VehicleFromSimFile(File.ReadAllText(scenefile));
+				explorer = SimulatedVehicle<MeasurerT, PoseT, MeasurementT>.
+				               FromFile(File.ReadAllText(scenefile));
 				break;
 			}
 		}
 		catch (IOException) {
 			Console.WriteLine("Couldn't open vehicle file/device: " + scenefile);
-			explorer = new SimulatedVehicle();
+			explorer = new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>();
 		}
 
 		try {
@@ -337,34 +350,35 @@ public class Simulation : Manipulator
 
 		switch (algorithm) {
 		case NavigationAlgorithm.Odometry:
-			navigator = new OdometryNavigator(explorer);
+			navigator = new OdometryNavigator<MeasurerT, PoseT, MeasurementT>(explorer);
 			break;
 		case NavigationAlgorithm.ISAM2:
-			navigator = new ISAM2Navigator(explorer, onlymapping);
+			navigator = new ISAM2Navigator<MeasurerT, PoseT, MeasurementT>(explorer, onlymapping);
 			break;
 		case NavigationAlgorithm.LoopyPHD:
 			Console.WriteLine("initializing Loopy PHD");
 			if (estimate != null) {
-				navigator = new LoopyPHDNavigator(explorer, estimate, odometry, measurements);
+				navigator = new LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT>(explorer, estimate,
+				                                                                  odometry, measurements);
 			}
 			else {
-				navigator = new LoopyPHDNavigator(explorer, commands,
-				                                  new PHDNavigator(explorer, particlecount, onlymapping));
+				navigator = new LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT>(explorer, commands,
+				                new PHDNavigator<MeasurerT, PoseT, MeasurementT>(explorer, particlecount, onlymapping));
 			}
 
-			explorer = new FakeVehicle();
+			explorer = new FakeVehicle<MeasurerT, PoseT, MeasurementT>();
 			Console.WriteLine("Loopy PHD initialized");
 
 			break;
 		case NavigationAlgorithm.PHD:
 		default:
-			navigator = new PHDNavigator(explorer, particlecount, onlymapping);
+			navigator = new PHDNavigator<MeasurerT, PoseT, MeasurementT>(explorer, particlecount, onlymapping);
 			break;
 		}
 
 		string title = "monorfs - simulating " + scenefile + " [" + algorithm + "]";
 
-		return new Simulation(title, explorer, navigator, commands, realtime, noterminate);
+		return new Simulation<MeasurerT, PoseT, MeasurementT>(title, explorer, navigator, commands, realtime, noterminate);
 	}
 
 	/// <summary>
@@ -389,7 +403,7 @@ public class Simulation : Manipulator
 			Console.WriteLine("  -- writing scene file");
 		}
 
-		string scenedata = FileParser.VehicleToDescriptor(InitVehicle);
+		string scenedata = InitVehicle.ToString();
 		File.WriteAllText(Path.Combine(output, "scene.world"), scenedata);
 
 		if (verbose) {
@@ -511,67 +525,66 @@ public class Simulation : Manipulator
 		bool forcehistoryreset = keyboard.IsKeyDown(Keys.T);
 		
 		if (keyboard.IsKeyDown(Keys.I)) {
-			dlocz += 0.02 * multiplier;
+			dlocz += multiplier;
 		}
 
 		if (keyboard.IsKeyDown(Keys.K)) {
-			dlocz -= 0.02 * multiplier;
+			dlocz -=  multiplier;
 		}
 
 		if (keyboard.IsKeyDown(Keys.J)) {
-			dyaw += 0.1 * multiplier;
+			dyaw -= multiplier;
 		}
 
 		if (keyboard.IsKeyDown(Keys.L)) {
-			dyaw -= 0.1 * multiplier;
+			dyaw += multiplier;
 		}
 
 		if (keyboard.IsKeyDown(Keys.W)) {
-			dpitch -= 0.1 * multiplier;
+			dpitch += multiplier;
 		}
 
 		if (keyboard.IsKeyDown(Keys.S)) {
-			dpitch += 0.1 * multiplier;
+			dpitch -= multiplier;
 		}
 
 		if (keyboard.IsKeyDown(Keys.A)) {
-			droll -= 0.1 * multiplier;
+			droll -= multiplier;
 		}
 
 		if (keyboard.IsKeyDown(Keys.D)) {
-			droll += 0.1 * multiplier;
+			droll += multiplier;
 		}
 		
 		if (keyboard.IsKeyDown(Keys.M) && !prevkeyboard.IsKeyDown(Keys.M)) {
 			forceslam    = Navigator.OnlyMapping;
 			forcemapping = !Navigator.OnlyMapping;
 		}
+
+		double[] autocmd = new double[OdoSize];
+		double[] keycmd  = new double[6] {dlocx, dlocy, dlocz, dpitch, dyaw, droll};
+
+		double[] odometry = Explorer.Pose.AddKeyboardInput(autocmd, keycmd);
 		
 		if (Paused) {
-			Explorer.Pose = Explorer.Pose.Add(new double[6] {dlocx, dlocy, dlocz, dpitch, dyaw, droll});
+			Explorer.Pose = Explorer.Pose.Add(odometry);
 		}
 		else {
 			if (commandindex < Commands.Count) {
-				double[] autocmd = Commands[commandindex];
-		
-				dlocx  += autocmd[0];
-				dlocy  += autocmd[1];
-				dlocz  += autocmd[2];
-				dyaw   += autocmd[3];
-				dpitch += autocmd[4];
-				droll  += autocmd[5];
+				autocmd  = Commands[commandindex];
+				odometry = Explorer.Pose.AddKeyboardInput(autocmd, keycmd);
 
-				// the 7th parameter, if any, can force slam or mapping
-				if (autocmd.Length > 6) {
-					if (autocmd[6] > 0) {
+				// the extra parameter, if any, can force slam or mapping
+				if (autocmd.Length > OdoSize) {
+					if (autocmd[OdoSize] > 0) {
 						forceslam    = true;
 						forcemapping = false;
 					}
-					else if (autocmd[6] < 0) {
+					else if (autocmd[OdoSize] < 0) {
 						forceslam    = false;
 						forcemapping = true;
 					}
-					// else, autocmd[6] == 0, do nothing
+					// else, autocmd[OdoSize] == 0, do nothing
 				}
 
 				commandindex++;
@@ -602,19 +615,19 @@ public class Simulation : Manipulator
 
 			GameTime origtime = time;
 			time = new GameTime(time.TotalGameTime.Add(FrameElapsed), time.ElapsedGameTime);
-			Explorer.Update(time, new double[6] {dlocx, dlocy, dlocz, dpitch, dyaw, droll});
+			Explorer.Update(time, odometry);
 
 			if (UseOdometry) {
-				double[] odm = Explorer.ReadOdometry(origtime);
-				Navigator.Update(time, odm);
+				double[] corruptodometry = Explorer.ReadOdometry(origtime);
+				Navigator.Update(time, corruptodometry);
 			}
 			else {
-				Navigator.Update(time, new double[6] {0, 0, 0, 0, 0, 0});
+				Navigator.Update(time, new double[OdoSize]);
 			}
 
 			if (time.TotalGameTime - lastnavigationupdate.TotalGameTime >= MeasureElapsed) {
-				List<double[]> measurements = Explorer.Measure(time);
-				WayMeasurements.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, measurements));
+				List<MeasurementT> measurements = Explorer.Measure(time);
+				WayMeasurements.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, measurements.ConvertAll(m => m.ToLinear())));
 				
 				try {
 					Navigator.SlamUpdate(time, measurements);

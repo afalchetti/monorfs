@@ -32,8 +32,6 @@ using Accord.Math;
 
 using Microsoft.Xna.Framework;
 
-using U = monorfs.Util;
-
 namespace monorfs
 {
 /// <summary>
@@ -41,7 +39,10 @@ namespace monorfs
 /// Similar to SimulatedVehicle, but adds
 /// a better visibility model for Kinect.
 /// </summary>
-public class TrackVehicle : SimulatedVehicle
+public class TrackVehicle<MeasurerT, PoseT, MeasurementT> : SimulatedVehicle<MeasurerT, PoseT, MeasurementT>
+	where PoseT        : IPose<PoseT>, new()
+	where MeasurementT : IMeasurement<MeasurementT>, new()
+	where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
 {
 	/// <summary>
 	/// Construct a TrackVehicle at the origin with default properties.
@@ -53,7 +54,8 @@ public class TrackVehicle : SimulatedVehicle
 	/// </summary>
 	/// <param name="that">Copied simulated vehicle.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
-	public TrackVehicle(SimulatedVehicle that, bool copytrajectory = false)
+	public TrackVehicle(SimulatedVehicle<MeasurerT, PoseT, MeasurementT> that,
+	                    bool copytrajectory = false)
 		: base(that, copytrajectory) {}
 
 	/// <summary>
@@ -66,7 +68,9 @@ public class TrackVehicle : SimulatedVehicle
 	/// <param name="pdetection">Probability of detection.</param>
 	/// <param name="clutter">Clutter density.</param>
 	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied. Relatively heavy operation.</param>
-	public TrackVehicle(Vehicle that, double motioncovmultiplier, double measurecovmultiplier, double pdetection, double clutter, bool copytrajectory = false)
+	public TrackVehicle(Vehicle<MeasurerT, PoseT, MeasurementT> that,
+	                    double motioncovmultiplier, double measurecovmultiplier,
+	                    double pdetection, double clutter, bool copytrajectory = false)
 		: base(that, motioncovmultiplier, measurecovmultiplier, pdetection, clutter, copytrajectory) {}
 
 
@@ -87,10 +91,9 @@ public class TrackVehicle : SimulatedVehicle
 		Update(time, reading);
 		
 		// no input, static friction makes the robot stay put (if there is any static friction)
-		if (!(PerfectStill && reading[0] == 0 && reading[1] == 0 && reading[2] == 0 &&
-		                      reading[3] == 0 && reading[4] == 0 && reading[5] == 0)) {
+		if (!(PerfectStill && reading.IsEqual(0))) {
 			double[] noise = time.ElapsedGameTime.TotalSeconds.Multiply(
-			                     U.RandomGaussianVector(new double[6] {0, 0, 0, 0, 0, 0},
+			                     Util.RandomGaussianVector(new double[OdoSize],
 			                                            MotionCovariance));
 			Pose = Pose.AddOdometry(noise);
 		}

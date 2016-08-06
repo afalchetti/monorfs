@@ -42,17 +42,35 @@ namespace monorfs
 /// <summary>
 /// Interactive controller for slam algorithms.
 /// </summary>
-public abstract class Manipulator : Game
+public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
+	where PoseT        : IPose<PoseT>, new()
+	where MeasurementT : IMeasurement<MeasurementT>, new()
+	where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
 {
+	/// <summary>
+	/// Saved odometry vector length.
+	/// </summary>
+	protected static int OdoSize;
+
+	/// <summary>
+	/// Saved state vector length.
+	/// </summary>
+	protected static int StateSize;
+
+	/// <summary>
+	/// Saved measurement vector length.
+	/// </summary>
+	protected static int MeasureSize;
+
 	/// <summary>
 	/// Main vehicle.
 	/// </summary>
-	public Vehicle Explorer { get; private set; }
+	public Vehicle<MeasurerT, PoseT, MeasurementT> Explorer { get; private set; }
 
 	/// <summary>
 	/// SLAM solver.
 	/// </summary>
-	public Navigator Navigator { get; private set; }
+	public Navigator<MeasurerT, PoseT, MeasurementT> Navigator { get; private set; }
 
 	/// <summary>
 	/// Frame period (frames per second inverse).
@@ -267,6 +285,16 @@ public abstract class Manipulator : Game
 	}
 
 	/// <summary>
+	/// Calculate global constants.
+	/// </summary>
+	static Manipulator()
+	{
+		OdoSize     = new PoseT().OdometrySize;
+		StateSize   = new PoseT().StateSize;
+		MeasureSize = new MeasurementT().Size;
+	}
+
+	/// <summary>
 	/// Construct a Manipulator from its components.
 	/// </summary>
 	/// <param name="title">Window title.</param>
@@ -274,7 +302,10 @@ public abstract class Manipulator : Game
 	/// <param name="navigator">SLAM solver.</param>
 	/// <param name="realtime">Realtime data processing.</param>
 	/// <param name="fps">Frame per seconds.</param>
-	protected Manipulator(string title, Vehicle explorer, Navigator navigator, bool realtime, double fps = 30)
+	protected Manipulator(string title,
+	                      Vehicle<MeasurerT, PoseT, MeasurementT> explorer,
+	                      Navigator<MeasurerT, PoseT, MeasurementT> navigator,
+	                      bool realtime, double fps = 30)
 	{
 		Window.Title = title;
 
@@ -293,8 +324,8 @@ public abstract class Manipulator : Game
 		graphicsManager.IsFullScreen              = false;
 
 		ScreenCut     = (Explorer.HasSidebar) ? 0.7 : 1.0;
-		SidebarWidth  = (Explorer.HasSidebar) ? Explorer.FilmArea.Width : 1;
-		SidebarHeight = (Explorer.HasSidebar) ? 2 * Explorer.FilmArea.Height : 1;
+		SidebarWidth  = (Explorer.HasSidebar) ? 640 : 1;
+		SidebarHeight = (Explorer.HasSidebar) ? 2 * 480 : 1;
 
 		FrameElapsed = new TimeSpan((long) (10000000/fps));
 		Message      = "";
@@ -583,14 +614,14 @@ public abstract class Manipulator : Game
 			color    = Color.OrangeRed;
 			vertices = new double[8][];
 
-			vertices[0] = new double[] {mousefocusproj[0] -     halflen, mousefocusproj[1] -     halflen, mousefocusproj[2]};
-			vertices[1] = new double[] {mousefocusproj[0] - 1.3*halflen, mousefocusproj[1] +           0, mousefocusproj[2]};
-			vertices[2] = new double[] {mousefocusproj[0] -     halflen, mousefocusproj[1] +     halflen, mousefocusproj[2]};
-			vertices[3] = new double[] {mousefocusproj[0] +           0, mousefocusproj[1] + 1.3*halflen, mousefocusproj[2]};
-			vertices[4] = new double[] {mousefocusproj[0] +     halflen, mousefocusproj[1] +     halflen, mousefocusproj[2]};
-			vertices[5] = new double[] {mousefocusproj[0] + 1.3*halflen, mousefocusproj[1] +           0, mousefocusproj[2]};
-			vertices[6] = new double[] {mousefocusproj[0] +     halflen, mousefocusproj[1] -     halflen, mousefocusproj[2]};
-			vertices[7] = new double[] {mousefocusproj[0] +           0, mousefocusproj[1] - 1.3*halflen, mousefocusproj[2]};
+			vertices[0] = new double[3] {mousefocusproj[0] -     halflen, mousefocusproj[1] -     halflen, mousefocusproj[2]};
+			vertices[1] = new double[3] {mousefocusproj[0] - 1.3*halflen, mousefocusproj[1] +           0, mousefocusproj[2]};
+			vertices[2] = new double[3] {mousefocusproj[0] -     halflen, mousefocusproj[1] +     halflen, mousefocusproj[2]};
+			vertices[3] = new double[3] {mousefocusproj[0] +           0, mousefocusproj[1] + 1.3*halflen, mousefocusproj[2]};
+			vertices[4] = new double[3] {mousefocusproj[0] +     halflen, mousefocusproj[1] +     halflen, mousefocusproj[2]};
+			vertices[5] = new double[3] {mousefocusproj[0] + 1.3*halflen, mousefocusproj[1] +           0, mousefocusproj[2]};
+			vertices[6] = new double[3] {mousefocusproj[0] +     halflen, mousefocusproj[1] -     halflen, mousefocusproj[2]};
+			vertices[7] = new double[3] {mousefocusproj[0] +           0, mousefocusproj[1] - 1.3*halflen, mousefocusproj[2]};
 
 			Graphics.DrawUser2DPolygon(vertices, 0.03f, color, true);
 		}

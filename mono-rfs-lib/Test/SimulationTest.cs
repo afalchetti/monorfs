@@ -34,7 +34,13 @@ using Microsoft.Xna.Framework;
 using NUnit.Framework;
 
 using AE         = monorfs.ArrayExtensions;
-using TimedState = System.Collections.Generic.List<System.Tuple<double, double[]>>;
+
+using TimedState       = System.Collections.Generic.List<System.Tuple<double, double[]>>;
+using Simulation       = monorfs.Simulation<monorfs.PRM3DMeasurer, monorfs.Pose3D, monorfs.PixelRangeMeasurement>;
+using PHDNavigator     = monorfs.PHDNavigator<monorfs.PRM3DMeasurer, monorfs.Pose3D, monorfs.PixelRangeMeasurement>;
+using Vehicle          = monorfs.Vehicle<monorfs.PRM3DMeasurer, monorfs.Pose3D, monorfs.PixelRangeMeasurement>;
+using SimulatedVehicle = monorfs.SimulatedVehicle<monorfs.PRM3DMeasurer, monorfs.Pose3D, monorfs.PixelRangeMeasurement>;
+using TrackVehicle     = monorfs.TrackVehicle<monorfs.PRM3DMeasurer, monorfs.Pose3D, monorfs.PixelRangeMeasurement>;
 
 namespace monorfs.Test
 {
@@ -119,7 +125,7 @@ class SimulationTest
 		updatehook();
 
 		if (time.TotalGameTime - lastnavigationupdate.TotalGameTime >= Simulation.MeasureElapsed) {
-			List<double[]> measurements = explorer.Measure(time);
+			List<PixelRangeMeasurement> measurements = explorer.Measure(time);
 			measurehook();
 
 			navigator.SlamUpdate(time, measurements);

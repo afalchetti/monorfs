@@ -49,7 +49,7 @@ namespace monorfs
 /// Kinect vehicle model.
 /// Extracts measurements from an online Kinect sensor.
 /// </summary>
-public class KinectVehicle : Vehicle
+public class KinectVehicle : Vehicle<KinectMeasurer, Pose3D, PixelRangeMeasurement>
 {
 	/// <summary>
 	/// Sensor depth data stream.
@@ -217,10 +217,11 @@ public class KinectVehicle : Vehicle
 	/// If null or empty, an unspecified active hardware sensor is used.</param>
 	/// <param name="sidebar">True to show a sidebar with the image processing results.</param>
 	public KinectVehicle(string inputfile = null, bool sidebar = true)
-		: base(Pose3D.Identity, 575.8156 / Delta,
-		       new Rectangle(-640 / Delta / 2, -480 / Delta / 2,
-		                      640 / Delta,      480 / Delta),
-		       new Range(0.1f, 4f))
+		: base(Pose3D.Identity, new KinectMeasurer(575.8156 / Delta,
+		                                          new Rectangle(-640 / Delta / 2, -480 / Delta / 2,
+		                                                         640 / Delta,      480 / Delta),
+		                                          new Range(0.1f, 4f),
+		                                          640, 480, 24, () => null))
 	{
 		try {
 			device = Device.Open((!string.IsNullOrEmpty(inputfile)) ? inputfile : Device.AnyDevice);
@@ -280,22 +281,33 @@ public class KinectVehicle : Vehicle
 			throw;
 		}
 	}
+
+	/// <summary>
+	/// Create a vehicle from a real sensor device.
+	/// </summary>
+	/// <param name="sensor">Device (or recorded file) path.</param>
+	/// <param name="sidebar">True to show a sidebar with image processing details.</param>
+	/// <returns>Vehicle linked to sensor.</returns>
+	public static KinectVehicle FromSensor(string sensor, bool sidebar)
+	{
+		return new KinectVehicle(sensor, sidebar);
+	}
 	
 	/// <summary>
 	/// Obtain several measurements from the hidden state.
 	/// </summary>
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	/// <returns>Pixel-range measurements.</returns>
-	public override List<double[]> Measure(GameTime time)
+	public override List<PixelRangeMeasurement> Measure(GameTime time)
 	{
-		List<double[]> measurements = new List<double[]>();
+		var measurements = new List<PixelRangeMeasurement>();
 		
 		NextFrame(out DepthFrame, out ColorFrame, out interest);
 
 		for (int i = 0; i < interest.Count; i++) {
 			float range = GetRange(interest[i].I, interest[i].K, (float) interest[i].Value);
 
-			measurements.Add(new double[3] {interest[i].I - ResX / 2, interest[i].K - ResY / 2, range});
+			measurements.Add(new PixelRangeMeasurement(interest[i].I - ResX / 2, interest[i].K - ResY / 2, range));
 		}
 		
 		if (ShowSidebar && depthsensed != null) {
@@ -304,8 +316,8 @@ public class KinectVehicle : Vehicle
 		}
 
 		MappedMeasurements.Clear();
-		foreach (double[] z in measurements) {
-			MappedMeasurements.Add(MeasureToMap(z));
+		foreach (PixelRangeMeasurement z in measurements) {
+			MappedMeasurements.Add(Measurer.MeasureToMap(Pose, z));
 		}
 
 		return measurements;
@@ -761,7 +773,8 @@ public class KinectVehicle : Vehicle
 			float range = GetRange(i, k, DepthFrame[i][k]);
 			m = Math.Max(m, DepthFrame[i][k]);
 			
-			double[] local = MeasureToMap(new double[3] {i - ResX / 2, k - ResY / 2, range});
+			double[] local = Measurer.MeasureToMap(Pose,
+			                     new PixelRangeMeasurement(i - ResX / 2, k - ResY / 2, range));
 			vertices[i][k] = camera.TransformH(local).ToVector3();
 		}
 		}
@@ -817,10 +830,10 @@ public class KinectVehicle : Vehicle
 		foreach (var point in prevprevkeypoints) {
 			double[][] vertices = new double[4][];
 
-			vertices[0] = new double[] {point.X * ratio + 2, point.Y * ratio - 2, 0};
-			vertices[1] = new double[] {point.X * ratio + 2, point.Y * ratio + 2, 0};
-			vertices[2] = new double[] {point.X * ratio - 2, point.Y * ratio + 2, 0};
-			vertices[3] = new double[] {point.X * ratio - 2, point.Y * ratio - 2, 0};
+			vertices[0] = new double[3] {point.X * ratio + 2, point.Y * ratio - 2, 0};
+			vertices[1] = new double[3] {point.X * ratio + 2, point.Y * ratio + 2, 0};
+			vertices[2] = new double[3] {point.X * ratio - 2, point.Y * ratio + 2, 0};
+			vertices[3] = new double[3] {point.X * ratio - 2, point.Y * ratio - 2, 0};
 
 			Graphics.DrawUser2DPolygon(vertices, 1.0f, Color.Blue, true);
 		}
@@ -828,10 +841,10 @@ public class KinectVehicle : Vehicle
 		foreach (var point in interest) {
 			double[][] vertices = new double[4][];
 
-			vertices[0] = new double[] {point.I * ratio + 2, point.K * ratio - 2, 0};
-			vertices[1] = new double[] {point.I * ratio + 2, point.K * ratio + 2, 0};
-			vertices[2] = new double[] {point.I * ratio - 2, point.K * ratio + 2, 0};
-			vertices[3] = new double[] {point.I * ratio - 2, point.K * ratio - 2, 0};
+			vertices[0] = new double[3] {point.I * ratio + 2, point.K * ratio - 2, 0};
+			vertices[1] = new double[3] {point.I * ratio + 2, point.K * ratio + 2, 0};
+			vertices[2] = new double[3] {point.I * ratio - 2, point.K * ratio + 2, 0};
+			vertices[3] = new double[3] {point.I * ratio - 2, point.K * ratio - 2, 0};
 
 			Graphics.DrawUser2DPolygon(vertices, 1.0f, Color.White, true);
 
@@ -853,8 +866,9 @@ public class KinectVehicle : Vehicle
 	/// <param name="vehicle">Vehicle to clone.</param>
 	/// <param name="copytrajectory">If true, copy the whole trajectory history.</param>
 	/// <returns>The clone.</returns>
-	public override TrackVehicle TrackClone(TrackVehicle vehicle,
-	                                        bool         copytrajectory = false)
+	public override TrackVehicle<KinectMeasurer, Pose3D, PixelRangeMeasurement>
+	                    TrackClone(TrackVehicle<KinectMeasurer, Pose3D, PixelRangeMeasurement> vehicle,
+	                               bool         copytrajectory = false)
 	{
 		if (vehicle is KinectTrackVehicle) {
 			return new KinectTrackVehicle((KinectTrackVehicle) vehicle, copytrajectory);
@@ -876,11 +890,12 @@ public class KinectVehicle : Vehicle
 	/// <param name="clutter">Clutter density.</param>
 	/// <param name="copytrajectory">If true, copy the whole trajectory history.</param>
 	/// <returns>The clone.</returns>
-	public override TrackVehicle TrackClone(double  motioncovmultiplier,
-	                                        double  measurecovmultiplier,
-	                                        double  pdetection,
-	                                        double  clutter,
-	                                        bool    copytrajectory = false)
+	public override TrackVehicle<KinectMeasurer, Pose3D, PixelRangeMeasurement>
+	                    TrackClone(double  motioncovmultiplier,
+	                               double  measurecovmultiplier,
+	                               double  pdetection,
+	                               double  clutter,
+	                               bool    copytrajectory = false)
 	{
 		return new KinectTrackVehicle(this, motioncovmultiplier, measurecovmultiplier,
 		                              pdetection, clutter, copytrajectory);
