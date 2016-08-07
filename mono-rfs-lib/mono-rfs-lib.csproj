@@ -91,50 +91,50 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ArrayExtensions.cs" />
-    <Compile Include="Manipulator.cs" />
-    <Compile Include="Viewer.cs" />
-    <Compile Include="GraphicsDeviceExtension.cs" />
-    <Compile Include="MatrixExtensions.cs" />
-    <Compile Include="Navigator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Simulation.cs" />
-    <Compile Include="GraphCombinatorics.cs" />
     <Compile Include="Test\GraphCombinatoricsTest.cs" />
     <Compile Include="Test\SimulationTest.cs" />
-    <Compile Include="Util.cs" />
-    <Compile Include="SimulatedVehicle.cs" />
-    <Compile Include="Vehicle.cs" />
-    <Compile Include="PHDNavigator.cs" />
-    <Compile Include="ISAM2Navigator.cs" />
     <Compile Include="Config.cs" />
-    <Compile Include="RecordVehicle.cs" />
-    <Compile Include="FileParser.cs" />
-    <Compile Include="TrackVehicle.cs" />
-    <Compile Include="OdometryNavigator.cs" />
-    <Compile Include="BasicStructures\Map.cs" />
-    <Compile Include="BasicStructures\IndexedMap.cs" />
-    <Compile Include="BasicStructures\IMap.cs" />
-    <Compile Include="BasicStructures\SparseMatrix.cs" />
-    <Compile Include="BasicStructures\Gaussian.cs" />
-    <Compile Include="BasicStructures\Quaternion.cs" />
-    <Compile Include="BasicStructures\Pose3D.cs" />
-    <Compile Include="BasicStructures\IPose.cs" />
-    <Compile Include="BasicStructures\IMeasurer.cs" />
-    <Compile Include="BasicStructures\IMeasurement.cs" />
-    <Compile Include="BasicStructures\PixelRangeMeasurement.cs" />
-    <Compile Include="BasicStructures\PRM3DMeasurer.cs" />
-    <Compile Include="BasicStructures\KinectMeasurer.cs" />
-    <Compile Include="LoopyPHDNavigator.cs" />
-    <Compile Include="DrawUtils.cs" />
     <Compile Include="Test\QuaternionTest.cs" />
     <Compile Include="Test\Pose3DTest.cs" />
-    <Compile Include="KinectVehicle.cs" />
-    <Compile Include="KinectTrackVehicle.cs" />
     <Compile Include="Test\LoopyPHDNavigatorTest.cs" />
-    <Compile Include="FakeNavigator.cs" />
-    <Compile Include="FakeVehicle.cs" />
     <Compile Include="External\FileCaptureX.cs" />
+    <Compile Include="BaseStructures\SparseMatrix.cs" />
+    <Compile Include="BaseStructures\Gaussian.cs" />
+    <Compile Include="BaseStructures\Quaternion.cs" />
+    <Compile Include="BaseStructures\Measurements\IMeasurement.cs" />
+    <Compile Include="BaseStructures\Poses\IPose.cs" />
+    <Compile Include="BaseStructures\Poses\Pose3D.cs" />
+    <Compile Include="BaseStructures\Measurements\PixelRangeMeasurement.cs" />
+    <Compile Include="BaseStructures\Maps\IMap.cs" />
+    <Compile Include="BaseStructures\Maps\IndexedMap.cs" />
+    <Compile Include="BaseStructures\Maps\Map.cs" />
+    <Compile Include="SLAM\Navigators\FakeNavigator.cs" />
+    <Compile Include="SLAM\Navigators\LoopyPHDNavigator.cs" />
+    <Compile Include="SLAM\Navigators\Navigator.cs" />
+    <Compile Include="SLAM\Navigators\OdometryNavigator.cs" />
+    <Compile Include="SLAM\Navigators\PHDNavigator.cs" />
+    <Compile Include="SLAM\Vehicles\FakeVehicle.cs" />
+    <Compile Include="SLAM\Vehicles\KinectTrackVehicle.cs" />
+    <Compile Include="SLAM\Vehicles\KinectVehicle.cs" />
+    <Compile Include="SLAM\Vehicles\RecordVehicle.cs" />
+    <Compile Include="SLAM\Vehicles\SimulatedVehicle.cs" />
+    <Compile Include="SLAM\Vehicles\TrackVehicle.cs" />
+    <Compile Include="SLAM\Vehicles\Vehicle.cs" />
+    <Compile Include="SLAM\Navigators\ISAM2Navigator.cs" />
+    <Compile Include="UI\Manipulator.cs" />
+    <Compile Include="UI\Simulation.cs" />
+    <Compile Include="UI\Viewer.cs" />
+    <Compile Include="Util\ArrayExtensions.cs" />
+    <Compile Include="Util\DrawUtils.cs" />
+    <Compile Include="Util\FileParser.cs" />
+    <Compile Include="Util\GraphicsDeviceExtension.cs" />
+    <Compile Include="Util\MatrixExtensions.cs" />
+    <Compile Include="Util\Util.cs" />
+    <Compile Include="Maths\GraphCombinatorics.cs" />
+    <Compile Include="BaseStructures\Measurers\IMeasurer.cs" />
+    <Compile Include="BaseStructures\Measurers\KinectMeasurer.cs" />
+    <Compile Include="BaseStructures\Measurers\PRM3DMeasurer.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
@@ -160,7 +160,17 @@
   </Target>
   -->
   <ItemGroup>
-    <Folder Include="BasicStructures\" />
     <Folder Include="External\" />
+    <Folder Include="BaseStructures\" />
+    <Folder Include="BaseStructures\Poses\" />
+    <Folder Include="BaseStructures\Measurements\" />
+    <Folder Include="BaseStructures\Maps\" />
+    <Folder Include="SLAM\" />
+    <Folder Include="SLAM\Vehicles\" />
+    <Folder Include="SLAM\Navigators\" />
+    <Folder Include="Util\" />
+    <Folder Include="UI\" />
+    <Folder Include="Maths\" />
+    <Folder Include="BaseStructures\Measurers\" />
   </ItemGroup>
 </Project>
