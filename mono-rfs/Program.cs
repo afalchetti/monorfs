@@ -163,7 +163,7 @@ public class Program
 				input, algorithm);
 		}
 		else {
-			Run<PRM3DMeasurer, Pose3D, PixelRangeMeasurement>(
+			Run<Linear2DMeasurer, LinearPose2D, LinearMeasurement2D>(
 				recfile, scenefile, commandfile, configfile,
 				particlecount, onlymapping, realtime, viewer,
 				filterhistory, headless, noterminate,

@@ -135,6 +135,9 @@
     <Compile Include="BaseStructures\Measurers\IMeasurer.cs" />
     <Compile Include="BaseStructures\Measurers\KinectMeasurer.cs" />
     <Compile Include="BaseStructures\Measurers\PRM3DMeasurer.cs" />
+    <Compile Include="BaseStructures\Poses\LinearPose2D.cs" />
+    <Compile Include="BaseStructures\Measurements\LinearMeasurement2D.cs" />
+    <Compile Include="BaseStructures\Measurers\Linear2DMeasurer.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
