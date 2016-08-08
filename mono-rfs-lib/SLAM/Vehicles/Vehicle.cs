@@ -226,7 +226,7 @@ public abstract class Vehicle<MeasurerT, PoseT, MeasurementT> : IDisposable
 		WayVisibleMaps = new TimedMapModel();
 
 		WayPoints     .Add(Tuple.Create(0.0, Util.SClone(Pose.State)));
-		WayVisibleMaps.Add(Tuple.Create(0.0, new Map()));
+		WayVisibleMaps.Add(Tuple.Create(0.0, new Map(3)));
 
 		HasSidebar   = false;
 		WantsToStop  = false;
@@ -262,7 +262,7 @@ public abstract class Vehicle<MeasurerT, PoseT, MeasurementT> : IDisposable
 			this.WayVisibleMaps = new TimedMapModel();
 
 			this.WayPoints     .Add(Tuple.Create(0.0, Util.SClone(Pose.State)));
-			this.WayVisibleMaps.Add(Tuple.Create(0.0, new Map()));
+			this.WayVisibleMaps.Add(Tuple.Create(0.0, new Map(3)));
 		}
 	}
 

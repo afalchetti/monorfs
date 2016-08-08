@@ -157,7 +157,7 @@ class SimulationTest
 		int success    = 0;
 
 		for (int h = 0; h < iterations; h++) {
-			Map goodmapmodel = new Map();
+			Map goodmapmodel = new Map(3);
 			int nloops = 80;
 			int iperfect = 0;
 			int[] nbest = new int[nparticles];

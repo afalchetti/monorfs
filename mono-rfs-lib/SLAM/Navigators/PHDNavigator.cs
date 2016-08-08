@@ -204,7 +204,7 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 
 		// note that reset does deep cloning so no info flows in slam mode;
 		// in mapping mode, info flows only through RefVehicle
-		reset(RefVehicle, new Map(), new List<double[]>(), particlecount);
+		reset(RefVehicle, new Map(3), new List<double[]>(), particlecount);
 	}
 
 	/// <summary>
@@ -762,7 +762,7 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 	                              SimulatedVehicle<MeasurerT, PoseT, MeasurementT> pose,
 	                              Map model)
 	{
-		Map corrected = new Map();
+		Map corrected = new Map(3);
 
 		// reduce predicted weight to acocunt for misdetection
 		// v += (1-PD) v
@@ -782,7 +782,7 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 		double[][][] PH = new double  [model.Count][][];
 		double[][][] S  = new double  [model.Count][][];
 		Gaussian[]   mc = new Gaussian[model.Count];
-		Map          q  = new Map();
+		Map          q  = new Map(MeasureSize);
 
 		var qindex = new Dictionary<Gaussian, int>();
 
@@ -842,7 +842,7 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 	/// <returns>Pruned model.</returns>
 	public Map PruneModel(Map model)
 	{
-		Map      pruned = new Map();
+		Map      pruned = new Map(3);
 		Gaussian candidate;
 		Map      close;
 
@@ -859,7 +859,7 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 
 		for (int i = 0; i < weightcut; i++) {
 			candidate = landmarks[i];
-			close     = new Map();
+			close     = new Map(3);
 
 			for (int k = i + 1; k < weightcut; k++) {
 				if (Gaussian.AreClose(landmarks[i], landmarks[k], MergeThreshold)) {

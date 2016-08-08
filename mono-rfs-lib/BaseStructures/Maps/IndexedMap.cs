@@ -48,28 +48,39 @@ public class IndexedMap : IMap
 	public int Count { get { return landmarks.Count; } }
 
 	/// <summary>
+	/// Number of dimensions for each landmark.
+	/// </summary>
+	public int Dimensions { get; private set; }
+
+	/// <summary>
 	/// Construct an empty map.
 	/// </summary>
-	public IndexedMap()
+	/// <param name="dimensions">Number of dimensions for each landmark.</param>
+	public IndexedMap(int dimensions)
 	{
-		landmarks = new List<Gaussian>();
+		landmarks  = new List<Gaussian>();
+		Dimensions = dimensions;
 	}
 
 	/// <summary>
 	/// Construct a empty map of a given capacity.
 	/// </summary>
 	/// <param name="capacity">Number of landmarks that may added without reallocation.</param>
-	public IndexedMap(int capacity)
+	/// <param name="dimensions">Number of dimensions for each landmark.</param>
+	public IndexedMap(int capacity, int dimensions)
 	{
-		landmarks = new List<Gaussian>(capacity);
+		landmarks  = new List<Gaussian>(capacity);
+		Dimensions = dimensions;
 	}
 
 	/// <summary>
 	/// Copy construct a map from another.
 	/// </summary>
+	/// <param name="that">Map to copy.</param>
 	public IndexedMap(IMap that)
 	{
-		landmarks = new List<Gaussian>();
+		landmarks  = new List<Gaussian>();
+		Dimensions = that.Dimensions;
 
 		foreach (var landmark in that) {
 			landmarks.Add(landmark);
@@ -137,7 +148,7 @@ public class IndexedMap : IMap
 	/// <returns>Filtered submap.</returns>
 	public IMap FindAll(Predicate<Gaussian> match)
 	{
-		IndexedMap filtered = new IndexedMap();
+		IndexedMap filtered = new IndexedMap(Dimensions);
 		filtered.landmarks = this.landmarks.FindAll(match);
 
 		return filtered;

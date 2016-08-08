@@ -150,9 +150,9 @@ public class ISAM2Navigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measurer
 		}
 
 		bestestimate      = new TrackVehicle<MeasurerT, PoseT, MeasurementT>();
-		MapModel          = new IndexedMap();
-		plmodel           = new IndexedMap();
-		CandidateMapModel = new IndexedMap();
+		MapModel          = new IndexedMap(3);
+		plmodel           = new IndexedMap(3);
+		CandidateMapModel = new IndexedMap(3);
 
 		BestEstimate.Pose = vehicle.Pose.DClone();
 
@@ -273,7 +273,7 @@ public class ISAM2Navigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measurer
 		Gaussian[] qcandidate;
 
 		var        pose             = BestEstimate;
-		IndexedMap visible          = new IndexedMap();
+		IndexedMap visible          = new IndexedMap(3);
 		List<int>  visibleLandmarks = new List<int>();
 
 		for (int i = 0; i < MapModel.Count; i++) {
@@ -539,9 +539,9 @@ public class ISAM2Navigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measurer
 	{
 		int        length;
 		Gaussian   component;
-		IndexedMap mapmodel = new IndexedMap();
+		IndexedMap mapmodel = new IndexedMap(3);
 
-		plmodel  = new IndexedMap();
+		plmodel  = new IndexedMap(3);
 
 		double* ptrmapmodel = (double*) ISAM2Lib.getmapmodel      (handle, out length);
 		double* ptrmapcov   = (double*) ISAM2Lib.getmapcovariances(handle, out length);

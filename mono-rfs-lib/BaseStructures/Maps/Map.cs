@@ -52,6 +52,11 @@ public class Map : IMap
 	private KDTree<Gaussian> landmarks;
 
 	/// <summary>
+	/// Number of dimensions for each landmark.
+	/// </summary>
+	public int Dimensions { get; private set; }
+
+	/// <summary>
 	/// The number of landmarks in the map.
 	/// </summary>
 	public int Count { get { return landmarks.Count; } }
@@ -74,17 +79,21 @@ public class Map : IMap
 	/// <summary>
 	/// Construct an empty map.
 	/// </summary>
-	public Map()
+	/// <param name="dimensions">Number of dimensions for each landmark.</param>
+	public Map(int dimensions)
 	{
-		landmarks = new KDTree<Gaussian>(3);
+		landmarks  = new KDTree<Gaussian>(dimensions);
+		Dimensions = dimensions;
 	}
 
 	/// <summary>
 	/// Copy construct a map from another.
 	/// </summary>
+	/// <param name="that">Map to copy.</param>
 	public Map(IMap that)
 	{
-		landmarks = new KDTree<Gaussian>(3);
+		landmarks  = new KDTree<Gaussian>(that.Dimensions);
+		Dimensions = that.Dimensions;
 
 		foreach (var landmark in that) {
 			landmarks.Add(landmark.Mean, landmark);
@@ -125,7 +134,7 @@ public class Map : IMap
 	/// <param name="maxcount">Maximum number of nearest landmarks.</param>
 	public Map Near(double[] point, int maxcount)
 	{
-		Map near = new Map();
+		Map near = new Map(Dimensions);
 		var kdnear = landmarks.Nearest(point, maxcount);
 
 		foreach (var component in kdnear) {
@@ -146,7 +155,7 @@ public class Map : IMap
 	/// <param name="radius">Maximum distance from point to be included in the submap.</param>
 	public Map Near(double[] point, double radius)
 	{
-		Map near = new Map();
+		Map near = new Map(Dimensions);
 		var kdnear = landmarks.Nearest(point, radius);
 
 		foreach (var component in kdnear) {
@@ -235,7 +244,7 @@ public class Map : IMap
 	/// <returns>Filtered submap.</returns>
 	public Map FindAll(Predicate<Gaussian> match)
 	{
-		Map filtered = new Map();
+		Map filtered = new Map(Dimensions);
 
 		foreach (var node in this.landmarks) {
 			if (match(node.Value)) {

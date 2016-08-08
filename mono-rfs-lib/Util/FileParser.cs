@@ -155,7 +155,7 @@ public static class FileParser
 	/// <returns>The map model as a vector of gaussian components.</returns>
 	public static Map MapFromDescriptor(string[] lines, int dim)
 	{
-		Map map = new Map();
+		Map map = new Map(dim);
 
 		for (int i = 0; i < lines.Length; i++) {
 			Gaussian component = ParseGaussianDescriptor(lines[i]);

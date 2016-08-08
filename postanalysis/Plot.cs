@@ -132,7 +132,7 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 		TimedTrajectory estimate;
 		TimedMapModel   map;
 		TimedMapModel   vislandmarks;
-		Map             landmarks = new Map();
+		Map             landmarks = new Map(3);
 		TimedMessage    tags;
 
 		PoseT        dummyP = new PoseT();
@@ -146,14 +146,14 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 			vislandmarks = FP.MapHistoryFromDescriptor(File.ReadAllText(vismapfile), dummyM.Size);
 
 			for (int i = vislandmarks.Count; i < map.Count; i++) {
-				vislandmarks.Add(Tuple.Create(map[i].Item1, new Map()));
+				vislandmarks.Add(Tuple.Create(map[i].Item1, new Map(3)));
 			}
 		}
 		else {
 			vislandmarks = new TimedMapModel();
 
 			foreach (var entry in map) {
-				vislandmarks.Add(Tuple.Create(entry.Item1, new Map()));
+				vislandmarks.Add(Tuple.Create(entry.Item1, new Map(3)));
 			}
 		}
 
@@ -214,7 +214,7 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 		get
 		{
 			TimedValue size       = new TimedValue();
-			Map        cumulative = new Map();
+			Map        cumulative = new Map(3);
 
 			for (int i = 0; i < Map.Count; i++) {
 				foreach (Gaussian landmark in VisibleLandmarks[i].Item2) {
@@ -461,7 +461,7 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 
 	public Map BestMapEstimate(Map map)
 	{
-		Map best = new Map();
+		Map best = new Map(3);
 
 		double[][] did = { new double[3] {1e-3, 0, 0},
 		                   new double[3] {0, 1e-3, 0},

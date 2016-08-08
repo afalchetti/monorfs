@@ -243,7 +243,7 @@ public class SimulatedVehicle<MeasurerT, PoseT, MeasurementT> : Vehicle<Measurer
 	public override List<MeasurementT> Measure(GameTime time)
 	{
 		List<MeasurementT> measurements = new List<MeasurementT>();
-		Map                visible      = new Map();
+		Map                visible      = new Map(3);
 		DataAssociation                 = new List<int>();
 
 		double[][] diraccov = new double[3][] { new double[3] {0.001, 0, 0},

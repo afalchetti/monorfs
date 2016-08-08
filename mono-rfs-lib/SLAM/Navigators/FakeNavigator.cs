@@ -72,7 +72,7 @@ public class FakeNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT
 		: base(vehicle, true)
 	{
 		Vehicle  = vehicle.TrackClone(1, 1, 1, 0, false);
-		MapModel = new Map();
+		MapModel = new Map(3);
 	}
 
 	/// <summary>

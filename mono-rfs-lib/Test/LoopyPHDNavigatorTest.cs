@@ -73,7 +73,7 @@ class LoopyPHDNavigatorTest
 	{
 		Pose3D   linearpoint  = new Pose3D();
 		double[] estimate     = new double[6];
-		Map      map          = new Map();
+		Map      map          = new Map(3);
 		var      measurements = new List<PixelRangeMeasurement>();
 
 		double[][] covariance = MatrixExtensions.Zero(6).SingularInverse();
@@ -89,7 +89,7 @@ class LoopyPHDNavigatorTest
 	{
 		Pose3D   linearpoint  = new Pose3D();
 		double[] estimate     = new double[6];
-		Map      map          = new Map();
+		Map      map          = new Map(3);
 		var      measurements = new List<PixelRangeMeasurement>();
 
 		measurements.Add(new PixelRangeMeasurement(0, 0, 1));
@@ -122,7 +122,7 @@ class LoopyPHDNavigatorTest
 	{
 		Pose3D   linearpoint  = new Pose3D();
 		double[] estimate     = new double[6];
-		Map      map          = new Map();
+		Map      map          = new Map(3);
 		var      measurements = new List<PixelRangeMeasurement>();
 
 		estimate[2] = -0.05;
@@ -160,7 +160,7 @@ class LoopyPHDNavigatorTest
 	{
 		Pose3D   linearpoint  = new Pose3D();
 		double[] estimate     = new double[6] {-0.002, 0.003, 0.001, 0, 0, 0};
-		Map      map          = new Map();
+		Map      map          = new Map(3);
 		var      measurements = new List<PixelRangeMeasurement>();
 
 		measurements.Add(new PixelRangeMeasurement(115.16312, 0, 1.019803903));
@@ -278,7 +278,7 @@ class LoopyPHDNavigatorTest
 	public void LogLike()
 	{
 		SimulatedVehicle estimate     = new SimulatedVehicle();
-		Map              map          = new Map();
+		Map              map          = new Map(3);
 		var              measurements = new List<PixelRangeMeasurement>();
 
 		measurements.Add(new PixelRangeMeasurement(0, 0, 1));

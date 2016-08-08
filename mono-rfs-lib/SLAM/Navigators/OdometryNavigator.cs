@@ -80,7 +80,7 @@ public class OdometryNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 		: base(vehicle)
 	{
 		bestestimate = new TrackVehicle<MeasurerT, PoseT, MeasurementT>(vehicle, 1, 1, 1, 0);
-		bestmapmodel = new Map();
+		bestmapmodel = new Map(3);
 	}
 	
 	/// <summary>

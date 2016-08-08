@@ -42,6 +42,11 @@ public interface IMap : IEnumerable<Gaussian>
 	int Count { get; }
 
 	/// <summary>
+	/// Number of dimensions for each landmark.
+	/// </summary>
+	int Dimensions { get; }
+
+	/// <summary>
 	/// Remove all landmarks from the map.
 	/// </summary>
 	void Clear();

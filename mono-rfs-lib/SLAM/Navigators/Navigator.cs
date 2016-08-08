@@ -159,7 +159,7 @@ public abstract class Navigator<MeasurerT, PoseT, MeasurementT> : IDisposable
 		WayTrajectories.Add(Tuple.Create(0.0, new TimedState {Tuple.Create(0.0, Util.SClone(vehicle.Pose.State))}));
 
 		WayMaps = new TimedMapModel();
-		WayMaps.Add(Tuple.Create(0.0, new Map()));
+		WayMaps.Add(Tuple.Create(0.0, new Map(3)));
 
 		const int segments = 32;
 		pinterval = new double[segments][];
@@ -218,7 +218,7 @@ public abstract class Navigator<MeasurerT, PoseT, MeasurementT> : IDisposable
 		WayMaps        .Clear();
 
 		WayTrajectories.Add(Tuple.Create(0.0, new TimedState {Tuple.Create(0.0, Util.SClone(BestEstimate.Pose.State))}));
-		WayMaps        .Add(Tuple.Create(0.0, new Map()));
+		WayMaps        .Add(Tuple.Create(0.0, new Map(3)));
 	}
 
 	/// <summary>
