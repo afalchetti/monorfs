@@ -138,6 +138,10 @@ public static class Config
 						field.SetValue(null, Matrix.ParseJagged(strvalue,
 							new OctaveMatrixFormatProvider(DefaultMatrixFormatProvider.CurrentCulture)));
 					}
+					else if (field.FieldType == typeof (double[])) {
+						field.SetValue(null, Matrix.ParseJagged(strvalue,
+							new OctaveMatrixFormatProvider(DefaultMatrixFormatProvider.CurrentCulture))[0]);
+					}
 					else if (field.FieldType == typeof (TimeSpan)) {
 						double seconds = double.Parse(strvalue);
 						field.SetValue(null, new TimeSpan((long) (10000000 * seconds)));
