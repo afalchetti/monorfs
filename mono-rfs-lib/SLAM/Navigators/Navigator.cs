@@ -65,6 +65,13 @@ public abstract class Navigator<MeasurerT, PoseT, MeasurementT> : IDisposable
 	protected static int MeasureSize;
 
 	/// <summary>
+	/// True if the algorithm performs online SLAM, i.e. uses information incrementally,
+	/// generating a new estimate each time step; false otherwise (i.e. uses all the
+	/// information at once and may run arbitrarily long).
+	/// </summary>
+	public virtual bool Online { get { return true; } }
+
+	/// <summary>
 	/// If true, the component rendering distinguishes between visible/nonvisible
 	/// instead of their weight.
 	/// </summary>

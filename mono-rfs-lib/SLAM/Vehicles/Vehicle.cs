@@ -247,6 +247,10 @@ public abstract class Vehicle<MeasurerT, PoseT, MeasurementT> : IDisposable
 		this.MappedMeasurements = that.MappedMeasurements;
 		this.Landmarks          = that.Landmarks;
 		this.Measurer           = that.Measurer;
+		this.KnowsGroundtruth   = that.KnowsGroundtruth;
+		this.Groundtruth        = that.Groundtruth;
+		this.HasDataAssociation = that.HasDataAssociation;
+		this.DataAssociation    = that.DataAssociation;
 
 		this.motionCovariance      = that.motionCovariance.MemberwiseClone();
 		this.MeasurementCovariance = that.MeasurementCovariance.MemberwiseClone();

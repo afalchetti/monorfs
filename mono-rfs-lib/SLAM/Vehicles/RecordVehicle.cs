@@ -307,9 +307,10 @@ public class RecordVehicle<MeasurerT, PoseT, MeasurementT> : Vehicle<MeasurerT, 
 		if (extrainfo) {
 			TimedTrajectory fullestimate = FP.TrajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), StateSize, false);
 
-			estimate      = fullestimate[fullestimate.Count - 1].Item2;
-			xodometry     = odometry;
-			xmeasurements = measurements;
+			estimate           = fullestimate[fullestimate.Count - 1].Item2;
+			explorer.WayPoints = trajectory;
+			xodometry          = odometry;
+			xmeasurements      = measurements;
 		}
 		else {
 			estimate      = null;

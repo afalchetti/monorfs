@@ -154,14 +154,16 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 	/// <param name="map">Recorded maximum-a-posteriori estimate for the map.</param>
 	/// <param name="measurements">Recorded vehicle measurements.</param>
 	/// <param name="tags">Tags in the timeline.</param>
+	/// <param name="online">True if the navigator works
+	/// incrementally with each time step.</param>
 	/// <param name="fps">Frame rate.</param>
 	/// <param name="sidebarfile">Sidebar video filename.</param>
 	public Viewer(string title,
 	              SimulatedVehicle<MeasurerT, PoseT, MeasurementT> explorer,
 	              TimedState trajectory, TimedTrajectory estimate,
 	              TimedMapModel map, TimedMeasurements measurements, TimedMessage tags,
-	              double fps, string sidebarfile)
-		: base(title, explorer, new FakeNavigator<MeasurerT, PoseT, MeasurementT>(explorer), false, fps)
+	              bool online, double fps, string sidebarfile)
+		: base(title, explorer, new FakeNavigator<MeasurerT, PoseT, MeasurementT>(explorer, online), false, fps)
 	{
 		xnavigator   = Navigator as FakeNavigator<MeasurerT, PoseT, MeasurementT>;
 		Trajectory   = trajectory;
@@ -178,7 +180,7 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 			Measurements.Add(Tuple.Create(map[Measurements.Count].Item1, new List<double[]>()));
 		}
 
-		mapindices = new int[trajectory.Count];
+		mapindices = new int[estimate.Count];
 
 		int h = 0;
 		for (int k = 0; k < estimate.Count; k++) {
@@ -281,7 +283,16 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 			explorer = new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>(new PoseT().IdentityP(), new List<double[]>());
 		}
 
-		return new Viewer<MeasurerT, PoseT, MeasurementT>("monorfs - viewing " + datafile, explorer, trajectory, estimate, map, measurements, tags, 30, sidebarfile);
+		// NOTE heuristic (estimate length grows on online but not offline);
+		//      if ambiguities arise, adding a command line flag could force it
+		//      instead of guessing from the text structure (though the edge cases
+		//      are pretty uninteresting)
+		bool online = (estimate[1].Item2.Count < estimate[estimate.Count - 1].Item2.Count &&
+		               estimate.Count == trajectory.Count);
+
+		return new Viewer<MeasurerT, PoseT, MeasurementT>("monorfs - viewing " + datafile, explorer,
+		                                                  trajectory, estimate, map, measurements, tags,
+		                                                  online, 30, sidebarfile);
 	}
 
 	/// <summary>
@@ -335,8 +346,8 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 	/// <param name="multiplier">Movement scale multiplier.</param>
 	protected override void Update(GameTime time, KeyboardState keyboard, KeyboardState prevkeyboard, double multiplier)
 	{
-		if (FrameIndex >= Trajectory.Count) {
-			FrameIndex = Trajectory.Count - 1;
+		if (FrameIndex >= Estimate.Count) {
+			FrameIndex = Estimate.Count - 1;
 			Paused     = true;
 		}
 		else if (FrameIndex < 0) {
@@ -347,18 +358,20 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 		bool speedup = keyboard.IsKeyDown(Keys.LeftShift);
 
 		preframeindex        = FrameIndex;
-		Explorer .WayPoints  = VehicleWaypoints;
+		Explorer .WayPoints  = (xnavigator.Online) ? VehicleWaypoints : Trajectory;
 		Explorer .Pose       = new PoseT().FromState(Explorer.WayPoints[Explorer.WayPoints.Count - 1].Item2);
 		xnavigator.MapModel  = Map[mapindices[FrameIndex]].Item2;
 		xnavigator.WayTrajectories[0] = Estimate[FrameIndex];
 		xnavigator.Vehicle.WayPoints  = Estimate[FrameIndex].Item2;
 		xnavigator.Vehicle.Pose       = new PoseT().FromState(Navigator.BestEstimate.WayPoints[Navigator.BestEstimate.WayPoints.Count - 1].Item2);
 
-		MeasurementT dummy = new MeasurementT();
+		if (xnavigator.Online) {
+			MeasurementT dummy = new MeasurementT();
 
-		Explorer.MappedMeasurements.Clear();
-		foreach (double[] z in Measurements[mapindices[FrameIndex]].Item2) {
-			Explorer.MappedMeasurements.Add(Explorer.Measurer.MeasureToMap(Explorer.Pose, dummy.FromLinear(z)));
+			Explorer.MappedMeasurements.Clear();
+			foreach (double[] z in Measurements[mapindices[FrameIndex]].Item2) {
+				Explorer.MappedMeasurements.Add(Explorer.Measurer.MeasureToMap(Explorer.Pose, dummy.FromLinear(z)));
+			}
 		}
 
 		if (!taggone) {
@@ -431,8 +444,10 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 		Flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
 		           DepthStencilState.Default, RasterizerState.CullNone);
 
-		Flip.Draw(SidebarHistory[preframeindex], SideDest, SidebarHistory[preframeindex].Bounds, Color.White);
-		
+		if (xnavigator.Online) {
+			Flip.Draw(SidebarHistory[preframeindex], SideDest, SidebarHistory[preframeindex].Bounds, Color.White);
+		}
+
 		Flip.End();
 	}
 

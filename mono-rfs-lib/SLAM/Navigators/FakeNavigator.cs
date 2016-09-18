@@ -44,6 +44,15 @@ public class FakeNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT
 	where MeasurementT : IMeasurement<MeasurementT>, new()
 	where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
 {
+	private bool online;
+
+	/// <summary>
+	/// True if the algorithm performs online SLAM, i.e. uses information incrementally,
+	/// generating a new estimate each time step; false otherwise (i.e. uses all the
+	/// information at once and may run arbitrarily long).
+	/// </summary>
+	public override bool Online { get { return online; } }
+
 	/// <summary>
 	/// Vehicle pose.
 	/// </summary>
@@ -68,11 +77,14 @@ public class FakeNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT
 	/// Construct a PHDNavigator using the indicated vehicle as a reference.
 	/// </summary>
 	/// <param name="vehicle">Vehicle to track.</param>
-	public FakeNavigator(Vehicle<MeasurerT, PoseT, MeasurementT> vehicle)
+	/// <param name="online">True if the navigator works
+	/// incrementally with each time step.</param>
+	public FakeNavigator(Vehicle<MeasurerT, PoseT, MeasurementT> vehicle, bool online)
 		: base(vehicle, true)
 	{
-		Vehicle  = vehicle.TrackClone(1, 1, 1, 0, false);
-		MapModel = new Map(3);
+		this.Vehicle  = vehicle.TrackClone(1, 1, 1, 0, false);
+		this.MapModel = new Map(3);
+		this.online   = online;
 	}
 
 	/// <summary>

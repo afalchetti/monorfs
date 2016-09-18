@@ -48,6 +48,13 @@ public class FakeVehicle<MeasurerT, PoseT, MeasurementT> : Vehicle<MeasurerT, Po
 	/// </summary>
 	public FakeVehicle()
 		: base(new PoseT().IdentityP(), new MeasurerT()) {}
+
+	/// <summary>
+	/// Construct a dummy vehicle copying metadata from another vehicle.
+	/// </summary>
+	/// <param name="that">Reference vehicle.</param>
+	public FakeVehicle(Vehicle<MeasurerT, PoseT, MeasurementT> that)
+		: base(that, false) {}
 	
 	/// <summary>
 	/// Apply the motion model to the vehicle. It does nothing.

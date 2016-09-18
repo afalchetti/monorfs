@@ -68,6 +68,13 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 	public static double GradientClip { get { return Config.GradientClip; } }
 
 	/// <summary>
+	/// True if the algorithm performs online SLAM, i.e. uses information incrementally,
+	/// generating a new estimate each time step; false otherwise (i.e. uses all the
+	/// information at once and may run arbitrarily long).
+	/// </summary>
+	public override bool Online { get  { return false; } }
+
+	/// <summary>
 	/// Inner PHD filter algorithm.
 	/// </summary>
 	public PHDNavigator<MeasurerT, PoseT, MeasurementT> InnerFilter { get; private set; }
@@ -289,7 +296,7 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 	/// </summary>
 	public override void ResetMapModel()
 	{
-		// TODO implement something here
+		// Unsupported
 	}
 
 	/// <summary>
@@ -297,7 +304,7 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 	/// </summary>
 	public override void ResetHistory()
 	{
-		// TODO think about the optimization time/trajectory time tricky situation
+		// Unsupported
 	}
 
 	/// <summary>
@@ -351,6 +358,8 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 			MapMessages        = GetMapMessages();
 		}
 
+		UpdateLPTrajectory(time);
+		UpdateMapHistory(time);
 		Console.WriteLine((clock++ % 2 == 0) ? "tick" : "tock");
 	}
 
@@ -840,6 +849,24 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 		hessian = eigvectors.Multiply(diagonal).MultiplyByTranspose(eigvectors);
 
 		return (-1.0).Multiply(hessian).PseudoInverse();
+	}
+
+	/// <summary>
+	/// Update the trajectory log with the latest estimate,
+	/// considering that each estimate has an associated
+	/// linearization point.
+	/// </summary>
+	/// <param name="time">Time.</param>
+	public void UpdateLPTrajectory(GameTime time)
+	{
+		TimedState trajectory = new TimedState();
+
+		for (int i = 0; i < FusedEstimate.Count; i++) {
+			double[] location = LinearizationPoints[i].Item2.Add(FusedEstimate[i].Item2.Mean).State;
+			trajectory.Add(Tuple.Create(FusedEstimate[i].Item1, Util.SClone(location)));
+		}
+
+		WayTrajectories.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, trajectory));
 	}
 
 	/// <summary>
