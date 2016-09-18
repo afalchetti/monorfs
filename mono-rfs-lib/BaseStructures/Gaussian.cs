@@ -27,6 +27,7 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
+using System.Collections.Generic;
 using System.Text;
 
 using Accord.Math;
@@ -168,8 +169,19 @@ public class Gaussian
 	public double Evaluate(double[] x)
 	{
 		double[]  diff = x.Subtract(Mean);
-		return Multiplier * ApproximateNegExp(0.5 * diff.InnerProduct(CovarianceInverse.Multiply(diff)));
-		//return Multiplier * Math.Exp(-0.5 * diff.InnerProduct(CovarianceInverse.Multiply(diff)));
+		//return Multiplier * ApproximateNegExp(0.5 * diff.InnerProduct(CovarianceInverse.Multiply(diff)));
+		return Multiplier * Math.Exp(-0.5 * diff.InnerProduct(CovarianceInverse.Multiply(diff)));
+	}
+
+	/// <summary>
+	/// Evaluate the logarithm of the gaussian component, although without the weight multiplication.
+	/// </summary>
+	/// <param name="x">Evaluation point.</param>
+	/// <returns>Distribution density.</returns>
+	public double LogEvaluate(double[] x)
+	{
+		double[] diff = x.Subtract(Mean);
+		return Math.Log(Multiplier) - 0.5 * diff.InnerProduct(CovarianceInverse.Multiply(diff));
 	}
 
 	/// <summary>
@@ -229,7 +241,61 @@ public class Gaussian
 		double[]   infovector = a.CanonicalVector.Subtract(b.CanonicalVector);
 
 		return Canonical(infovector, infomatrix, 1.0);
+	}
 
+	/// <summary>
+	/// Merge a list of gaussian components into a one big gaussian
+	/// that tries to approximate as much as possible the behaviour
+	/// of the original mixture.
+	/// </summary>
+	/// <param name="components">List of other gaussian components.</param>
+	/// <returns>Merged gaussian.</returns>
+	public static Gaussian Merge(List<Gaussian> components)
+	{
+		Gaussian   first      = components[0];
+		double     weight     = 0.0;
+		double[]   mean       = new double[first.Mean.Length];
+		double[][] covariance = MatrixExtensions.Zero(first.Mean.Length);
+
+		// // merged gaussian follows the rules
+		// // w = sum of (wi)
+		// // m = sum of (wi mi) / w
+		// // P = sum of (wi (Pi + (mi - m) (mi - m)^T)) / w
+		// 
+		// // equivalent form:
+		// foreach (Gaussian component in components) {
+		// 	weight += component.Weight;
+		// 	mean    = mean.Add(component.Weight.Multiply(component.Mean));
+		// }
+		// 
+		// mean = mean.Divide(weight);
+		// 
+		// foreach (Gaussian component in components) {
+		// 	double[] diff = component.Mean.Subtract(mean);
+		// 	covariance    = covariance.Add(component.Weight.Multiply(
+		// 		component.Covariance.Add(diff.OuterProduct(diff).ToArray())));
+		// }
+		// 
+		// covariance = covariance.Divide(weight);
+
+		foreach (Gaussian component in components) {
+			double     w   = component.Weight;
+			double[]   m   = component.Mean;
+			double[][] cov = component.Covariance;
+		
+			weight    += w;
+			mean       = mean.Add(w.Multiply(m));
+			covariance = covariance.Add(w.Multiply(cov.Add(m.OuterProduct(m).ToArray())));
+		}
+
+		if (weight < 1e-15) {
+			return new Gaussian(first.Mean, Util.InfiniteCovariance(first.Mean.Length), 0.0);
+		}
+
+		mean       = mean.Divide(weight);
+		covariance = covariance.Divide(weight).Subtract(mean.OuterProduct(mean).ToArray());
+
+		return new Gaussian(mean, covariance, weight);
 	}
 
 	/// <summary>

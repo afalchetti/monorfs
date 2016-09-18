@@ -837,9 +837,9 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 	/// <returns>Pruned model.</returns>
 	public Map PruneModel(Map model)
 	{
-		Map      pruned = new Map(3);
-		Gaussian candidate;
-		Map      close;
+		Map            pruned = new Map(3);
+		Gaussian       candidate;
+		List<Gaussian> close;
 
 		List<Gaussian> landmarks = model.ToList();
 		landmarks.Sort((a, b) => Math.Sign(b.Weight - a.Weight));
@@ -854,7 +854,9 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 
 		for (int i = 0; i < weightcut; i++) {
 			candidate = landmarks[i];
-			close     = new Map(3);
+			close     = new List<Gaussian>();
+
+			close.Add(candidate);
 
 			for (int k = i + 1; k < weightcut; k++) {
 				if (Gaussian.AreClose(landmarks[i], landmarks[k], MergeThreshold)) {
@@ -864,45 +866,10 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 				}
 			}
 
-			if (close.Count > 0) {
-				candidate = Merge(candidate, close);
-			}
-
-			pruned.Add(candidate);
+			pruned.Add(Gaussian.Merge(close));
 		}
 
 		return pruned;
-	}
-
-	/// <summary>
-	/// Merge a list of gaussian components into a one big gaussian
-	/// that tries to approximate as much as possible the behaviour
-	/// of the original mixture.
-	/// </summary>
-	/// <param name="maincomponent">First gaussian component.</param>
-	/// <param name="components">List of the other gaussian components.</param>
-	/// <returns>Merged gaussian.</returns>
-	private static Gaussian Merge(Gaussian maincomponent, Map components)
-	{
-		double     weight     = maincomponent.Weight;
-		double[]   mean       = maincomponent.Weight.Multiply(maincomponent.Mean);
-		double[][] covariance = maincomponent.Weight.Multiply(maincomponent.Covariance);
-
-		// merged gaussian follows the rules
-		// w = sum of (wi)
-		// m = sum of (wi mi) / w
-		// P = sum of (wi (Pi + (mi - m0) (mi - m0)^T)) / w
-		foreach (Gaussian component in components) {
-			double[] diff = component.Mean.Subtract(maincomponent.Mean);
-			weight    += component.Weight;
-			mean       = mean      .Add(component.Weight.Multiply(component.Mean));
-			covariance = covariance.Add(component.Weight.Multiply(component.Covariance.Add(diff.OuterProduct(diff).ToArray())));
-		}
-
-		mean       = mean.Divide(weight);
-		covariance = covariance.Divide(weight);
-
-		return new Gaussian(mean, covariance, weight);
 	}
 
 	/// <summary>
