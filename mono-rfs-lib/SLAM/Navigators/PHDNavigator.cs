@@ -375,26 +375,21 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 	{
 		IMap cvisible = corrected.FindAll(g => pose.Visible(g.Mean) && g.Weight > 0.8);
 
-		double plikelihood = 1;
-		double clikelihood = 1;
+		double ploglikelihood = 0;
+		double cloglikelihood = 0;
 
 		foreach (var component in cvisible) {
-			plikelihood *= predicted.Evaluate(component.Mean);
-			clikelihood *= corrected.Evaluate(component.Mean);
+			ploglikelihood += Math.Log(predicted.Evaluate(component.Mean));
+			cloglikelihood += Math.Log(corrected.Evaluate(component.Mean));
 		}
 
 		double pcount = predicted.ExpectedSize;
 		double ccount = corrected.ExpectedSize;
 
-		double setlikelihood = SetLikelihood(measurements, cvisible, pose);
+		double setloglikelihood   = SetLogLikelihood(measurements, cvisible, pose);
+		double loglikelihoodratio = (ploglikelihood - pcount) - (cloglikelihood - ccount);
 
-		double likelihoodratio = plikelihood / clikelihood;
-
-		if (pcount > 0 && ccount > 0) {
-			likelihoodratio *= ccount / pcount;
-		}
-
-		return setlikelihood * likelihoodratio;
+		return Math.Exp(setloglikelihood + loglikelihoodratio);
 	}
 
 	/// <summary>
