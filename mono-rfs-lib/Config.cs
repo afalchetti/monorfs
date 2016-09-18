@@ -49,7 +49,7 @@ public static class Config
 	public static TimeSpan MeasureElapsed      = new TimeSpan(10000000/30);
 	public static float[]  MapClip             = new float[4] {-6, 6, -3, 3};
 	public static bool     UseOdometry         = true;
-	public static int      CheckpointCycleTime = 900;
+	public static int      CheckpointCycleTime = 300;
 
 	// Vehicle
 	public static double[][] MotionCovariance = new double[6][] { new double[6] {5e-3, 0, 0, 0, 0, 0},
@@ -67,28 +67,25 @@ public static class Config
 	public static double   DetectionProbability = 0.9;
 	public static double   ClutterDensity       = 3e-7;
 	public static bool     PerfectStill         = false;
-	public static double[] VisibilityRamp       = new double[3] {3 * MeasurementCovariance[0][0], 
-	                                                             3 * MeasurementCovariance[1][1],
-	                                                             3 * MeasurementCovariance[2][2]};
+	public static double[] VisibilityRamp       = new double[3] {10 * Math.Sqrt(MeasurementCovariance[0][0]),
+	                                                             10 * Math.Sqrt(MeasurementCovariance[1][1]),
+	                                                             10 * Math.Sqrt(MeasurementCovariance[2][2])};
 
 	// KinectVehicle
-	public static int  KinectDelta    = 2;
+	public static int  KinectDelta    = 4;
 	public static bool KeypointFilter = true;
-
-	// Map
-	public static double DensityDistanceThreshold = 1;//10*Math.Sqrt(BirthCovariance[0][0]);
 
 	// Navigator
 	public static bool ShowVisible = false;
 
 	// PHDNavigator
-	public static double[][] BirthCovariance = new double[3][] { new double[3] {1e-3, 0, 0},
-	                                                             new double[3] {0, 1e-3, 0},
-	                                                             new double[3] {0, 0, 1e-3} };
+	public static double[][] BirthCovariance = new double[3][] { new double[3] {1e-1, 0, 0},
+	                                                             new double[3] {0, 1e-1, 0},
+	                                                             new double[3] {0, 0, 1e-1} };
 	public static double BirthWeight          = 0.05;
-	public static double MinWeight            = 1e-2;
-	public static double MinEffectiveParticle = 0.2;
-	public static int    MaxQuantity          = 200;
+	public static double MinWeight            = 1e-4;
+	public static double MinEffectiveParticle = 0.1;
+	public static int    MaxQuantity          = 600;
 	public static double MergeThreshold       = 3e0;
 	public static double ExplorationThreshold = 1e-5;
 	public static bool   RenderAllParticles   = true;
@@ -109,6 +106,9 @@ public static class Config
 
 	// OdometryNavigator
 	public static double OdometryMergeThreshold = 1e-2;
+
+	// Map
+	public static double DensityDistanceThreshold = 10 * Math.Sqrt(BirthCovariance[0][0]);
 
 	/// <summary>
 	/// Read configuration instructions from file.

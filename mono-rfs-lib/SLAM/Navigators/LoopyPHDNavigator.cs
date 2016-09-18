@@ -215,7 +215,7 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 	                         Navigator<MeasurerT, PoseT, MeasurementT> initialestimate)
 		: base(vehicle, false)
 	{
-		InnerFilter   = new PHDNavigator<MeasurerT, PoseT, MeasurementT>(vehicle, 1, true);
+		InnerFilter = new PHDNavigator<MeasurerT, PoseT, MeasurementT>(vehicle, 1, true);
 
 		TimedArray        odometry;
 		TimedMeasurements measurements;

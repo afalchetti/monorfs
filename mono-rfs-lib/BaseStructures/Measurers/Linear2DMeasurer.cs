@@ -285,7 +285,7 @@ public class Linear2DMeasurer : IMeasurer<Linear2DMeasurer, LinearPose2D, Linear
 	/// <returns>Simulated vehicle descriptor string.</returns>
 	public string ToString(string format)
 	{
-		return "(" + Range.ToString(format) + ")";
+		return Range.ToString(format);
 	}
 }
 }

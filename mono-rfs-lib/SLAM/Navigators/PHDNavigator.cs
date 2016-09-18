@@ -340,16 +340,11 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 
 		// localization update
 		if (!OnlyMapping) {
-			double sum = VehicleWeights.Sum();
-
-			if (sum == 0) {
-				sum = 1;
-			}
-
+			double sum     = VehicleWeights.Sum();
+			sum            = (sum == 0) ? 1 : sum;
 			VehicleWeights = VehicleWeights.Divide(sum);
-			double maxweight = 0;
 
-			int prev = BestParticle;
+			double maxweight = 0;
 
 			for (int i = 0; i < VehicleWeights.Length; i++) {
 				if (VehicleWeights[i] > maxweight) {
@@ -675,7 +670,7 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 			random      += 1.0 / weights.Length;
 
 			if (VehicleWeights[k - 1] > maxweight) {
-				maxweight = VehicleWeights[k - 1];
+				maxweight    = VehicleWeights[k - 1];
 				BestParticle = i;
 			}
 		}
@@ -705,7 +700,7 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 			cum += weight * weight;
 		}
 
-		return 1.0/cum < MinEffectiveParticle * VehicleWeights.Length;
+		return 1.0 / cum < MinEffectiveParticle * VehicleWeights.Length;
 	}
 
 	/// <summary>

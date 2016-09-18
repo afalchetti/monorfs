@@ -279,7 +279,7 @@ public static class FileParser
 	/// <param name="descriptor">String representing the list. Separated by spaces.</param>
 	/// <returns>The double array.</returns>
 	public static double[] ParseDoubleList(string descriptor) {
-		string[] values = descriptor.Split(' ');
+		string[] values = descriptor.Split(new char[] {' '}, StringSplitOptions.RemoveEmptyEntries);
 		double[] point  = new double[values.Length];
 		
 		try {

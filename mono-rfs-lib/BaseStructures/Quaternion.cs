@@ -170,8 +170,7 @@ public class Quaternion
 	/// <summary>
 	/// Subtract a quaternion to another quaternion to obtain a Lie delta element.
 	/// </summary>
-	/// <param name="a">First quaternion.</param>
-	/// <param name="b">Second quaternion.</param>
+	/// <param name="b">Subtracted quaternion.</param>
 	/// <returns>Lie delta element.</returns>
 	public double[] Subtract(Quaternion b)
 	{
