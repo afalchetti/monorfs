@@ -485,28 +485,71 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 		}
 
 		double[][] infcovariance = Util.InfiniteCovariance(OdoSize);
+		double[]   infdelta      = new double[OdoSize];
+
+		for (int k = 0; k < OdoSize; k++) {
+			infdelta[k] = 1e5;
+		}
+
+		// Pose very far from the map (distance to everything is > 10-sigma)
+		PoseT infpose  = new PoseT().IdentityP().Add(infdelta);
+		var infvehicle = new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>(infpose, new List<double[]>());
 
 		MeasurementT dummy = new MeasurementT();
 
 		for (int i = 0; i < MessagesFromMap.Count; i++) {
 		//Parallel.For(0, MessagesFromMap.Count,
 		//             new ParallelOptions { MaxDegreeOfParallelism = Config.NParallel}, i => {
-			Gaussian estimate = null;
+			List<Gaussian> estimates     = null;
+			Gaussian       totalestimate = null;
+			Gaussian pastfuture = Gaussian.Fuse(MessagesFromPast[i].Item2, MessagesFromFuture[i].Item2);
 
 			if (Measurements[i].Item2.Count > 0) {
-				Map dMap = FilterMissing(MapMessages, Measurements, i);
-				estimate = GuidedFitGaussian(FusedEstimate[i].Item2.Mean, Measurements[i].Item2.ConvertAll(m => dummy.FromLinear(m)),
-				                       dMap, LinearizationPoints[i].Item2);
+				// typed list (instead of list of array of doubles)
+				List<MeasurementT> measurements = Measurements[i].Item2.ConvertAll(m => dummy.FromLinear(m));
+
+				Map dMap  = FilterMissing(MapMessages, Measurements, i);
+				estimates = GuidedFitGaussian(pastfuture.Mean, measurements, dMap, LinearizationPoints[i].Item2);
+				
+				// Modelling P(Z|X, M) as one big gaussian is not enough;
+				// besides the multimodality (which is less severe),
+				// the function never goes to zero (it reaches a lower
+				// bound empty-space probability, i.e. everything is
+				// misdetected and clutter).
+				// If we're close to the gaussian part, that doesn't matter
+				// much, but if the distance between this gaussian and the
+				// past-future gaussians is too large, the product will be a
+				// very small gaussian, which usually after normalization
+				// would be just fine, but the product can fall below the
+				// empty-space threshold. In that case, normalization would
+				// not bring the small gaussian into a "regular" integral=1
+				// gaussian; instead the product of the constant threshold
+				// and the original past-future gaussians would become prevalent.
+				// This behaviour is smooth between "far away gaussians"
+				// and close ones, but will be approximated by a hard max{...}
+
+				double emptyspace = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
+				                        SetLogLikelihood(measurements, dMap, infvehicle);
+
+				List<Gaussian> fusecandidates = estimates.ConvertAll(e => Gaussian.Fuse(pastfuture, e));
+				//double   fusealpha     = estimate.LogEvaluate(fusecandidate.Mean) + Math.Log(estimate.Weight);
+
+				fusecandidates.Add(new Gaussian(pastfuture.Mean, pastfuture.Covariance, emptyspace));
+
+				Gaussian fused = Gaussian.Merge(fusecandidates);
+				totalestimate  = Gaussian.Unfuse(fused, pastfuture);
+
+				//if (fusealpha < emptyspace || fusecandidate.Mean.SquareEuclidean(pastfuture.Mean) > 0.25) {
+				//	estimate = new Gaussian(pastfuture.Mean, infcovariance, 1.0);
+				//}
 			}
 			else {
-					estimate = new Gaussian(FusedEstimate[i].Item2.Mean, infcovariance, 1.0);
+				totalestimate = new Gaussian(pastfuture.Mean, infcovariance, 1.0);
 			}
-			
-			messages[i] = Tuple.Create(MapMessages[i].Item1, estimate);
 
-			FusedEstimate[i] = Tuple.Create(FusedEstimate[i].Item1,
-				Gaussian.Fuse(Gaussian.Fuse(messages[i].Item2,
-				                            MessagesFromPast[i].Item2), MessagesFromFuture[i].Item2));
+			messages[i] = Tuple.Create(MapMessages[i].Item1, totalestimate);
+
+			FusedEstimate[i] = Tuple.Create(FusedEstimate[i].Item1, Gaussian.Fuse(pastfuture, totalestimate));
 		//});
 		}
 
@@ -651,8 +694,8 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 	/// <param name="map">Fixed map.</param>
 	/// <param name="linearpoint">Linearization point.</param>
 	/// <returns>Fitted gaussian.</returns>
-	public static Gaussian GuidedFitGaussian(double[] pose0, List<MeasurementT> measurements,
-	                                         Map map, PoseT linearpoint)
+	public static List<Gaussian> GuidedFitGaussian(double[] pose0, List<MeasurementT> measurements,
+	                                               Map map, PoseT linearpoint)
 	{
 		List<double[]> guesses  = new List<double[]>();
 		MeasurerT      measurer = new MeasurerT();
@@ -665,27 +708,52 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 
 		foreach (Gaussian landmark in visible) {
 			foreach (MeasurementT measurement in measurements) {
-				PoseT   guess = measurer.FitToMeasurement(initpose, measurement, landmark.Mean);
-				guesses.Add(guess.Subtract(linearpoint));
+				PoseT guess = measurer.FitToMeasurement(initpose, measurement, landmark.Mean);
+
+				if (guess.Subtract(initpose).SquareEuclidean() < 0.5 * 0.5) {
+					guesses.Add(guess.Subtract(linearpoint));
+				}
 			}
 		}
 
-		double   maxvalue = double.NegativeInfinity;
-		double[] maxpose  = new double[0];
+		double[]       maxpose    = pose0;
+		double[]       infdelta   = new double[OdoSize];
+		List<Gaussian> components = new List<Gaussian>();
+
+		for (int k = 0; k < OdoSize; k++) {
+			infdelta[k] = 1e5;
+		}
+
+		// Pose very far from the map (distance to everything is > 10-sigma)
+		PoseT infpose     = new PoseT().IdentityP().Add(infdelta);
+		var infvehicle    = new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>(infpose, new List<double[]>());
+		double emptyspace = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
+		                        SetLogLikelihood(measurements, map, infvehicle);
 
 		foreach (double[] guess in guesses) {
-			double   localmax;
+			double localmax = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
+				SetLogLikelihood(measurements, map,
+					new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>(
+						linearpoint.Add(guess), new List<double[]>())
+					);
+
 			double[] localpose = LogLikeGradientAscent(guess, measurements, visible, linearpoint, out localmax);
 
-			if (localmax > maxvalue) {
-				maxvalue = localmax;
-				maxpose  = localpose;
+			foreach (Gaussian component in components) {
+				if (component.Mahalanobis(localpose) < 0.01) {
+					continue;
+				}
 			}
+
+			double[][] localcov = LogLikeFitCovariance(maxpose, measurements, visible, linearpoint);
+
+			double logmultiplier = Math.Log(Math.Pow(2 * Math.PI, -localpose.Length / 2) / Math.Sqrt(localcov.PseudoDeterminant()));
+			double weight        = Math.Exp(localmax - logmultiplier);
+
+			components.Add(new Gaussian(localpose, localcov, weight));
 		}
 
-		double[][] covariance = LogLikeFitCovariance(maxpose, measurements, visible, linearpoint);
-
-		return new Gaussian(maxpose, covariance, maxvalue);
+		return components;
 	}
 
 	/// <summary>
