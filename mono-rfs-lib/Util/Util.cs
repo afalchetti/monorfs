@@ -41,6 +41,9 @@ using Accord.Math.Decompositions;
 using DotImaging;
 using DotImaging.Primitives2D;
 
+using TimedState = System.Collections.Generic.List<System.Tuple<double, double[]>>;
+
+
 namespace monorfs
 {
 /// <summary>
@@ -309,6 +312,40 @@ public static class Util
 
 			writer.Close();
 		}
+	}
+
+	/// <summary>
+	/// Save a trajectory as an odometry file.
+	/// </summary>
+	/// <param name="trajectory">Trajectory to save.</param>
+	/// <param name="filename">Output file name.</param>
+	/// <param name="transform">Transform every pose using this transformation.</param>
+	/// <returns>Initial pose.</returns>
+	public static PoseT TrajectoryToOdometry<PoseT>(TimedState trajectory, string filename,
+	                                                Func<PoseT, PoseT> transform = null)
+		where PoseT : IPose<PoseT>, new()
+	{
+		if (transform == null) {
+			transform = p => p;
+		}
+
+		PoseT dummy = new PoseT();
+		PoseT pose0 = transform(dummy.FromState(trajectory[0].Item2));
+		PoseT prev  = pose0;
+
+		List<double[]> dpose = new List<double[]>();
+
+		for (int i = 1; i < trajectory.Count; i++) {
+			PoseT    pose = transform(dummy.FromState(trajectory[i].Item2));
+			double[] diff = pose.DiffOdometry(prev);
+			prev          = pose;
+
+			dpose.Add(diff);
+		}
+
+		File.WriteAllLines(filename, dpose.ConvertAll(dp => dp.ToString("g12")));
+
+		return pose0;
 	}
 }
 }
