@@ -150,9 +150,16 @@ public class Program
 		}
 
 		if (!string.IsNullOrEmpty(configfile)) {
-			Config.FromFile(configfile);
+			try {
+				Config.FromFile(configfile);
+			}
+			catch (FileNotFoundException e) {
+				Console.WriteLine("Error: Configuration file '" + e.FileName + "' not found.");
+				Environment.Exit(3);
+			}
 		}
 
+		try {
 		switch (Config.Model) {
 		case DynamicsModel.Linear2D:
 			Run<Linear2DMeasurer, LinearPose2D, LinearMeasurement2D>(
@@ -164,20 +171,27 @@ public class Program
 		case DynamicsModel.PRM3D:
 		default:
 			Run<PRM3DMeasurer, Pose3D, PixelRangeMeasurement>(
-			    recfile, scenefile, commandfile, configfile,
+			    recfile, scenefile, commandfile,
 			    particlecount, onlymapping, realtime, viewer,
 			    filterhistory, headless, noterminate,
 				input, algorithm);
 			break;
 		}
 		}
+		catch (FileNotFoundException e) {
+			Console.WriteLine("Error: File '" + e.FileName + "' not found.");
+			Environment.Exit(4);
+		}
+
+		KinectVehicle.Shutdown();
+		signalthread.Abort();
 	}
 
 	/// <summary>
 	/// Run the simulation or viewer.
 	/// </summary>
 	public static void Run<MeasurerT, PoseT, MeasurementT>(
-	                       string recfile, string scenefile, string commandfile, string configfile,
+	                       string recfile, string scenefile, string commandfile,
 	                       int particlecount, bool onlymapping, bool realtime, bool viewer,
 	                       bool filterhistory, bool headless, bool noterminate,
 	                       VehicleType input, NavigationAlgorithm algorithm)
@@ -241,10 +255,6 @@ public class Program
 				sim.SaveToFile(recfile);
 			}
 		}
-
-		KinectVehicle.Shutdown();
-
-		signalthread.Abort();
 	}
 }
 }
