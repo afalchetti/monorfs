@@ -190,12 +190,8 @@ public class Map : IMap
 	{
 		double value = 0;
 
-		/*foreach (var component in Nearest(point, radius)) {
+		foreach (var component in landmarks.Nearest(point, radius)) {
 			Gaussian landmark = component.Node.Value;
-			value += landmark.Weight * landmark.Evaluate(point);
-		}*/
-
-		foreach (var landmark in this) {
 			value += landmark.Weight * landmark.Evaluate(point);
 		}
 
