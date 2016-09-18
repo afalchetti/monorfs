@@ -133,7 +133,7 @@ public class Gaussian
 		Mean              = mean;
 		Covariance        = covariance;
 		Weight            = (!double.IsNaN(weight)) ? weight : 0;
-		Multiplier        = Math.Pow(2 * Math.PI, -mean.Length / 2) / Math.Sqrt(covariance.Determinant());
+		Multiplier        = Math.Pow(2 * Math.PI, -mean.Length / 2) / Math.Sqrt(covariance.PseudoDeterminant());
 		CovarianceInverse = covariance.PseudoInverse();
 		CanonicalVector   = CovarianceInverse.Multiply(Mean);
 	}

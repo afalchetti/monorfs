@@ -290,6 +290,17 @@ public static class MatrixExtensions
 	}
 
 	/// <summary>
+	/// Calculate the pseudo-determinant of a jagged matrix.
+	/// </summary>
+	/// <remarks>Jagged version of the Accord.Net function.</remarks>
+	/// <param name="matrix">Original matrix.</param>
+	/// <returns>Matrix determinant.</returns>
+	public static double PseudoDeterminant(this double[][] matrix)
+	{
+		return matrix.ToMatrix().PseudoDeterminant();
+	}
+
+	/// <summary>
 	/// Invert a matrix and try to deal with singular matrices by
 	/// introducing a little offset; since singular matrices live in
 	/// a very thin subspace, the offset will almost surely make the
