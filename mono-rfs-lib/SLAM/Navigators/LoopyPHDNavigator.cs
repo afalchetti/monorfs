@@ -752,7 +752,7 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 	public static double[] LogLikeGradientAscent(double[] initial, List<MeasurementT> measurements, Map map,
 	                                             PoseT linearpoint, out double loglike)
 	{
-		const double loglikethreshold = 1e-5;
+		const double loglikethreshold = 1e-2;
 
 		double[] pose        = initial;
 		double[] nextpose    = pose;
@@ -760,6 +760,7 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 
 		double   prevvalue = double.NegativeInfinity;
 		double[] gradient;
+		double[] dummy;
 
 		loglike = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
 		              QuasiSetLogLikelihood(measurements, map, nextvehicle, out gradient);
@@ -776,7 +777,7 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 				nextpose         = pose.Add(multiplier.Multiply(gradient));
 				nextvehicle.Pose = linearpoint.Add(nextpose);
 				nextloglike      = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
-				                       QuasiSetLogLikelihood(measurements, map, nextvehicle, out gradient);
+				                       QuasiSetLogLikelihood(measurements, map, nextvehicle, out dummy);
 				multiplier      /= 2.0;
 
 				counter++;
