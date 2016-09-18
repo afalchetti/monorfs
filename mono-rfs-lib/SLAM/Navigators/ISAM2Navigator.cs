@@ -514,7 +514,7 @@ public class ISAM2Navigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measurer
 		for (int i = 0, k = 0; i < length; i++) {
 			double[] point = new double[StateSize];
 
-			for (int h = 0; h < StateSize; k++) {
+			for (int h = 0; h < StateSize; h++, k++) {
 				point[h] = ptrtrajectory[k];
 			}
 
