@@ -372,9 +372,11 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 		TimedGaussian messages = new TimedGaussian();
 
 		messages.Add(Tuple.Create(MessagesFromPast[0].Item1, Util.DiracDelta(new double[OdoSize])));
+		FusedEstimate[0] = Tuple.Create(FusedEstimate[0].Item1,
+			Gaussian.Fuse(Gaussian.Fuse(messages[0].Item2,
+			                            MessagesFromFuture[0].Item2), MessagesFromMap[0].Item2));
 
 		for (int i = 1; i < MessagesFromPast.Count; i++) {
-			//messages.Add(Tuple.Create(0.0, (Gaussian) null));
 			messages.Add(MessagesFromPast[i]);
 		}
 
@@ -422,13 +424,17 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 		TimedGaussian messages = new TimedGaussian();
 
 		for (int i = 0; i < MessagesFromFuture.Count - 1; i++) {
-			//messages.Add(Tuple.Create(0.0, (Gaussian) null));
 			messages.Add(MessagesFromFuture[i]);
 		}
 
-		var lastpose = FusedEstimate[FusedEstimate.Count - 1];
+		int lastindex = FusedEstimate.Count - 1;
+		var lastpose = FusedEstimate[lastindex];
 		messages.Add(Tuple.Create(lastpose.Item1,
 		                          new Gaussian(lastpose.Item2.Mean, Util.InfiniteCovariance(OdoSize), 1.0)));
+		
+		FusedEstimate[lastindex] = Tuple.Create(FusedEstimate[lastindex].Item1,
+			Gaussian.Fuse(Gaussian.Fuse(messages[lastindex].Item2,
+			                            MessagesFromPast[lastindex].Item2), MessagesFromMap[lastindex].Item2));
 
 		for (int i = MessagesFromFuture.Count - 2; i >= 0 ; i--) {
 		//Parallel.For(0, MessagesFromFuture.Count - 1,
