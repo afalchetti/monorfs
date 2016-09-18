@@ -871,16 +871,20 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 		TimedState trajectory = new TimedState();
 
 		for (int i = 0; i < FusedEstimate.Count; i++) {
-			double[]   location = LinearizationPoints[i].Item2.Add(gaussians[i].Item2.Mean).State.Submatrix(0, 2);
-			double[][] loccov   = gaussians[i].Item2.Covariance.Submatrix(0, 2, 0, 2);
-
-			var decomp       = new SingularValueDecomposition(loccov.ToMatrix());
-			double[] svalues = decomp.Diagonal;
-
-			if (svalues.Max() < 1e5) {
-				//RenderGaussian(new Gaussian(location, loccov, 1.0), camera, color);
-			}
-			trajectory.Add(Tuple.Create(gaussians[i].Item1, Util.SClone(LinearizationPoints[i].Item2.Add(gaussians[i].Item2.Mean).State)));
+			PoseT    pose     = LinearizationPoints[i].Item2.Add(gaussians[i].Item2.Mean);
+			double[] location = pose.Location;
+			// double[][] loccov = MatrixExtensions.Zero(3);
+			// double[][] cov2d  = gaussians[i].Item2.Covariance;
+			// 
+			// for (int h = 0; h < cov2d.Length; h++) {
+			// 	for (int k = 0; k < cov2d[h].Length; k++) {
+			// 		loccov[h][k] = cov2d[h][k];
+			// 	}
+			// }
+			// 
+			// RenderGaussian(new Gaussian(location, loccov, 1.0), camera, color);
+			
+			trajectory.Add(Tuple.Create(gaussians[i].Item1, Util.SClone(pose.State)));
 		}
 
 		DrawUtils.DrawTrajectory<PoseT>(Graphics, trajectory, color, camera);

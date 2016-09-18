@@ -108,7 +108,6 @@ public class Program
 
 		VehicleType         input     = VehicleType.Simulation;
 		NavigationAlgorithm algorithm = NavigationAlgorithm.PHD;
-		DynamicsModel       model     = DynamicsModel.PRM3D;
 
 		OptionSet options = new OptionSet {
 			{ "f|scene=",      "Scene description file. Simulated, recorded or device id.",     f       => scenefile     = f },
@@ -116,7 +115,6 @@ public class Program
 			{ "c|command=",    "Auto-command file (simulates user input).",                     c       => commandfile   = c },
 			{ "g|config=",     "Configuration file. Contains global constants",                 g       => configfile    = g },
 			{ "a|algorithm=",  "SLAM solver algorithm ('odometry', 'phd', 'loopy' or 'isam2')", a       => algorithm     = (a == "isam2") ? NavigationAlgorithm.ISAM2 : (a == "odometry") ? NavigationAlgorithm.Odometry : (a == "loopy") ? NavigationAlgorithm.LoopyPHD : NavigationAlgorithm.PHD },
-			{ "m|model=",      "Motion and measuremet models ('prm3d' or 'linear2d')",          m       => model         = (m == "linear2d") ? DynamicsModel.Linear2D : DynamicsModel.PRM3D },
 			{ "p|particles=",  "Number of particles used for the RB-PHD",                       (int p) => particlecount = p },
 			{ "y|onlymap",     "Only do mapping, assuming known localization.",                 y       => onlymapping   = y != null },
 			{ "i|input=",      "Vehicle input stream: 'kinect', 'simulation' or 'record'",      i       => input         = (i == "kinect") ? VehicleType.Kinect : (i == "record") ? VehicleType.Record : VehicleType.Simulation },
@@ -155,19 +153,23 @@ public class Program
 			Config.FromFile(configfile);
 		}
 
-		if (model == DynamicsModel.PRM3D) {
+		switch (Config.Model) {
+		case DynamicsModel.Linear2D:
+			Run<Linear2DMeasurer, LinearPose2D, LinearMeasurement2D>(
+			    recfile, scenefile, commandfile,
+			    particlecount, onlymapping, realtime, viewer,
+			    filterhistory, headless, noterminate,
+			    input, algorithm);
+			break;
+		case DynamicsModel.PRM3D:
+		default:
 			Run<PRM3DMeasurer, Pose3D, PixelRangeMeasurement>(
 			    recfile, scenefile, commandfile, configfile,
 			    particlecount, onlymapping, realtime, viewer,
 			    filterhistory, headless, noterminate,
 				input, algorithm);
+			break;
 		}
-		else {
-			Run<Linear2DMeasurer, LinearPose2D, LinearMeasurement2D>(
-				recfile, scenefile, commandfile, configfile,
-				particlecount, onlymapping, realtime, viewer,
-				filterhistory, headless, noterminate,
-			    input, algorithm);
 		}
 	}
 

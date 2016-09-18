@@ -305,7 +305,7 @@ public class RecordVehicle<MeasurerT, PoseT, MeasurementT> : Vehicle<MeasurerT, 
 			template.Measurer);
 
 		if (extrainfo) {
-			TimedTrajectory fullestimate = FP.TrajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), 7, false);
+			TimedTrajectory fullestimate = FP.TrajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), StateSize, false);
 
 			estimate      = fullestimate[fullestimate.Count - 1].Item2;
 			xodometry     = odometry;

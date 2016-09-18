@@ -39,8 +39,8 @@ namespace monorfs
 public static class Config
 {
 	// General
-	public static int NParallel = 8;  // number of permitted threads
-
+	public static int           NParallel = 8;  // number of permitted threads
+	public static DynamicsModel Model     = DynamicsModel.PRM3D;
 
 	// Manipulator
 	public static double AxisLimit = 10.0;
@@ -148,6 +148,9 @@ public static class Config
 					}
 					else if (field.FieldType == typeof (DataAssociationAlgorithm)) {
 						field.SetValue(null, Enum.Parse(typeof (DataAssociationAlgorithm), strvalue));
+					}
+					else if (field.FieldType == typeof (DynamicsModel)) {
+						field.SetValue(null, Enum.Parse(typeof (DynamicsModel), strvalue));
 					}
 					else if (field.FieldType == typeof (int)) {
 						field.SetValue(null, int.Parse(strvalue));

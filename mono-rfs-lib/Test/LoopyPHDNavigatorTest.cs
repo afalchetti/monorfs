@@ -33,14 +33,17 @@ using Accord.Math;
 
 using NUnit.Framework;
 
-using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
-using TimedArray        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
-using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
-using TimedGaussian     = System.Collections.Generic.List<System.Tuple<double, monorfs.Gaussian>>;
-using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
-using PHDNavigator      = monorfs.PHDNavigator<monorfs.PRM3DMeasurer, monorfs.Pose3D, monorfs.PixelRangeMeasurement>;
-using LoopyPHDNavigator = monorfs.LoopyPHDNavigator<monorfs.PRM3DMeasurer, monorfs.Pose3D, monorfs.PixelRangeMeasurement>;
-using SimulatedVehicle  = monorfs.SimulatedVehicle<monorfs.PRM3DMeasurer, monorfs.Pose3D, monorfs.PixelRangeMeasurement>;
+using TimedState         = System.Collections.Generic.List<System.Tuple<double, double[]>>;
+using TimedArray         = System.Collections.Generic.List<System.Tuple<double, double[]>>;
+using TimedMapModel      = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
+using TimedGaussian      = System.Collections.Generic.List<System.Tuple<double, monorfs.Gaussian>>;
+using TimedMeasurements  = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
+using PHDNavigator       = monorfs.PHDNavigator<monorfs.PRM3DMeasurer, monorfs.Pose3D, monorfs.PixelRangeMeasurement>;
+using LoopyPHDNavigator  = monorfs.LoopyPHDNavigator<monorfs.PRM3DMeasurer, monorfs.Pose3D, monorfs.PixelRangeMeasurement>;
+using SimulatedVehicle   = monorfs.SimulatedVehicle<monorfs.PRM3DMeasurer, monorfs.Pose3D, monorfs.PixelRangeMeasurement>;
+using PHDNavigator2      = monorfs.PHDNavigator<monorfs.Linear2DMeasurer, monorfs.LinearPose2D, monorfs.LinearMeasurement2D>;
+using LoopyPHDNavigator2 = monorfs.LoopyPHDNavigator<monorfs.Linear2DMeasurer, monorfs.LinearPose2D, monorfs.LinearMeasurement2D>;
+using SimulatedVehicle2  = monorfs.SimulatedVehicle<monorfs.Linear2DMeasurer, monorfs.LinearPose2D, monorfs.LinearMeasurement2D>;
 
 namespace monorfs.Test
 {
@@ -318,6 +321,101 @@ class LoopyPHDNavigatorTest
 		}
 
 		Assert.True(false);
+	}
+}
+
+[TestFixture]
+class LoopyPHDNavigator2DTest
+{
+	// LoopyPHDNavigator nav;
+	double[][] identitycov;
+
+	[SetUp]
+	public void Setup()
+	{
+		// Vehicle           vehicle      = new SimulatedVehicle();
+		// TimedState        trajectory   = new TimedState();
+		// TimedArray        odometry     = new TimedArray();
+		// TimedMeasurements measurements = new TimedMeasurements();
+
+		// nav = new LoopyPHDNavigator(vehicle, trajectory, odometry, measurements);
+
+		identitycov = new double[3][] { new double[3] {1, 0, 0},
+		                                new double[3] {0, 1, 0},
+		                                new double[3] {0, 0, 1} };
+
+		Config.MeasurementCovariance = new double[2][] { new double[2] {5e-2, 0},
+		                                                 new double[2] {0, 5e-2}};
+	}
+
+	[Test]
+	public void LogLike2D()
+	{
+		LinearPose2D      realpose     = new LinearPose2D();
+		SimulatedVehicle2 estimate     = new SimulatedVehicle2();
+		Map               map          = new Map(3);
+		var               measurements = new List<LinearMeasurement2D>();
+
+		measurements.Add(new LinearMeasurement2D(0, 1));
+		measurements.Add(new LinearMeasurement2D(0.2, 0.6));
+
+		map.Add(new Gaussian(new double[3] {0, 1.45, 0}, identitycov, 1.0));
+		map.Add(new Gaussian(new double[3] {0, 0.65, 0}, identitycov, 1.0));
+		map.Add(new Gaussian(new double[3] {1.0, 0, 0}, identitycov, 1.0));
+
+		int          n = 201;
+		double[]     x = new double[n];
+		double[]     y = new double[n];
+		double[][]   loglike = new double[n][];
+		double[][][] dloglike = new double[n][][];
+
+		for (int i = 0 ; i < x.Length; i++) {
+			x[i] = ((double) i / (n - 1) - 0.5) / 0.5;
+		}
+
+		for (int k = 0 ; k < x.Length; k++) {
+			y[k] = ((double) k / (n - 1) - 0.5) / 0.5;
+		}
+
+		for (int i = 0 ; i < x.Length; i++) {
+			loglike[i] = new double[n];
+			dloglike[i] = new double[n][];
+			for (int k = 0 ; k < y.Length; k++) {
+				double[] ds    = new double[2];
+				dloglike[i][k] = new double[2];
+				ds[0] = x[i];
+				ds[1] = y[k];
+
+				estimate.Pose = realpose.Add(ds);
+				loglike[i][k] = PHDNavigator2.QuasiSetLogLikelihood(measurements, map, estimate, out dloglike[i][k]);
+			}
+		}
+
+		string xstr      = string.Join(" ", x.Convert(i => i.ToString("e12")));
+		string ystr      = string.Join(" ", y.Convert(i => i.ToString("e12")));
+		string likestr   = string.Join("\n", loglike.Convert(i => string.Join(" ", i.Convert(k => k.ToString("e12")))));
+		string dlike1str = string.Join("\n", dloglike.Convert(i => string.Join(" ", i.Convert(k => k[0].ToString("e12")))));
+		string dlike2str = string.Join("\n", dloglike.Convert(i => string.Join(" ", i.Convert(k => k[1].ToString("e12")))));
+
+		string root = Environment.GetFolderPath(Environment.SpecialFolder.Personal);
+
+		System.IO.File.WriteAllText(System.IO.Path.Combine(root, "x.data"),      xstr);
+		System.IO.File.WriteAllText(System.IO.Path.Combine(root, "y.data"),      ystr);
+		System.IO.File.WriteAllText(System.IO.Path.Combine(root, "like.data"),   likestr);
+		System.IO.File.WriteAllText(System.IO.Path.Combine(root, "dlike1.data"), dlike1str);
+		System.IO.File.WriteAllText(System.IO.Path.Combine(root, "dlike2.data"), dlike2str);
+
+		for (int i = 1; i < x.Length - 1; i++) {
+		for (int k = 1; k < y.Length - 1; k++) {
+			double xnumerical = (loglike[i + 1][k] - loglike[i - 1][k]) / (x[i + 1] - x[i - 1]);
+			double ynumerical = (loglike[i][k + 1] - loglike[i][k - 1]) / (y[k + 1] - y[k - 1]);
+
+			Console.WriteLine(xnumerical + " " + dloglike[i][k][0] + " " + ynumerical + " " + dloglike[i][k][1]);
+
+			Assert.IsTrue(xnumerical.IsEqual(dloglike[i][k][0], 0.5));
+			Assert.IsTrue(ynumerical.IsEqual(dloglike[i][k][1], 0.5));
+		}
+		}
 	}
 }
 }
