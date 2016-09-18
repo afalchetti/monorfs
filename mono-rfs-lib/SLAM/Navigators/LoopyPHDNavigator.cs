@@ -879,12 +879,38 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 	{
 		DrawUtils.DrawTrajectory<PoseT>(Graphics, RefVehicle.Groundtruth, Color.Yellow, camera);
 		RefVehicle.RenderLandmarks(camera);
+		RenderMeasurements(camera);
+
 		//RefVehicle.RenderBody(camera);
-		//RenderTimedGaussian(MessagesFromPast, Color.Red, camera);
-		//RenderTimedGaussian(MessagesFromFuture, Color.Green, camera);
-		//RenderTimedGaussian(MessagesFromMap, Color.Orange, camera);
-		RenderTimedGaussian(FusedEstimate, Color.Gray, camera);
+		RenderTimedGaussian(MessagesFromPast, Color.Red, camera);
+		RenderTimedGaussian(MessagesFromFuture, Color.Green, camera);
+		RenderTimedGaussian(MessagesFromMap, Color.Orange, camera);
+		RenderTimedGaussian(FusedEstimate, new Color(128, 120, 160, 140), camera);
 		RenderMap(camera);
+	}
+
+	public void RenderMeasurements(double[][] camera)
+	{
+		MeasurerT    measurer = new MeasurerT();
+		MeasurementT mdummy   = new MeasurementT();
+		double[][]   vertices = new double[7][];
+
+		for (int i = 0; i < FusedEstimate.Count; i++) {
+			PoseT pose  = LinearizationPoints[i].Item2.Add(FusedEstimate[i].Item2.Mean);
+			vertices[0] = camera.TransformH(pose.Location);
+
+			foreach (double[] measurement in Measurements[i].Item2) {
+				double[] mmap = camera.TransformH(measurer.MeasureToMap(pose, mdummy.FromLinear(measurement)));
+				vertices[1]   = mmap;
+				vertices[2]   = mmap.Add(new double[3] { 0.05,  0.05, 0});
+				vertices[3]   = mmap.Add(new double[3] {-0.05, -0.05, 0});
+				vertices[4]   = mmap;
+				vertices[5]   = mmap.Add(new double[3] {-0.05,  0.05, 0});
+				vertices[6]   = mmap.Add(new double[3] { 0.05, -0.05, 0});
+
+				graphics.DrawUser2DPolygon(vertices, 0.02f, new Color(255, 0, 0, 160), false);
+			}
+		}
 	}
 
 	/// <summary>
