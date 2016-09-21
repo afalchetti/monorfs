@@ -40,7 +40,7 @@ public static class Config
 {
 	// General
 	public static int           NParallel = 8;  // number of permitted threads
-	public static DynamicsModel Model     = DynamicsModel.PRM3D;
+	public static DynamicsModel Model;
 
 	// Manipulator
 	public static double AxisLimit = 10.0;
@@ -52,24 +52,14 @@ public static class Config
 	public static int      CheckpointCycleTime = 300;
 
 	// Vehicle
-	public static double[][] MotionCovariance = new double[6][] { new double[6] {5e-3, 0, 0, 0, 0, 0},
-	                                                              new double[6] {0, 5e-3, 0, 0, 0, 0},
-	                                                              new double[6] {0, 0, 5e-3, 0, 0, 0},
-	                                                              new double[6] {0, 0, 0, 2e-4, 0, 0},
-	                                                              new double[6] {0, 0, 0, 0, 2e-4, 0},
-	                                                              new double[6] {0, 0, 0, 0, 0, 2e-4} };
-	
-	public static double[][] MeasurementCovariance = new double[3][] { new double[3] {2e-0, 0, 0},
-	                                                                   new double[3] {0, 2e-0, 0},
-	                                                                   new double[3] {0, 0, 1e-3} };
+	public static double[][] MotionCovariance      = new double[0][];
+	public static double[][] MeasurementCovariance = new double[0][];
 	
 	// SimulatedVehicle
 	public static double   DetectionProbability = 0.9;
-	public static double   ClutterDensity       = 3e-7;
+	public static double   ClutterDensity;
 	public static bool     PerfectStill         = false;
-	public static double[] VisibilityRamp       = new double[3] {10 * Math.Sqrt(MeasurementCovariance[0][0]),
-	                                                             10 * Math.Sqrt(MeasurementCovariance[1][1]),
-	                                                             10 * Math.Sqrt(MeasurementCovariance[2][2])};
+	public static double[] VisibilityRamp       = new double[0];
 
 	// KinectVehicle
 	public static int  KinectDelta    = 4;
@@ -87,7 +77,7 @@ public static class Config
 	public static double MinWeight            = 1e-4;
 	public static double MinEffectiveParticle = 0.1;
 	public static int    MaxQuantity          = 600;
-	public static double MergeThreshold       = 3e0;
+	public static double MergeThreshold       = 0.3;
 	public static double ExplorationThreshold = 1e-5;
 	public static bool   RenderAllParticles   = true;
 
@@ -108,6 +98,13 @@ public static class Config
 	// OdometryNavigator
 	public static double OdometryMergeThreshold = 1e-2;
 
+	/// <summary>
+	/// Complete the default configurations.
+	/// </summary>
+	static Config()
+	{
+		SetPRM3DDefaults();
+	}
 
 	/// <summary>
 	/// Read configuration instructions from file.
@@ -169,6 +166,60 @@ public static class Config
 				}
 			}
 		}
+	}
+
+	/// <summary>
+	/// Set every model-related configuration value to reasonable defaults for a linear 2D system.
+	/// </summary>
+	public static void SetLinear2DDefaults()
+	{
+		// General
+		Model = DynamicsModel.Linear2D;
+
+		// Vehicle
+		MotionCovariance = new double[2][] { new double[2] {2e0, 0},
+		                                     new double[2] {0, 2e0} };
+		
+		MeasurementCovariance = new double[2][] { new double[2] {5e-4, 0},
+		                                          new double[2] {0, 5e-4} };
+		
+		// SimulatedVehicle
+		ClutterDensity = 3e-7;
+		VisibilityRamp = new double[2] { 3 * Math.Sqrt(MeasurementCovariance[0][0]),
+		                                 3 * Math.Sqrt(MeasurementCovariance[1][1]) };
+		
+		// PHDNavigator
+		NavigatorClutterDensity = ClutterDensity;
+	}
+
+	/// <summary>
+	/// Set every model-related configuration value to reasonable defaults for a pixel-range 3D system.
+	/// </summary>
+	public static void SetPRM3DDefaults()
+	{
+		// General
+		Model = DynamicsModel.PRM3D;
+
+		// Vehicle
+		MotionCovariance = new double[6][] { new double[6] {5e-3, 0, 0, 0, 0, 0},
+		                                     new double[6] {0, 5e-3, 0, 0, 0, 0},
+		                                     new double[6] {0, 0, 5e-3, 0, 0, 0},
+		                                     new double[6] {0, 0, 0, 2e-4, 0, 0},
+		                                     new double[6] {0, 0, 0, 0, 2e-4, 0},
+		                                     new double[6] {0, 0, 0, 0, 0, 2e-4} };
+		
+		MeasurementCovariance = new double[3][] { new double[3] {2e-0, 0, 0},
+		                                          new double[3] {0, 2e-0, 0},
+		                                          new double[3] {0, 0, 1e-3} };
+		
+		// SimulatedVehicle
+		ClutterDensity = 3e-7;
+		VisibilityRamp = new double[3] {3 * Math.Sqrt(MeasurementCovariance[0][0]),
+		                                3 * Math.Sqrt(MeasurementCovariance[1][1]),
+		                                3 * Math.Sqrt(MeasurementCovariance[2][2])};
+		
+		// PHDNavigator
+		NavigatorClutterDensity = ClutterDensity;
 	}
 
 	/// <summary>
