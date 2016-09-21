@@ -770,10 +770,11 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 		double[][][] P  = new double  [model.Count][][];
 		double[][][] PH = new double  [model.Count][][];
 		double[][][] S  = new double  [model.Count][][];
+		double[]     PD = new double  [model.Count];
 		Gaussian[]   mc = new Gaussian[model.Count];
-		Map          q  = new Map(MeasureSize);
 
-		var qindex = new Dictionary<Gaussian, int>();
+		var          qindex = new Dictionary<Gaussian, int>();
+		MeasurementT dummyM = new MeasurementT();
 
 		int n = 0;
 		foreach (Gaussian component in model) {
@@ -784,16 +785,15 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 			PH[n] = P[n].MultiplyByTranspose(H[n]);
 			S [n] = H[n].Multiply(PH[n]).Add(R);
 			mc[n] = new Gaussian(mp[n], S[n], component.Weight);
+			PD[n] = pose.DetectionProbabilityM(dummyM.FromLinear(mp[n]));
 
 			qindex.Add(component, n);
-			q.Add(mc[n]);
-
 			n++;
 		}
 
 		// for each measurement z and a priori map component,
 		// v += w' N(x, m', P'), where
-		// w'   = PD w q(z) / (k(z) + sum over components(w q(z)))
+		// w'   = PD w q(z) / (k(z) + sum over components(PD w q(z)))
 		// m'   = m + K (z - h(m))
 		// P'   = [I - K H] P
 		// K    = P H^T (H P H^T + R)^-1
@@ -801,21 +801,24 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 		// R is the measurement covariance
 		// H is the measurement linear operator (jacobian) from the model
 		foreach (MeasurementT measurement in measurements) {
-			double PD = pose.DetectionProbabilityM(measurement);
-
 			Map      near      = model.Near(pose.Measurer.MeasureToMap(pose.Pose, measurement), DensityDistanceThreshold);
 			double[] mlinear   = measurement.ToLinear();
-			double   weightsum = q.Evaluate(mlinear);
+			double   weightsum = 0;
+
+			foreach (Gaussian landmark in near) {
+				int i = qindex[landmark];
+				Gaussian mlandmark = mc[i];
+				weightsum         += PD[i] * mlandmark.Weight * mlandmark.Evaluate(mlinear);
+			}
 
 			foreach (var landmark in near) {
 				int i = qindex[landmark];
 
-				// double[][] gain       = PH[i].Multiply(S[i].Inverse());
 				double[][] gain       = PH[i].Multiply(mc[i].CovarianceInverse);
 				double[]   mean       = m[i].Add(gain.Multiply(mlinear.Subtract(mp[i])));
 				double[][] covariance = I.Subtract(gain.Multiply(H[i])).Multiply(P[i]);
 
-				double weight = PD * landmark.Weight * mc[i].Evaluate(measurement.ToLinear()) / (pose.ClutterDensity + PD * weightsum);
+				double weight = PD[i] * mc[i].Weight * mc[i].Evaluate(mlinear) / (pose.ClutterDensity + weightsum);
 
 				corrected.Add(new Gaussian(mean, covariance, weight));
 			}
