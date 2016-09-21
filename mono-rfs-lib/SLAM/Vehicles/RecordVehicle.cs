@@ -40,7 +40,7 @@ using FP = monorfs.FileParser;
 using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedArray        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedTrajectory   = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<System.Tuple<double, double[]>>>>;
-using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
+using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, monorfs.Map>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
 using TimedMessage      = System.Collections.Generic.List<System.Tuple<double, string>>;
 
@@ -255,6 +255,7 @@ public class RecordVehicle<MeasurerT, PoseT, MeasurementT> : Vehicle<MeasurerT, 
 		string estimatefile   = Path.Combine(datadir, "estimate.out");
 		string odometryfile   = Path.Combine(datadir, "odometry.out");
 		string measurefile    = Path.Combine(datadir, "measurements.out");
+		string vismapfile     = Path.Combine(datadir, "vismaps.out");
 		string tagfile        = Path.Combine(datadir, "tags.out");
 
 		if (!File.Exists(scenefile)) {
@@ -276,6 +277,10 @@ public class RecordVehicle<MeasurerT, PoseT, MeasurementT> : Vehicle<MeasurerT, 
 		if (!File.Exists(measurefile)) {
 			throw new ArgumentException("Missing measurement file");
 		}
+		
+		if (!File.Exists(vismapfile)) {
+			vismapfile = "";
+		}
 
 		if (!File.Exists(tagfile)) {
 			tagfile = "";
@@ -285,6 +290,7 @@ public class RecordVehicle<MeasurerT, PoseT, MeasurementT> : Vehicle<MeasurerT, 
 		TimedState        trajectory;
 		TimedArray        odometry;
 		TimedMeasurements measurements;
+		TimedMapModel     vismap;
 		TimedMessage      tags;
 
 		var template = SimulatedVehicle<MeasurerT, PoseT, MeasurementT>.
@@ -293,6 +299,21 @@ public class RecordVehicle<MeasurerT, PoseT, MeasurementT> : Vehicle<MeasurerT, 
 		trajectory   = FP.TimedArrayFromDescriptor  (File.ReadAllLines(trajectoryfile), StateSize);
 		odometry     = FP.TimedArrayFromDescriptor  (File.ReadAllLines(odometryfile), OdoSize);
 		measurements = FP.MeasurementsFromDescriptor(File.ReadAllText(measurefile), MeasureSize);
+
+		if (!string.IsNullOrEmpty(vismapfile)) {
+			vismap = FP.MapHistoryFromDescriptor(File.ReadAllText(vismapfile), 3);
+
+			for (int i = vismap.Count; i < trajectory.Count; i++) {
+				vismap.Add(Tuple.Create(trajectory[i].Item1, new Map(3)));
+			}
+		}
+		else {
+			vismap = new TimedMapModel();
+
+			foreach (var entry in trajectory) {
+				vismap.Add(Tuple.Create(entry.Item1, new Map(3)));
+			}
+		}
 
 		if (!string.IsNullOrEmpty(tagfile)) {
 			tags = FP.TimedMessageFromDescriptor(File.ReadAllLines(tagfile));
@@ -303,6 +324,8 @@ public class RecordVehicle<MeasurerT, PoseT, MeasurementT> : Vehicle<MeasurerT, 
 
 		explorer = new RecordVehicle<MeasurerT, PoseT, MeasurementT>(trajectory, odometry, measurements, tags, template.Landmarks,
 			template.Measurer);
+		
+		explorer.WayVisibleMaps = vismap;
 
 		if (extrainfo) {
 			TimedTrajectory fullestimate = FP.TrajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), StateSize, false);

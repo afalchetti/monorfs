@@ -124,7 +124,7 @@ public abstract class Vehicle<MeasurerT, PoseT, MeasurementT> : IDisposable
 	/// <summary>
 	/// History of landmark visibility.
 	/// </summary>
-	public TimedMapModel WayVisibleMaps { get; private set; }
+	public TimedMapModel WayVisibleMaps { get; set; }
 	
 	/// <summary>
 	/// Cached measurements from the update process for rendering purposes.

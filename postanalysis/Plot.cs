@@ -136,14 +136,13 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 		TimedMessage    tags;
 
 		PoseT        dummyP = new PoseT();
-		MeasurementT dummyM = new MeasurementT();
 
 		trajectory   = FP.TimedArrayFromDescriptor       (File.ReadAllLines(vehiclefile), dummyP.StateSize);
 		estimate     = FP.TrajectoryHistoryFromDescriptor(File.ReadAllText(estimatefile), dummyP.StateSize);
-		map          = FP.MapHistoryFromDescriptor       (File.ReadAllText(mapfile), dummyM.Size);
+		map          = FP.MapHistoryFromDescriptor       (File.ReadAllText(mapfile), 3);
 
 		if (!string.IsNullOrEmpty(vismapfile)) {
-			vislandmarks = FP.MapHistoryFromDescriptor(File.ReadAllText(vismapfile), dummyM.Size);
+			vislandmarks = FP.MapHistoryFromDescriptor(File.ReadAllText(vismapfile), 3);
 
 			for (int i = vislandmarks.Count; i < map.Count; i++) {
 				vislandmarks.Add(Tuple.Create(map[i].Item1, new Map(3)));
