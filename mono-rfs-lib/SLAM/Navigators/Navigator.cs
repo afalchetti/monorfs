@@ -65,6 +65,13 @@ public abstract class Navigator<MeasurerT, PoseT, MeasurementT> : IDisposable
 	protected static int MeasureSize;
 
 	/// <summary>
+	/// Maximum euclidean distance for a gaussian to be deemed relevant when evaluating the density.
+	/// Note that ideally this would be Mahalanobis distance, but that is not scalable; a
+	/// conservative euclidean distance should work fine, e.g. the prior measurement 5-sigma distance.
+	/// </summary>
+	public static double DensityDistanceThreshold { get { return Config.DensityDistanceThreshold; } }
+
+	/// <summary>
 	/// True if the algorithm performs online SLAM, i.e. uses information incrementally,
 	/// generating a new estimate each time step; false otherwise (i.e. uses all the
 	/// information at once and may run arbitrarily long).

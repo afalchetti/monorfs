@@ -76,7 +76,8 @@ public static class Config
 	public static bool KeypointFilter = true;
 
 	// Navigator
-	public static bool ShowVisible = false;
+	public static bool   ShowVisible = false;
+	public static double DensityDistanceThreshold = 1.2;
 
 	// PHDNavigator
 	public static double[][] BirthCovariance = new double[3][] { new double[3] {1e-1, 0, 0},
@@ -107,8 +108,6 @@ public static class Config
 	// OdometryNavigator
 	public static double OdometryMergeThreshold = 1e-2;
 
-	// Map
-	public static double DensityDistanceThreshold = 10 * Math.Sqrt(BirthCovariance[0][0]);
 
 	/// <summary>
 	/// Read configuration instructions from file.

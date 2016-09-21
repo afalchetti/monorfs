@@ -803,7 +803,7 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 		foreach (MeasurementT measurement in measurements) {
 			double PD = pose.DetectionProbabilityM(measurement);
 
-			Map      near      = model.Near(pose.Measurer.MeasureToMap(pose.Pose, measurement), 1.2);
+			Map      near      = model.Near(pose.Measurer.MeasureToMap(pose.Pose, measurement), DensityDistanceThreshold);
 			double[] mlinear   = measurement.ToLinear();
 			double   weightsum = q.Evaluate(mlinear);
 

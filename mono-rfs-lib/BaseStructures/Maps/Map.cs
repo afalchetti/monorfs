@@ -40,13 +40,6 @@ namespace monorfs
 public class Map : IMap
 {
 	/// <summary>
-	/// Maximum euclidean distance for a gaussian to be deemed relevant when evaluating the density.
-	/// Note that ideally this would be Mahalanobis distance, but that is not scalable; a
-	/// conservative euclidean distance should work fine, e.g. the prior measurement 5-sigma distance.
-	/// </summary>
-	public static double DensityDistanceThreshold { get { return Config.DensityDistanceThreshold; } }
-
-	/// <summary>
 	/// Point landmarks and their covariances.
 	/// </summary>
 	private KDTree<Gaussian> landmarks;
@@ -118,16 +111,6 @@ public class Map : IMap
 	}
 
 	/// <summary>
-	/// Find the landmarks that are near to a point in space
-	/// using DensityDistanceThreshold as the radius.
-	/// </summary>
-	/// <param name="point">Search point.</param>
-	public Map Near(double[] point)
-	{
-		return Near(point, DensityDistanceThreshold);
-	}
-
-	/// <summary>
 	/// Find the landmarks that are near to a point in space.
 	/// </summary>
 	/// <param name="point">Search point.</param>
@@ -177,7 +160,14 @@ public class Map : IMap
 	/// <returns>Density on the specified location.</returns>
 	public double Evaluate(double[] point)
 	{
-		return Evaluate(point, DensityDistanceThreshold);
+		double value = 0;
+
+		foreach (var component in landmarks) {
+			Gaussian landmark = component.Value;
+			value += landmark.Weight * landmark.Evaluate(point);
+		}
+
+		return value;
 	}
 
 	/// <summary>
