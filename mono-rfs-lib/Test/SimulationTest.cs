@@ -74,7 +74,7 @@ class SimulationTest
 	public void setup() {
 		try {
 			nparticles = 20;
-			simulation = Simulation.FromFiles("map.world", "movroom.in", nparticles, VehicleType.Simulation, NavigationAlgorithm.PHD, false, false);
+			simulation = Simulation.FromFiles("assets/map.world", "assets/movroom.in", nparticles, VehicleType.Simulation, NavigationAlgorithm.PHD, false, false);
 			commands   = simulation.Commands;
 			explorer   = simulation.Explorer;
 			navigator  = simulation.Navigator as PHDNavigator;
