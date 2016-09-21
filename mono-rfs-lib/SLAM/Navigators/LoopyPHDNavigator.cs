@@ -534,7 +534,7 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 				List<Gaussian> fusecandidates = estimates.ConvertAll(e => Gaussian.Fuse(pastfuture, e));
 				//double   fusealpha     = estimate.LogEvaluate(fusecandidate.Mean) + Math.Log(estimate.Weight);
 
-				fusecandidates.Add(new Gaussian(pastfuture.Mean, pastfuture.Covariance, emptyspace));
+				fusecandidates.Add(pastfuture.Reweight(emptyspace));
 
 				Gaussian fused = Gaussian.Merge(fusecandidates);
 				totalestimate  = Gaussian.Unfuse(fused, pastfuture);

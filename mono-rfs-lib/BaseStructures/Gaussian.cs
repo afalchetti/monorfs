@@ -66,6 +66,11 @@ public class Gaussian
 	public double[][] CovarianceInverse { get; private set; }
 
 	/// <summary>
+	/// Cached covariance determinant
+	/// </summary>
+	public double CovarianceDeterminant { get; private set; }
+
+	/// <summary>
 	/// Matrix from the canonical representation.
 	/// </summary>
 	public double[][] CanonicalMatrix
@@ -107,6 +112,17 @@ public class Gaussian
 	private const double tabdelta = 32 / 16;
 
 	/// <summary>
+	/// Exponent bias term (independent of x) in the canonical representation.
+	/// </summary>
+	public double CanonicalBias
+	{
+		get
+		{
+			return Math.Log(Multiplier) - 0.5 * Mean.InnerProduct(CovarianceInverse.Multiply(Mean));
+		}
+	}
+
+	/// <summary>
 	/// Construct the negative exponential tabulation.
 	/// </summary>
 	static Gaussian()
@@ -131,12 +147,13 @@ public class Gaussian
 	/// <param name="weight">Gaussian coefficient in the mixture.</param>
 	public Gaussian(double[] mean, double[][] covariance, double weight)
 	{
-		Mean              = mean;
-		Covariance        = covariance;
-		Weight            = (!double.IsNaN(weight)) ? weight : 0;
-		Multiplier        = Math.Pow(2 * Math.PI, -mean.Length / 2) / Math.Sqrt(covariance.PseudoDeterminant());
-		CovarianceInverse = covariance.PseudoInverse();
-		CanonicalVector   = CovarianceInverse.Multiply(Mean);
+		Mean                  = mean;
+		Covariance            = covariance;
+		CovarianceDeterminant = covariance.PseudoDeterminant();
+		CovarianceInverse     = covariance.PseudoInverse();
+		Weight                = (!double.IsNaN(weight)) ? weight : 0;
+		Multiplier            = Math.Pow(2 * Math.PI, -mean.Length / 2) / Math.Sqrt(CovarianceDeterminant);
+		CanonicalVector       = CovarianceInverse.Multiply(Mean);
 	}
 
 	/// <summary>
@@ -155,10 +172,23 @@ public class Gaussian
 		gaussian.Covariance = matrix.PseudoInverse();
 		gaussian.Mean       = gaussian.Covariance.Multiply(vector);
 
+		gaussian.CovarianceDeterminant = gaussian.Covariance.PseudoDeterminant();
 		gaussian.Weight     = (!double.IsNaN(weight)) ? weight : 0;
-		gaussian.Multiplier = Math.Pow(2 * Math.PI, -gaussian.Mean.Length / 2) / Math.Sqrt(gaussian.Covariance.Determinant());
+		gaussian.Multiplier = Math.Pow(2 * Math.PI, -gaussian.Mean.Length / 2) / Math.Sqrt(gaussian.CovarianceDeterminant);
 
 		return gaussian;
+	}
+
+	/// <summary>
+	/// Get a new gaussian with the same mean and variance but with a different weight.
+	/// </summary>
+	/// <param name="newweight">New gaussian weight.</param>
+	public Gaussian Reweight(double newweight)
+	{
+		Gaussian reweighted = (Gaussian) this.MemberwiseClone();
+		reweighted.Weight   = newweight;
+
+		return reweighted;
 	}
 
 	/// <summary>
@@ -244,6 +274,20 @@ public class Gaussian
 	}
 
 	/// <summary>
+	/// Multiply two gaussian probability density functions.
+	/// </summary>
+	/// <param name="a">First gaussian.</param>
+	/// <param name="b">Second gaussian.</param>
+	/// <returns>Gaussian equivalent to the density product of the argument gaussians.</returns>
+	public static Gaussian Multiply(Gaussian a, Gaussian b)
+	{
+		Gaussian fused    = Fuse(a, b);
+		double   logscale = a.CanonicalBias + b.CanonicalBias - fused.CanonicalBias;
+
+		return fused.Reweight(Math.Exp(logscale + Math.Log(a.Weight) + Math.Log(b.Weight)));
+	}
+
+	/// <summary>
 	/// Merge a list of gaussian components into a one big gaussian
 	/// that tries to approximate as much as possible the behaviour
 	/// of the original mixture.
@@ -318,6 +362,21 @@ public class Gaussian
 	{
 		double[] diff = Mean.Subtract(point);
 		return diff.InnerProduct(CovarianceInverse.Multiply(diff));
+	}
+
+	/// <summary>
+	/// Obtain the Bhattacharyya distance between two gaussian distributions.
+	/// </summary>
+	/// <param name="a">First gaussian.</param>
+	/// <param name="b">Second gaussian.</param>
+	public static double Bhattacharyya(Gaussian a, Gaussian b)
+	{
+		double[]   meandiff  = a.Mean.Subtract(b.Mean);
+		double[][] avgcov    = (0.5).Multiply((a.Covariance.Add(b.Covariance)));
+		double     avgcovdet = avgcov.PseudoDeterminant();
+
+		return 0.125 * meandiff.InnerProduct(avgcov.Multiply(meandiff)) +
+		       0.5 * Math.Log(avgcovdet / Math.Sqrt(a.CovarianceDeterminant * b.CovarianceDeterminant));
 	}
 
 	/// <summary>

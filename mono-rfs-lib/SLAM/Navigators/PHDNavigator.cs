@@ -757,9 +757,8 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 		// reduce predicted weight to acocunt for misdetection
 		// v += (1-PD) v
 		foreach (Gaussian component in model) {
-			corrected.Add(new Gaussian(component.Mean,
-			                           component.Covariance,
-			                           (1 - pose.DetectionProbability(component.Mean)) * component.Weight));
+			corrected.Add(component.Reweight((1 - pose.DetectionProbability(component.Mean)) *
+			                                      component.Weight));
 		}
 
 		// measurement PHD update
