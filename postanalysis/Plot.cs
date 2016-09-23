@@ -208,6 +208,26 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 		}
 	}
 
+	public Map VisitedMap
+	{
+		get
+		{
+			Map cumulative = new Map(3);
+
+			for (int i = 0; i < Map.Count; i++) {
+				foreach (Gaussian landmark in VisibleLandmarks[i].Item2) {
+					// forcing landmark.Weight to be bigger than zero disregards visible but
+					// non-measured landmarks, which is probably the fairest thing to do
+					if (cumulative.Near(landmark.Mean, 1e-5).Count == 0 && landmark.Weight > 0) {
+						cumulative.Add(landmark);
+					}
+				}
+			}
+
+			return cumulative;
+		}
+	}
+
 	public TimedValue CorrectSize
 	{
 		get
@@ -217,6 +237,8 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 
 			for (int i = 0; i < Map.Count; i++) {
 				foreach (Gaussian landmark in VisibleLandmarks[i].Item2) {
+					// forcing landmark.Weight to be bigger than zero disregards visible but
+					// non-measured landmarks, which is probably the fairest thing to do
 					if (cumulative.Near(landmark.Mean, 1e-5).Count == 0 && landmark.Weight > 0) {
 						cumulative.Add(landmark);
 					}
@@ -443,9 +465,11 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 			double carderror;
 			double spatialerror;
 
+			Map visited = VisitedMap;
+
 			for (int i = 0; i < Map.Count; i++) {
 				Map jmap     = Map[i].Item2.BestMapEstimate;
-				ospaerror    = OSPA(Landmarks, jmap, out carderror);
+				ospaerror    = OSPA(visited, jmap, out carderror);
 				spatialerror = Math.Pow(Math.Pow(ospaerror, P) - Math.Pow(carderror, P), 1.0 / P);
 
 				oerror.Add(Tuple.Create(Map[i].Item1, ospaerror));
