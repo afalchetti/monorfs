@@ -34,8 +34,8 @@ echo ""
 echo "Solving with iSAM2"
 /opt/monodevelop/bin/mono "${solver}" -x -i=record -f="${phdfile}" -a=isam2 -g="${cfgfile}" -r="${isamfile}"
 
-/opt/monodevelop/bin/mono "${plotter}" -f="${phdfile}" -c=1 -p=2 -H='timed'
-/opt/monodevelop/bin/mono "${plotter}" -f="${odofile}" -c=1 -p=2 -H='timed'
-/opt/monodevelop/bin/mono "${plotter}" -f="${isamfile}" -c=1 -p=2 -H='timed'
+/opt/monodevelop/bin/mono "${plotter}" -f="${phdfile}" -c=1 -p=1 -H='timed'
+/opt/monodevelop/bin/mono "${plotter}" -f="${odofile}" -c=1 -p=1 -H='timed'
+/opt/monodevelop/bin/mono "${plotter}" -f="${isamfile}" -c=1 -p=1 -H='timed'
 
 popd >/dev/null

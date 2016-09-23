@@ -31,7 +31,7 @@ for cfgfile in ${cfgfiles}; do
 done
 
 for cfgfile in ${cfgfiles}; do
-	/opt/monodevelop/bin/mono "${plotter}" -f="${outprefix}${cfgfile}.zip" -c=1 -p=2 -H='timed'
+	/opt/monodevelop/bin/mono "${plotter}" -f="${outprefix}${cfgfile}.zip" -c=1 -p=1 -H='timed'
 done
 
 popd >/dev/null

@@ -67,14 +67,14 @@ public static class Config
 
 	// Navigator
 	public static bool   ShowVisible = false;
-	public static double DensityDistanceThreshold = 1.2;
+	public static double DensityDistanceThreshold = 0.5;
 
 	// PHDNavigator
-	public static double[][] BirthCovariance = new double[3][] { new double[3] {1e-1, 0, 0},
-	                                                             new double[3] {0, 1e-1, 0},
-	                                                             new double[3] {0, 0, 1e-1} };
+	public static double[][] BirthCovariance = new double[3][] { new double[3] {1e-2, 0, 0},
+	                                                             new double[3] {0, 1e-2, 0},
+	                                                             new double[3] {0, 0, 1e-2} };
 	public static double BirthWeight          = 0.05;
-	public static double MinWeight            = 1e-4;
+	public static double MinWeight            = 1e-3;
 	public static double MinEffectiveParticle = 0.1;
 	public static int    MaxQuantity          = 600;
 	public static double MergeThreshold       = 0.3;
