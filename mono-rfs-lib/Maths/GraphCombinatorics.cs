@@ -65,8 +65,8 @@ public static class GraphCombinatorics
 	{
 		// initial feasible labeling
 		var      rowmax = matrix.FoldRows(Math.Max, 0);
-		double[] labelx = new double[matrix.Height];
-		double[] labely = new double[matrix.Width];
+		double[] labelx = new double[matrix.Width];
+		double[] labely = new double[matrix.Height];
 
 		int   [] matchx = new int   [labelx.Length];
 		int   [] matchy = new int   [labelx.Length];
@@ -367,7 +367,7 @@ public static class GraphCombinatorics
 			bool[] rowvisited = new bool[complete.Height];
 			bool[] colvisited = new bool[complete.Width];
 
-			SparseMatrix component = new SparseMatrix(complete.Width, complete.Height, original.DefaultValue);
+			SparseMatrix component = new SparseMatrix(complete.Height, complete.Width, original.DefaultValue);
 			SparseItem   element   = complete.Any;
 			rowstack.Add(element.I);
 			colstack.Add(element.K);

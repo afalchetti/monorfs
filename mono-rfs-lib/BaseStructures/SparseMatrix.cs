@@ -76,15 +76,15 @@ public class SparseMatrix<T> : IEnumerable<SparseItem<T>>
 	/// <summary>
 	/// Construct a new SparseMatrix with a given initial width and height.
 	/// </summary>
-	/// <param name="width">Initial width.</param>
 	/// <param name="height">Initial height.</param>
+	/// <param name="width">Initial width.</param>
 	/// <param name="defaultvalue">Unassigned cell value.</param>
-	public SparseMatrix(int width, int height, T defaultvalue = default(T))
+	public SparseMatrix(int height, int width, T defaultvalue = default(T))
 	{
 		data         = new Dictionary<int, Dictionary<int, T>>();
 		DefaultValue = defaultvalue;
-		Width        = width;
 		Height       = height;
+		Width        = width;
 	}
 
 	/// <summary>
@@ -108,8 +108,8 @@ public class SparseMatrix<T> : IEnumerable<SparseItem<T>>
 		}
 
 		this.DefaultValue = defaultvalue;
-		this.Width        = that.Width;
 		this.Height       = that.Height;
+		this.Width        = that.Width;
 	}
 
 	/// <summary>
@@ -286,7 +286,7 @@ public class SparseMatrix<T> : IEnumerable<SparseItem<T>>
 	/// <returns>Matrix transpose.</returns>
 	public SparseMatrix<T> Transpose()
 	{
-		SparseMatrix<T> transpose = new SparseMatrix<T>(Height, Width, DefaultValue);
+		SparseMatrix<T> transpose = new SparseMatrix<T>(Width, Height, DefaultValue);
 
 		foreach (var item in this) {
 			transpose[item.K, item.I] = item.Value;

@@ -158,7 +158,7 @@ class GraphCombinatoricsTest
 		while (enumerator.MoveNext()) {
 			current = enumerator.Current;
 
-			inter = new SparseMatrix(current.Width, current.Height);
+			inter = new SparseMatrix(current.Height, current.Width);
 			foreach (var item in current) {
 				if (previous.Defines(item.I, item.K)) {
 					inter[item.I, item.K] = item.Value;
