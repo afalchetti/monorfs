@@ -444,9 +444,9 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 			double spatialerror;
 
 			for (int i = 0; i < Map.Count; i++) {
-				Map jmap = BestMapEstimate(Map[i].Item2);
-				ospaerror = OSPA(Landmarks, jmap, out carderror);
-				spatialerror = Math.Pow(Math.Pow(ospaerror, P) - Math.Pow(carderror, P), 1.0/P);
+				Map jmap     = Map[i].Item2.BestMapEstimate;
+				ospaerror    = OSPA(Landmarks, jmap, out carderror);
+				spatialerror = Math.Pow(Math.Pow(ospaerror, P) - Math.Pow(carderror, P), 1.0 / P);
 
 				oerror.Add(Tuple.Create(Map[i].Item1, ospaerror));
 				serror.Add(Tuple.Create(Map[i].Item1, spatialerror));
@@ -456,23 +456,6 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 
 			return oerror;
 		}
-	}
-
-	public Map BestMapEstimate(Map map)
-	{
-		Map best = new Map(3);
-
-		double[][] did = { new double[3] {1e-3, 0, 0},
-		                   new double[3] {0, 1e-3, 0},
-		                   new double[3] {0, 0, 1e-3} };
-
-		foreach (Gaussian component in map) {
-			if (component.Weight > 0.8) {
-				best.Add(new Gaussian(component.Mean, did, 1.0));
-			}
-		}
-
-		return best;
 	}
 
 	public double OSPA(Map a, Map b, out double cardinalityerror)
@@ -488,15 +471,15 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 			return cardinalityerror;
 		}
 
-		var alist = a.ToList();
-		var blist = b.ToList();
+		List<Gaussian> alist = a.ToList();
+		List<Gaussian> blist = b.ToList();
 
-		SparseMatrix transport = new SparseMatrix(b.Count, b.Count);
+		SparseMatrix transport = new SparseMatrix(b.Count, b.Count, 0.0);
 
 		double CP = Math.Pow(C, P);
 
-		for (int k = 0; k < blist.Count; k++) {
 		for (int i = 0; i < alist.Count; i++) {
+		for (int k = 0; k < blist.Count; k++) {
 			double distance = Math.Pow(LandmarkDistance(alist[i].Mean, blist[k].Mean), P);
 			
 			// usually would be:
@@ -506,7 +489,7 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 			// difference against C^P (most of the entries will equal zero)
 
 			if (CP - distance > 1e-5) {
-				transport[k,i] = CP - distance;
+				transport[i, k] = CP - distance;
 			}
 		}
 		}
@@ -519,11 +502,12 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 		//}
 
 		int[] best = GraphCombinatorics.LinearAssignment(transport);
+
 		transport.Apply(x => CP - x);
 
-		cardinalityerror = C * Math.Pow((double) (blist.Count - alist.Count) / blist.Count, 1.0/P);
+		cardinalityerror = C * Math.Pow((double) (blist.Count - alist.Count) / blist.Count, 1.0 / P);
 
-		return Math.Pow(GraphCombinatorics.AssignmentValue(transport, best) / blist.Count, 1.0/P);
+		return Math.Pow(GraphCombinatorics.AssignmentValue(transport, best) / blist.Count, 1.0 / P);
 	}
 
 	public double LandmarkDistance(double[] a, double[] b)

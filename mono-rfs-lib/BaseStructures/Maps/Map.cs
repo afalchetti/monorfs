@@ -30,6 +30,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
+using Accord.Math;
 using Accord.MachineLearning.Structures;
 
 namespace monorfs
@@ -108,6 +109,36 @@ public class Map : IMap
 	public void Add(Gaussian landmark)
 	{
 		landmarks.Add(landmark.Mean, landmark);
+	}
+
+	/// <summary>
+	/// Get a MAP-like estimate for the map (i.e. the most probable map).
+	/// It corresponds to the Marginal Multi-Object Estimator in RFS.
+	/// </summary>
+	/// <returns>MAP-like estimate.</returns>
+	public Map BestMapEstimate
+	{
+		get {
+			Map best = new Map(Dimensions);
+			
+			double[][] identity = Matrix.JaggedIdentity(Dimensions);
+			
+			int            size    = (int) ExpectedSize;
+			List<Gaussian> mlist   = ToList();
+			
+			mlist.Sort((a, b) => Math.Sign(b.Weight - a.Weight));
+			
+			for (int i = 0; i < size; i++) {
+				Gaussian component = mlist[i];
+			
+				best.Add(new Gaussian(component.Mean, identity, 1.0));
+			
+				mlist.Add(mlist[i].Reweight(mlist[i].Weight - 1));
+				mlist.Sort((a, b) => Math.Sign(b.Weight - a.Weight));
+			}
+			
+			return best;
+		}
 	}
 
 	/// <summary>

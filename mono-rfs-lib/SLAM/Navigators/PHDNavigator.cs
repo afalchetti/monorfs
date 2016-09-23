@@ -373,12 +373,12 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 	public double WeightAlpha(List<MeasurementT> measurements, Map predicted, Map corrected,
 	                          SimulatedVehicle<MeasurerT, PoseT, MeasurementT> pose)
 	{
-		IMap cvisible = corrected.FindAll(g => pose.Visible(g.Mean) && g.Weight > 0.8);
+		IMap jmap = corrected.BestMapEstimate;
 
 		double ploglikelihood = 0;
 		double cloglikelihood = 0;
 
-		foreach (var component in cvisible) {
+		foreach (var component in jmap) {
 			ploglikelihood += Math.Log(predicted.Evaluate(component.Mean));
 			cloglikelihood += Math.Log(corrected.Evaluate(component.Mean));
 		}
@@ -386,7 +386,7 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 		double pcount = predicted.ExpectedSize;
 		double ccount = corrected.ExpectedSize;
 
-		double setloglikelihood   = SetLogLikelihood(measurements, cvisible, pose);
+		double setloglikelihood   = SetLogLikelihood(measurements, jmap, pose);
 		double loglikelihoodratio = (ploglikelihood - pcount) - (cloglikelihood - ccount);
 
 		return Math.Exp(setloglikelihood + loglikelihoodratio);

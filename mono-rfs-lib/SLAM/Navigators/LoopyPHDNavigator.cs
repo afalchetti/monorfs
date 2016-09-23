@@ -701,12 +701,11 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 		MeasurerT      measurer = new MeasurerT();
 		PoseT          initpose = linearpoint.Add(pose0);
 
-		Map visible = map.FindAll(g => measurer.VisibleM(measurer.MeasurePerfect(initpose, g.Mean)) &&
-		                               g.Weight > 0.8);
+		Map jmap = map.BestMapEstimate;
 
 		guesses.Add(pose0);
 
-		foreach (Gaussian landmark in visible) {
+		foreach (Gaussian landmark in jmap) {
 			foreach (MeasurementT measurement in measurements) {
 				PoseT guess = measurer.FitToMeasurement(initpose, measurement, landmark.Mean);
 
@@ -728,16 +727,16 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 		PoseT infpose     = new PoseT().IdentityP().Add(infdelta);
 		var infvehicle    = new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>(infpose, new List<double[]>());
 		double emptyspace = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
-		                        SetLogLikelihood(measurements, map, infvehicle);
+		                        SetLogLikelihood(measurements, jmap, infvehicle);
 
 		foreach (double[] guess in guesses) {
 			double localmax = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
-				SetLogLikelihood(measurements, map,
+				SetLogLikelihood(measurements, jmap,
 					new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>(
 						linearpoint.Add(guess), new List<double[]>())
 					);
 
-			double[] localpose = LogLikeGradientAscent(guess, measurements, visible, linearpoint, out localmax);
+			double[] localpose = LogLikeGradientAscent(guess, measurements, jmap, linearpoint, out localmax);
 
 			foreach (Gaussian component in components) {
 				if (component.Mahalanobis(localpose) < 0.01) {
@@ -745,7 +744,7 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 				}
 			}
 
-			double[][] localcov = LogLikeFitCovariance(maxpose, measurements, visible, linearpoint);
+			double[][] localcov = LogLikeFitCovariance(maxpose, measurements, jmap, linearpoint);
 
 			double logmultiplier = Math.Log(Math.Pow(2 * Math.PI, -localpose.Length / 2) / Math.Sqrt(localcov.PseudoDeterminant()));
 			double weight        = Math.Exp(localmax - logmultiplier);
