@@ -252,8 +252,9 @@ public class SimulatedVehicle<MeasurerT, PoseT, MeasurementT> : Vehicle<Measurer
 
 		// add every measurement with probability = DetectionProbability
 		for (int i = 0; i < Landmarks.Count; i++) {
-			if (Visible(Landmarks[i])) {
-				if (Util.Uniform.Next() < detectionProbability) {
+			double pd = DetectionProbability(Landmarks[i]);
+			if (pd >  0) {
+				if (Util.Uniform.Next() < pd) {
 					measurements   .Add(MeasureDetected(Landmarks[i]));
 					DataAssociation.Add(i);
 					visible.Add(new Gaussian(Landmarks[i], diraccov, 1.0));
