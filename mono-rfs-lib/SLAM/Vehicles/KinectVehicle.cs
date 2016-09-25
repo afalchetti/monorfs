@@ -548,7 +548,7 @@ public class KinectVehicle : Vehicle<KinectMeasurer, Pose3D, PixelRangeMeasureme
 				}
 			}
 			catch (Accord.ConvergenceException) {
-				// just continue, like if not enough points were found
+				// just continue as if not enough points were found
 			}
 		}
 		else {

@@ -154,13 +154,17 @@ public class KinectMeasurer : PRM3DMeasurer, IMeasurer<KinectMeasurer, Pose3D, P
 		int   y     = (int)  (landmark.Y + ResY / 2);
 		float range = (float) landmark.Range;
 
-		double    minwdistance = base.FuzzyVisibleM(landmark);
+		double minwdistance = base.FuzzyVisibleM(landmark);
 
 		if (minwdistance == 0) {  // outside of image region, can't obtain depth
 			return 0;
 		}
 
 		float[][] depth = GetDepth();
+
+		if (double.IsNaN(depth[x][y])) {
+			return 0;
+		}
 
 		minwdistance = Math.Min(minwdistance, (range - RangeClip.Min)  / VisibilityRamp[2]);
 		minwdistance = Math.Min(minwdistance, (depth[x][y]  - range) / VisibilityRamp[2]);

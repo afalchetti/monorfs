@@ -27,6 +27,7 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -636,8 +637,15 @@ public class Simulation<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT,
 					Navigator.SlamUpdate(time, measurements);
 				}
 				catch (InvalidOperationException e) {
-					if (e.Data["module"].Equals("gtsam")) {
+					if (e.Data["module"] == null) {
+						Console.WriteLine("Unknown invalid operation.");
+						foreach (DictionaryEntry entry in e.Data) {
+							Console.WriteLine(entry.Key + ": " + entry.Value);
+						}
+					}
+					else if (e.Data["module"].Equals("gtsam")) {
 						Tags.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, "!gtsam failure"));
+						Console.WriteLine("gtsam failed.");
 					}
 					else if (e.Data["module"].Equals("association")) {
 						Console.WriteLine("Tried to use perfect data association when none exists.");

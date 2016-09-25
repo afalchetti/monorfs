@@ -170,11 +170,20 @@ public class Program
 			break;
 		case DynamicsModel.PRM3D:
 		default:
+			if (input == VehicleType.Kinect) {
+			Run<KinectMeasurer, Pose3D, PixelRangeMeasurement>(
+			    recfile, scenefile, commandfile,
+			    particlecount, onlymapping, realtime, viewer,
+			    filterhistory, headless, noterminate,
+				input, algorithm);
+			}
+			else {
 			Run<PRM3DMeasurer, Pose3D, PixelRangeMeasurement>(
 			    recfile, scenefile, commandfile,
 			    particlecount, onlymapping, realtime, viewer,
 			    filterhistory, headless, noterminate,
 				input, algorithm);
+			}
 			break;
 		}
 		}

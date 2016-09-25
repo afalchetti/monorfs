@@ -151,7 +151,14 @@ public class Pose3D : IPose<Pose3D>
 		Y = state[1];
 		Z = state[2];
 
-		Orientation = new Quaternion(state[3], state[4], state[5], state[6]);
+		double w = state[3];
+		double x = state[4];
+		double y = state[5];
+		double z = state[6];
+
+		double a = 1.0 / Math.Sqrt(w * w + x * x + y * y + z  *z);
+
+		Orientation = new Quaternion(a * w, a * x, a * y, a * z);
 	}
 
 	/// <summary>
