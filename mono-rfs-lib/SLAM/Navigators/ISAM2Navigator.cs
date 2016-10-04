@@ -290,7 +290,7 @@ public class ISAM2Navigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measurer
 		int m = visible.Count + CandidateMapModel.Count + measurements.Count;
 
 		// distances(i, k) = distance between landmark i and measurements k
-		SparseMatrix distances  = new SparseMatrix(n, n, double.NegativeInfinity);
+		SparseMatrix distances = new SparseMatrix(n, n, double.NegativeInfinity);
 
 		int candidatecount = CandidateMapModel.Count;
 		// candidate count at the beggining of the process

@@ -147,7 +147,7 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 	/// Map clipping area.
 	/// It is formatted as [left, right, bottom, top].
 	/// </summary>
-	public readonly float[] MapClip = Config.MapClip;
+	public readonly float[] MapClip = Config.MapClip.ToSingle();
 
 	/// <summary>
 	/// Previous frame keyboard state.

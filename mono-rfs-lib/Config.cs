@@ -47,7 +47,7 @@ public static class Config
 
 	// Simulation
 	public static TimeSpan MeasureElapsed      = new TimeSpan(10000000/30);
-	public static float[]  MapClip             = new float[4] {-6, 6, -3, 3};
+	public static double[] MapClip             = new double[4] {-6, 6, -3, 3};
 	public static bool     UseOdometry         = true;
 	public static int      CheckpointCycleTime = 300;
 
@@ -136,7 +136,7 @@ public static class Config
 					}
 					else if (field.FieldType == typeof (double[])) {
 						field.SetValue(null, Matrix.ParseJagged(strvalue,
-							new OctaveMatrixFormatProvider(DefaultMatrixFormatProvider.CurrentCulture))[0]);
+							new OctaveMatrixFormatProvider(DefaultMatrixFormatProvider.CurrentCulture)).Transpose()[0]);
 					}
 					else if (field.FieldType == typeof (TimeSpan)) {
 						double seconds = double.Parse(strvalue);
