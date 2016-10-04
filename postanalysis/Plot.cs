@@ -91,7 +91,7 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 		P                = p;
 		RefTime          = Trajectory.BinarySearch(Tuple.Create(reftime, new double[0]), new ComparisonComparer<Tuple<double, double[]>>(
 		                                          (Tuple<double, double[]> a, Tuple<double, double[]> b) => Math.Sign(a.Item1 - b.Item1)));
-		RefTime          = (RefTime != ~Trajectory.Count) ? RefTime : 0;
+		RefTime          = (RefTime >= 0) ? RefTime : (RefTime != ~Trajectory.Count) ? ~RefTime : 0;
 	}
 
 	/// <summary>
@@ -357,11 +357,11 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 
 		for (int i = 0; i < estimate.Count; i++) {
 			int   reftime = Math.Min(i, RefTime);
-			PoseT gpose   = dummy.FromOdometry(dummy.FromState(groundtruth[i].Item2).Subtract(
-			                                   dummy.FromState(groundtruth[reftime].Item2)));
-			PoseT epose   = dummy.FromOdometry(dummy.FromState(estimate[i].Item2).Subtract(
-			                                   dummy.FromState(estimate[reftime].Item2)));
-			
+			PoseT gpose   = dummy.FromLinear(dummy.FromState(groundtruth[i].Item2).Subtract(
+			                                 dummy.FromState(groundtruth[reftime].Item2)));
+			PoseT epose   = dummy.FromLinear(dummy.FromState(estimate[i].Item2).Subtract(
+			                                 dummy.FromState(estimate[reftime].Item2)));
+
 			error.Add(Tuple.Create(groundtruth[i].Item1, diffloc(gpose, epose)));
 		}
 
@@ -375,10 +375,10 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 
 		for (int i = 0; i < estimate.Count; i++) {
 			int   reftime = Math.Min(i, RefTime);
-			PoseT gpose   = dummy.FromOdometry(dummy.FromState(groundtruth[i].Item2).Subtract(
-			                                   dummy.FromState(groundtruth[reftime].Item2)));
-			PoseT epose   = dummy.FromOdometry(dummy.FromState(estimate[i].Item2).Subtract(
-			                                   dummy.FromState(estimate[reftime].Item2)));
+			PoseT gpose   = dummy.FromLinear(dummy.FromState(groundtruth[i].Item2).Subtract(
+			                                 dummy.FromState(groundtruth[reftime].Item2)));
+			PoseT epose   = dummy.FromLinear(dummy.FromState(estimate[i].Item2).Subtract(
+			                                 dummy.FromState(estimate[reftime].Item2)));
 			
 			error.Add(Tuple.Create(groundtruth[i].Item1, diffrot(gpose, epose)));
 		}
@@ -394,10 +394,10 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 		error.Add(Tuple.Create(groundtruth[0].Item1, 0.0));
 
 		for (int i = 10; i < estimate.Count; i++) {
-			PoseT godo = dummy.FromOdometry(dummy.FromState(groundtruth[i].Item2).Subtract(
-			                                dummy.FromState(groundtruth[i-10].Item2)));
-			PoseT eodo = dummy.FromOdometry(dummy.FromState(estimate[i].Item2).Subtract(
-			                                dummy.FromState(estimate[i-10].Item2)));
+			PoseT godo = dummy.FromLinear(dummy.FromState(groundtruth[i].Item2).Subtract(
+			                              dummy.FromState(groundtruth[i-10].Item2)));
+			PoseT eodo = dummy.FromLinear(dummy.FromState(estimate[i].Item2).Subtract(
+			                              dummy.FromState(estimate[i-10].Item2)));
 
 			error.Add(Tuple.Create(groundtruth[i].Item1, diffloc(godo, eodo)));
 		}
@@ -413,10 +413,10 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 		error.Add(Tuple.Create(groundtruth[0].Item1, 0.0));
 
 		for (int i = 10; i < estimate.Count; i++) {
-			PoseT godo = dummy.FromOdometry(dummy.FromState(groundtruth[i].Item2).Subtract(
-			                                dummy.FromState(groundtruth[i-10].Item2)));
-			PoseT eodo = dummy.FromOdometry(dummy.FromState(estimate[i].Item2).Subtract(
-			                                dummy.FromState(estimate[i-10].Item2)));
+			PoseT godo = dummy.FromLinear(dummy.FromState(groundtruth[i].Item2).Subtract(
+			                              dummy.FromState(groundtruth[i-10].Item2)));
+			PoseT eodo = dummy.FromLinear(dummy.FromState(estimate[i].Item2).Subtract(
+			                              dummy.FromState(estimate[i-10].Item2)));
 
 			error.Add(Tuple.Create(groundtruth[i].Item1, diffrot(godo, eodo)));
 		}
@@ -426,12 +426,15 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 
 	private double diffloc(PoseT a, PoseT b)
 	{
-		return new PoseT().FromOdometry(a.Subtract(b)).Location.Euclidean();
+		return new PoseT().FromLinear(a.Subtract(b)).Location.Euclidean();
 	}
 
 	private double diffrot(PoseT a, PoseT b)
 	{
-		return Math.Abs(new PoseT().FromOdometry(a.Subtract(b)).Orientation.Angle);
+		double rawangle  = new PoseT().FromLinear(a.Subtract(b)).Orientation.Angle;
+		double canonical = Math.Abs(Util.NormalizeAngle(rawangle));
+
+		return canonical;
 	}
 
 	private double difflandmark(double[] a, double[] b)
