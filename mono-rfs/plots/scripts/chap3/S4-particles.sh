@@ -11,7 +11,7 @@ scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 mkdir -p "${suboutdir}"
 
 particlecount0="20"
-particlecount="100 800"
+particlecount="100 800 2000"
 
 outprefix="${suboutdir}/p"
 cfgfile="${scriptdir}/default.cfg"

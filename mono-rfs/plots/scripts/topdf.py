@@ -32,6 +32,7 @@ from matplotlib import rcParams
 import numpy as np
 import math
 import os, sys
+import re
 import bisect
 
 rcParams['axes.labelsize']  = 9
@@ -56,8 +57,48 @@ labels = {"map":     "OSPA map error",
 def formatlegend(legend):
 	legend = legend.replace("phd", "PHD")
 	legend = legend.replace("isam", "iSAM")
+	legend = legend.replace("nopre", " (no preprocessing)")
+	legend = legend.replace("known", " (known association)")
 	legend = legend.replace("odometry", "Odometry")
+	legend = legend.replace("stat", "PHD, Config ")
+	legend = legend.replace("-spatial", " (spatial)")
+	legend = re.sub(r"p(?P<count>[0-9]+)", r"PHD, p = \1", legend)
 	return legend
+
+def getstyle(legend):
+	
+	style = "-k"
+	
+	if "phd" in legend:
+		style = "-b"
+	elif "odometry" in legend:
+		style = "-k"
+	elif "isam" in legend:
+		style = "-r"
+		
+		if "nopre" in legend:
+			style = "-c"
+		elif "known" in legend:
+			style = "-g"
+	elif "p2000" in legend:
+		style = "-b"
+	elif "p800" in legend:
+		style = "-r"
+	elif "p100" in legend:
+		style = "-g"
+	elif "p20" in legend:
+		style = "-c"
+	elif "stat1" in legend:
+		style = "-b"
+	elif "stat2" in legend:
+		style = "-r"
+	elif "stat3" in legend:
+		style = "-g"
+	
+	if "spatial" in legend:
+		style = "-" + style
+	
+	return style
 
 def readtags(tagfile):
 	with open(tagfile) as file:
@@ -114,7 +155,8 @@ def parsefiles(directory):
 			if not filedata[highlevel].has_key(sublevel):
 				filedata[highlevel][sublevel] = []
 			
-			filedata[highlevel][sublevel].append({"legend": formatlegend(legend), "data": np.loadtxt(os.path.join(directory, fn))})
+			filedata[highlevel][sublevel].append({"legend": formatlegend(legend), "style": getstyle(legend),
+			                                      "data": np.loadtxt(os.path.join(directory, fn))})
 	
 	return (filedata, tagdata)
 
@@ -135,7 +177,7 @@ def filterdata(filedata):
 			if realsize["data"][-1, 1] > 0:
 				rsdata = realsize["data"]
 		
-		filtered["size"][""].append({"legend": "Real size", "data": rsdata})
+		filtered["size"][""].append({"legend": "Real size", "style": getstyle("real"), "data": rsdata})
 		
 		filtered.pop("realsize", None)
 		
@@ -149,7 +191,8 @@ def filterdata(filedata):
 		
 		for sublayer in filtered["loc"]:
 			filtered["pathlen"][sublayer] = filtered["loc"][sublayer][:]
-			filtered["pathlen"][sublayer].append({"legend": "Real trajectory arclength", "data": pldata})
+			filtered["pathlen"][sublayer].append({"legend": "Real trajectory arclength", "style": getstyle("arclength"),
+			                                      "data": pldata})
 	
 	return filtered
 
@@ -165,12 +208,8 @@ def plot(layers, tags, axes, label, outfile):
 			mp.annotate(xy=(tag[0], ymax), s=tag[1], color=color, fontsize=5, family="sans-serif",
 				xycoords='data', xytext=(1, -2), textcoords='offset points', rotation="vertical", verticalalignment="top")
 	
-	styles  = ["-b", "-g", "-r", "-k", "-c", "--b", "--g", "--r", "--k", "--c"]
-	i       = 0
-	
 	for layer in layers:
-		mp.plot(layer["data"][:, 0], layer["data"][:, 1], styles[i], label = layer["legend"])
-		i = i + 1
+		mp.plot(layer["data"][:, 0], layer["data"][:, 1], layer["style"], label = layer["legend"])
 	
 	mp.xlabel("Time [s]")
 	mp.ylabel(label)
@@ -191,8 +230,15 @@ def plotfiles(filedata, tags, directory):
 		ymin = float("inf")
 		ymax = float("-inf")
 		
+		sortedlevels = {}
+		
+		numregex = re.compile(r"([0-9]+)")
+		
 		for sublevel in filedata[highlevel]:
-			sortedlayers = sorted(filedata[highlevel][sublevel], key= lambda x: x["legend"])
+			# use a natural sort on the legend, i.e. A = a, a < b, p20 < p100 < p800 < p2000
+			sortedlayers = sorted(filedata[highlevel][sublevel], key= lambda x: [int(text) if text.isdigit() else text.lower()
+			                                                                         for text in re.split(numregex, x["legend"])])
+			sortedlevels[sublevel] = sortedlayers
 			for layer in sortedlayers:
 				data = layer["data"]
 				xmin = min(xmin, min(data[:, 0]))
@@ -207,9 +253,9 @@ def plotfiles(filedata, tags, directory):
 		index = bisect.bisect(levels, ymax + 1e-5)
 		ymax = levels[index] if index < len(levels) else (50 * (math.floor(ymax / 50) + 1))
 		
-		for sublevel in filedata[highlevel]:
+		for sublevel in sortedlevels:
 			label = labels.get(highlevel, "Value")
-			plot(filedata[highlevel][sublevel], tags, [xmin, xmax, ymin, ymax], label,
+			plot(sortedlevels[sublevel], tags, [xmin, xmax, ymin, ymax], label,
 			     os.path.join(directory, ".".join(filter(None, (highlevel, sublevel))) + ".pdf"))
 
 def print_usage():

@@ -34,4 +34,8 @@ for cfgfile in ${cfgfiles}; do
 	/opt/monodevelop/bin/mono "${plotter}" -f="${outprefix}${cfgfile}.zip" -c=1 -p=1 -H='timed'
 done
 
+echo "Solving with Odometry"
+/opt/monodevelop/bin/mono "${solver}" -x -i=record -f="${outprefix}${cfgfile0}.zip" -a=odometry -g="${scriptdir}/${cfgfile0}.cfg" -r="${outprefix}odometry.zip"
+/opt/monodevelop/bin/mono "${plotter}" -f="${outprefix}odometry.zip" -c=1 -p=1 -H='timed'
+
 popd >/dev/null
