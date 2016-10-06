@@ -64,7 +64,7 @@ public static class DrawUtils
 			vertices[i] = camera.TransformH(w.Location);
 		}
 
-		graphics.DrawUser2DPolygon(vertices, 0.02f, color, false);
+		graphics.DrawUser2DPolygon(vertices, 0.06f, color, false);
 	}
 }
 }

@@ -411,7 +411,7 @@ public abstract class Vehicle<MeasurerT, PoseT, MeasurementT> : IDisposable
 	/// <param name="camera">Camera 4d transform matrix.</param>
 	public void RenderTrajectory(double[][] camera)
 	{
-		RenderTrajectory(camera, Color.Yellow);
+		RenderTrajectory(camera, Color.Red);
 	}
 
 	/// <summary>
@@ -431,7 +431,7 @@ public abstract class Vehicle<MeasurerT, PoseT, MeasurementT> : IDisposable
 	/// <param name="camera">Camera 4d transform matrix.</param>
 	private void RenderMeasure(double[] measurement, double[][] camera)
 	{
-		const float halflen = 0.06f;
+		const float halflen = 0.08f;
 		
 		Color color =  Color.Crimson;
 
@@ -447,7 +447,7 @@ public abstract class Vehicle<MeasurerT, PoseT, MeasurementT> : IDisposable
 		vertices[0] = new double[3] {measurement[0] - halflen, measurement[1] + halflen, measurement[2]};
 		vertices[1] = new double[3] {measurement[0] + halflen, measurement[1] - halflen, measurement[2]};
 
-		Graphics.DrawUser2DPolygon(vertices, 0.02f, color, true);
+		Graphics.DrawUser2DPolygon(vertices, 0.04f, color, true);
 	}
 
 	/// <summary>
@@ -457,10 +457,10 @@ public abstract class Vehicle<MeasurerT, PoseT, MeasurementT> : IDisposable
 	/// <param name="camera">Camera 4d transform matrix.</param>
 	private void RenderLandmark(double[] landmark, double[][] camera)
 	{
-		const float halflen = 0.024f;
+		const float halflen = 0.04f;
 
-		Color innercolor =  Color.LightGray;
-		Color outercolor =  Color.Black;
+		Color innercolor =  Color.LightGray; innercolor.A = 180;
+		Color outercolor =  Color.Black; outercolor.A = 180;
 
 		landmark = camera.TransformH(landmark);
 
@@ -478,7 +478,7 @@ public abstract class Vehicle<MeasurerT, PoseT, MeasurementT> : IDisposable
 		invertices[3] = new VertexPositionColor(outvertices[2].ToVector3(), innercolor);
 
 		Graphics.DrawUserPrimitives(PrimitiveType.TriangleStrip, invertices, 0, invertices.Length - 2);
-		Graphics.DrawUser2DPolygon(outvertices, 0.02f, outercolor, true);
+		Graphics.DrawUser2DPolygon(outvertices, 0.05f, outercolor, true);
 	}
 
 	/// <summary>

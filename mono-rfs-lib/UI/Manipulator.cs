@@ -571,7 +571,7 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 	{
 		// visualization
 		Graphics.SetRenderTarget(SceneBuffer);
-		Graphics.Clear(Color.DarkSeaGreen);
+		Graphics.Clear(Color.White);
 
 		foreach (EffectPass pass in effect.CurrentTechnique.Passes) {
 			pass.Apply();
@@ -699,7 +699,7 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 
 		vertices[0] = camera.TransformH(from);
 		vertices[1] = camera.TransformH(to);
-		Graphics.DrawUser2DPolygon(vertices, 0.02f, Color.Black);
+		Graphics.DrawUser2DPolygon(vertices, 0.06f, Color.Black);
 
 		double[] delta    = to.Subtract(from);
 		double[] tickunit = tickres.Multiply(delta.Normalize());
@@ -714,11 +714,11 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 		for (int i = 0; i < nticks; i++) {
 			vertices[0] = camera.TransformH(postick);
 			vertices[1] = camera.TransformH(postick.Add(tick));
-			Graphics.DrawUser2DPolygon(vertices, 0.02f, Color.Black);
+			Graphics.DrawUser2DPolygon(vertices, 0.06f, Color.Black);
 
 			vertices[0] = camera.TransformH(negtick);
 			vertices[1] = camera.TransformH(negtick.Add(tick));
-			Graphics.DrawUser2DPolygon(vertices, 0.02f, Color.Black);
+			Graphics.DrawUser2DPolygon(vertices, 0.06f, Color.Black);
 
 			postick = postick.Add(tickunit);
 			negtick = negtick.Subtract(tickunit);
