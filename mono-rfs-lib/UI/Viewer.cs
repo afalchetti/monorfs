@@ -91,18 +91,7 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 	/// <summary>
 	/// Obtain vehicle history that corresponds to the current indexed time.
 	/// </summary>
-	public TimedState VehicleWaypoints
-	{
-		get {
-			TimedState waypoints = new TimedState();
-
-			for (int k = 0; k <= FrameIndex; k++) {
-				waypoints.Add(Trajectory[k]);
-			}
-
-			return waypoints;
-		}
-	}
+	public TimedTrajectory VehicleWaypoints { get; private set; }
 
 	/// <summary>
 	/// Sidebar video filename.
@@ -145,6 +134,12 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 	public bool TagChanged { get; private set; }
 
 	/// <summary>
+	/// True if this is not an interactive session and only screenshot will be produced
+	/// from specifications in the tags.
+	/// </summary>
+	public bool ScreenshotMode { get; private set; }
+
+	/// <summary>
 	/// Construct a visualization from its components.
 	/// </summary>
 	/// <param name="title">Window title.</param>
@@ -158,11 +153,13 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 	/// incrementally with each time step.</param>
 	/// <param name="fps">Frame rate.</param>
 	/// <param name="sidebarfile">Sidebar video filename.</param>
+	/// <param name="screenshotmode">If true, skip to the screenshot tags,
+	/// set the camera, take the shots and close the file.</param>
 	public Viewer(string title,
 	              SimulatedVehicle<MeasurerT, PoseT, MeasurementT> explorer,
 	              TimedState trajectory, TimedTrajectory estimate,
 	              TimedMapModel map, TimedMeasurements measurements, TimedMessage tags,
-	              bool online, double fps, string sidebarfile)
+	              bool online, double fps, string sidebarfile, bool screenshotmode)
 		: base(title, explorer, new FakeNavigator<MeasurerT, PoseT, MeasurementT>(explorer, online), false, fps)
 	{
 		xnavigator   = Navigator as FakeNavigator<MeasurerT, PoseT, MeasurementT>;
@@ -174,10 +171,81 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 		FrameIndex   = 0;
 		TagChanged   = false;
 
+		VehicleWaypoints = new TimedTrajectory();
+
+		if (!xnavigator.Online) {
+			for (int i = 0; i < Trajectory.Count; i++) {
+				TimedState partialtrajectory = new TimedState();
+
+				for (int k = 0; k <= i; k++) {
+					partialtrajectory.Add(Tuple.Create(Trajectory[k].Item1, Trajectory[k].Item2));
+				}
+
+				VehicleWaypoints.Add(Tuple.Create(Trajectory[i].Item1, partialtrajectory));
+			}
+
+			for (int i = VehicleWaypoints.Count; i < Estimate.Count; i++) {
+				VehicleWaypoints.Add(Tuple.Create(Estimate[i].Item1, Trajectory));
+			}
+		}
+		else {
+			for (int i = 0; i < Estimate.Count; i++) {
+				VehicleWaypoints.Add(Tuple.Create(Estimate[i].Item1, Trajectory));
+			}
+		}
+
 		Measurements.Insert(0, Tuple.Create(0.0, new List<double[]>()));
 
 		while (Measurements.Count < map.Count) {
 			Measurements.Add(Tuple.Create(map[Measurements.Count].Item1, new List<double[]>()));
+		}
+
+		ScreenshotMode = screenshotmode;
+
+		if (screenshotmode) {
+			List<int> shotindices = new List<int>();
+
+			foreach (var entry in Tags) {
+				double time = entry.Item1;
+				string tag  = entry.Item2;
+
+				if (tag.StartsWith("screenshot")) {
+					int index = map.BinarySearch(Tuple.Create(time, new Map(3)),
+					                                    new ComparisonComparer<Tuple<double, Map>>(
+					                                    (Tuple<double, Map> a, Tuple<double, Map> b) =>
+					                                        Math.Sign(a.Item1 - b.Item1)));
+
+					if (index != ~Tags.Count) {
+						if (index < 0) {
+							index = ~index;
+						}
+
+						if (Math.Abs(map[index].Item1 - time) < 1e-5) {
+							shotindices.Add(index);
+						}
+					}
+				}
+			}
+
+			trajectory    = new TimedState();
+			estimate      = new TimedTrajectory();
+			map           = new TimedMapModel();
+			measurements  = new TimedMeasurements();
+			var waypoints = new TimedTrajectory();
+
+			foreach (int index in shotindices) {
+				trajectory  .Add(Trajectory      [index]);
+				estimate    .Add(Estimate        [index]);
+				map         .Add(Map             [index]);
+				measurements.Add(Measurements    [index]);
+				waypoints   .Add(VehicleWaypoints[index]);
+			}
+
+			Trajectory       = trajectory;
+			Estimate         = estimate;
+			Map              = map;
+			Measurements     = measurements;
+			VehicleWaypoints = waypoints;
 		}
 
 		mapindices = new int[estimate.Count];
@@ -211,12 +279,14 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 	/// i.e. the smooth history may change retroactively from future knowledge. Note however that the
 	/// recorded vehicle may not support smoothing and may perform the same in both modes.
 	/// Note also that this is not the algorithm mode, only the visualization; the algorithm
-	/// could still take past information into account, but it won't be visualized.</param> 
+	/// could still take past information into account, but it won't be visualized.</param>
+	/// <param name="screenshotmode">If true, skip to the screenshot tags,
+	/// set the camera, take the shots and close the file.</param>
 	/// <param name="tmpdir">Temporary data directory, to be removed after use.</param>
 	/// <returns>Prepared visualization object.</returns>
 	/// <remarks>All file must be previously sorted by time value. This property is assumed.</remarks>
 	public static Viewer<MeasurerT, PoseT, MeasurementT> FromFiles(string datafile, bool filterhistory,
-	                                                               out string tmpdir)
+	                                                               bool screenshotmode, out string tmpdir)
 	{
 		tmpdir         = Util.TemporaryDir();
 		string datadir = Path.Combine(tmpdir, "data");
@@ -292,7 +362,7 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 
 		return new Viewer<MeasurerT, PoseT, MeasurementT>("monorfs - viewing " + datafile, explorer,
 		                                                  trajectory, estimate, map, measurements, tags,
-		                                                  online, 30, sidebarfile);
+		                                                  online, 30, sidebarfile, screenshotmode);
 	}
 
 	/// <summary>
@@ -347,6 +417,11 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 	protected override void Update(GameTime time, KeyboardState keyboard, KeyboardState prevkeyboard, double multiplier)
 	{
 		if (FrameIndex >= Estimate.Count) {
+			if (ScreenshotMode) {
+				Exit();
+				return;
+			}
+
 			FrameIndex = Estimate.Count - 1;
 			Paused     = true;
 		}
@@ -358,7 +433,7 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 		bool speedup = keyboard.IsKeyDown(Keys.LeftShift);
 
 		preframeindex        = FrameIndex;
-		Explorer .WayPoints  = (xnavigator.Online) ? VehicleWaypoints : Trajectory;
+		Explorer .WayPoints  = VehicleWaypoints[FrameIndex].Item2;
 		Explorer .Pose       = new PoseT().FromState(Explorer.WayPoints[Explorer.WayPoints.Count - 1].Item2);
 		xnavigator.MapModel  = Map[mapindices[FrameIndex]].Item2;
 		xnavigator.WayTrajectories[0] = Estimate[FrameIndex];
@@ -395,39 +470,62 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 		}
 
 		Message = string.Format("time = {0,12:N4}        frame = {1,5:N0}", viewtime, FrameIndex);
-		
-		// frame-by-frame fine time lookup, reverse
-		if (keyboard.IsKeyDown(Keys.Q) && !prevkeyboard.IsKeyDown(Keys.Q)) {
-			FrameIndex -= (speedup) ? 8 : 1;
-			Paused      = true;
-		}
-		
-		// frame-by-frame, forward
-		if (keyboard.IsKeyDown(Keys.W) && !prevkeyboard.IsKeyDown(Keys.W)) {
-			FrameIndex += (speedup) ? 8 : 1;
-			Paused      = true;
-		}
 
-		// normal speed, reverse
-		if (keyboard.IsKeyDown(Keys.A)) {
-			FrameIndex -= (speedup) ? 8 : 1;
-			Paused      = true;
-		}
+		if (ScreenshotMode) {
+			// tag format: "screenshot theta_value phi_value zoom_value"
+			// e.g.        "screenshot 12 -0.4 0.97"
 
-		// normal speed, forward
-		if (keyboard.IsKeyDown(Keys.S)) {
-			Paused = false;
-		}
+			if (TagMessage.StartsWith("screenshot")) {
+				double[] parameters = FileParser.ParseDoubleList(TagMessage.Substring("screenshot".Length));
 
-		// add a new tag
-		if (keyboard.IsKeyDown(Keys.G) && !prevkeyboard.IsKeyDown(Keys.G)) {
-			Tags.Add(Tuple.Create(viewtime, "User tag"));
-			Tags.Sort();
-			TagChanged = true;
-		}
+				if (parameters.Length == 3) {
+					double theta = parameters[0];
+					double phi   = parameters[1];
+					double zoom  = parameters[2];
 
-		if (!Paused) {
-			FrameIndex += (speedup) ? 8 : 1;
+					SetCamera(theta, phi, zoom);
+					Draw(time);
+
+					Screenshot();
+				}
+			}
+
+			FrameIndex++;
+		}
+		else {
+			// frame-by-frame fine time lookup, reverse
+			if (keyboard.IsKeyDown(Keys.Q) && !prevkeyboard.IsKeyDown(Keys.Q)) {
+				FrameIndex -= (speedup) ? 8 : 1;
+				Paused      = true;
+			}
+			
+			// frame-by-frame, forward
+			if (keyboard.IsKeyDown(Keys.W) && !prevkeyboard.IsKeyDown(Keys.W)) {
+				FrameIndex += (speedup) ? 8 : 1;
+				Paused      = true;
+			}
+
+			// normal speed, reverse
+			if (keyboard.IsKeyDown(Keys.A)) {
+				FrameIndex -= (speedup) ? 8 : 1;
+				Paused      = true;
+			}
+
+			// normal speed, forward
+			if (keyboard.IsKeyDown(Keys.S)) {
+				Paused = false;
+			}
+
+			// add a new tag
+			if (keyboard.IsKeyDown(Keys.G) && !prevkeyboard.IsKeyDown(Keys.G)) {
+				Tags.Add(Tuple.Create(viewtime, "User tag"));
+				Tags.Sort();
+				TagChanged = true;
+			}
+
+			if (!Paused) {
+				FrameIndex += (speedup) ? 8 : 1;
+			}
 		}
 	}
 	

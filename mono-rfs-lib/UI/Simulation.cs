@@ -578,8 +578,9 @@ public class Simulation<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT,
 				autocmd  = Commands[commandindex];
 				odometry = Explorer.Pose.AddKeyboardInput(autocmd, keycmd);
 
-				// the extra parameter, if any, can force slam or mapping
+				// extra parameters
 				if (autocmd.Length > OdoSize) {
+					// the first can force slam or mapping
 					if (autocmd[OdoSize] > 0) {
 						forceslam    = true;
 						forcemapping = false;
@@ -589,6 +590,23 @@ public class Simulation<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT,
 						forcemapping = true;
 					}
 					// else, autocmd[OdoSize] == 0, do nothing
+
+					// the second takes a screenshot; if "true"
+					// the next three components specify the camera angles and zoom
+					// for the screenshot
+					// this is unavailable in headless mode because of the lack of a graphics context
+					// to draw the image
+					if (Graphics != null && autocmd.Length > OdoSize + 1 && autocmd[OdoSize + 1] > 0) {
+						double theta = autocmd[OdoSize + 2];
+						double phi   = autocmd[OdoSize + 3];
+						double zoom  = autocmd[OdoSize + 4];
+
+						SetCamera(theta, phi, zoom);
+
+						// the new camera will not take effect until the scene is redrawn
+						Draw(time);
+						Screenshot();
+					}
 				}
 
 				commandindex++;

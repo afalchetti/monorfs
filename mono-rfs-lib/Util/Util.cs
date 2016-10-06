@@ -32,6 +32,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 using AForge;
 using AForge.Math.Random;
@@ -279,6 +280,62 @@ public static class Util
 		Directory.CreateDirectory(dir);
 
 		return dir;
+	}
+
+	/// <summary>
+	/// Save a texture to file (workaround for
+	/// unimplemented texture.SaveAsPng method).
+	/// </summary>
+	/// <param name="frame">Texture.</param>
+	/// <param name="stream">Output stream.</param>
+	public static void SaveAsPng(Texture2D frame, Stream stream)
+	{
+		int width  = frame.Width;
+		int height = frame.Height;
+
+		int    blocksize    = 3;
+		double invblockarea = 1.0 / (blocksize * blocksize);
+		int    subwidth     = width / blocksize;
+		int    subheight    = height / blocksize;
+
+		Color[]      data        = new Color[height * width];
+		Bgr<byte>[,] oversampled = new Bgr<byte>[height, width];
+		Bgr<byte>[,] bitmap      = new Bgr<byte>[subheight, subwidth];
+
+		frame.GetData(data);
+
+		int h = 0;
+		for (int k = 0; k < height; k++) {
+		for (int i = 0; i < width;  i++) {
+			oversampled[k, i] = new Bgr<byte>(data[h].B, data[h].G, data[h].R);
+			h++;
+		}
+		}
+
+		for (int k = 0, kover = 0; k < subheight; k++, kover += blocksize) {
+		for (int i = 0, iover = 0; i < subwidth;  i++, iover += blocksize) {
+			double b = 0;
+			double g = 0;
+			double r = 0;
+
+			for (int kb = 0; kb < blocksize; kb++) {
+			for (int ib = 0; ib < blocksize; ib++) {
+				Bgr<byte> value = oversampled[kover + kb, iover + ib];
+				b += value.B;
+				g += value.G;
+				r += value.R;
+			}
+			}
+		
+			bitmap[k, i] = new Bgr<byte>((byte)(b * invblockarea),
+			                             (byte)(g * invblockarea),
+			                             (byte)(r * invblockarea));
+		}
+		}
+
+		byte[] bytes = bitmap.EncodeAsPng(9);
+
+		stream.Write(bytes, 0, bytes.Length);
 	}
 
 	/// <summary>

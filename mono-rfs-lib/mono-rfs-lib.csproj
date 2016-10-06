@@ -139,6 +139,7 @@
     <Compile Include="BaseStructures\Measurements\LinearMeasurement2D.cs" />
     <Compile Include="BaseStructures\Measurers\Linear2DMeasurer.cs" />
     <Compile Include="Test\PHDNavigatorTest.cs" />
+    <Compile Include="Util\ComparisonComparer.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

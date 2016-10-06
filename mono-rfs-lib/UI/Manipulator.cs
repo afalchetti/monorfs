@@ -28,6 +28,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 
 using Accord.Math;
 
@@ -225,6 +226,19 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 	public const int TransitionFrames = 30;
 
 	/// <summary>
+	/// Output directory/filename for saving screenshots;
+	/// a number and an extension will be appended for each screenshot taken,
+	/// so "dir/file" becomes "dir/file1.png", "dir/file2.png" and so on.
+	/// It defaults to "MY_PICTURES_FOLDER/monorfs"
+	/// </summary>
+	public string ScreenshotPrefix { get; set; }
+
+	/// <summary>
+	/// Number of screenshots taken so far.
+	/// </summary>
+	private int screenshotcount = 0;
+
+	/// <summary>
 	/// Text message displayed next to the rendered simulation. 
 	/// </summary>
 	public string Message { get; protected set; }
@@ -327,6 +341,8 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 		SidebarWidth  = (Explorer.HasSidebar) ? 640 : 1;
 		SidebarHeight = (Explorer.HasSidebar) ? 2 * 480 : 1;
 
+		ScreenshotPrefix = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "monorfs");
+
 		FrameElapsed = new TimeSpan((long) (10000000/fps));
 		Message      = "";
 		messagepos   = new Vector2(350, graphicsManager.PreferredBackBufferHeight - 30);
@@ -396,7 +412,7 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 
 		SideDest.X += (int) (graphicsManager.PreferredBackBufferWidth * ScreenCut);
 		
-		SceneBuffer = new RenderTarget2D(Graphics, 2 * SceneDest.Width, 2 * SceneDest.Height,
+		SceneBuffer = new RenderTarget2D(Graphics, 6 * SceneDest.Width, 6 * SceneDest.Height,
 		                                 false, SurfaceFormat.Color, DepthFormat.Depth16,
 		                                 0, RenderTargetUsage.DiscardContents);
 
@@ -479,6 +495,9 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 			Exit();
 			return;
 		}
+		if (keyboard.IsKeyDown(Keys.Z)) {
+			Screenshot();
+		}
 
 		if (keyboard.IsKeyDown(Keys.Up) && !alt) {
 			dcamphi += 0.06 * multiplier;
@@ -513,10 +532,9 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 			targetreached = !targetupdater.MoveNext();
 		}
 
-		camtheta += dcamtheta;
-		camphi    = Math.Max(-Math.PI/2 + 0.01, Math.Min(Math.PI/2 - 0.01, camphi + dcamphi));
-		camzoom   = Math.Max(0.01, Math.Min(100.0, camzoom * (1 + dcamzoom)));
-		camera    = MatrixExtensions.AngleDistanceCamera(camtarget, camtheta, camphi, camzoom);
+		SetCamera(camtheta + dcamtheta,
+		          Math.Max(-Math.PI/2 + 0.01, Math.Min(Math.PI/2 - 0.01, camphi + dcamphi)),
+		          Math.Max(0.01, Math.Min(100.0, camzoom * (1 + dcamzoom))));
 
 		Update(new GameTime(simtime.TotalGameTime, simtime.ElapsedGameTime), keyboard, prevkeyboard, multiplier);
 
@@ -562,6 +580,16 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 			RenderHUD(camera);
 		}
 
+		Flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
+		           DepthStencilState.Default, RasterizerState.CullNone);
+
+		double limit = Config.AxisLimit;
+		renderAxisAnnotations(new double[3] {-limit, 0, 0}, new double[3] {+limit, 0, 0}, 5);
+		renderAxisAnnotations(new double[3] {0, -limit, 0}, new double[3] {0, +limit, 0}, 5);
+		renderAxisAnnotations(new double[3] {0, 0, -limit}, new double[3] {0, 0, +limit}, 5);
+
+		Flip.End();
+
 		// sidebar
 		Graphics.SetRenderTarget(SideBuffer);
 		Graphics.Clear(Color.Black);
@@ -589,14 +617,39 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 		Flip.DrawString(font, Message,    messagepos,    Color.White);
 		Flip.DrawString(font, TagMessage, TagMessagePos, TagColor);
 		
-		double limit = Config.AxisLimit;
-		renderAxisAnnotations(new double[3] {-limit, 0, 0}, new double[3] {+limit, 0, 0}, 5);
-		renderAxisAnnotations(new double[3] {0, -limit, 0}, new double[3] {0, +limit, 0}, 5);
-		renderAxisAnnotations(new double[3] {0, 0, -limit}, new double[3] {0, 0, +limit}, 5);
+		//double limit = Config.AxisLimit;
+		//renderAxisAnnotations(new double[3] {-limit, 0, 0}, new double[3] {+limit, 0, 0}, 5);
+		//renderAxisAnnotations(new double[3] {0, -limit, 0}, new double[3] {0, +limit, 0}, 5);
+		//renderAxisAnnotations(new double[3] {0, 0, -limit}, new double[3] {0, 0, +limit}, 5);
 		
 		Flip.End();
 
 		base.Draw(time);
+	}
+
+	/// <summary>
+	/// Take a screenshot of the currently shown scene.
+	/// </summary>
+	public void Screenshot()
+	{
+		using (var file = new FileStream(ScreenshotPrefix + (screenshotcount + 1) + ".png", FileMode.Create)) {
+			Util.SaveAsPng(SceneBuffer, file);
+			screenshotcount++;
+		}
+	}
+
+	/// <summary>
+	/// Change the camera settings.
+	/// </summary>
+	/// <param name="theta">Ground angle.</param>
+	/// <param name="phi">Elevation angle.</param>
+	/// <param name="zoom">Zoom factor.</param>
+	public void SetCamera(double theta, double phi, double zoom)
+	{
+		camtheta = theta;
+		camphi   = phi;
+		camzoom  = zoom;
+		camera   = MatrixExtensions.AngleDistanceCamera(camtarget, theta, phi, zoom);
 	}
 
 	/// <summary>
@@ -680,7 +733,7 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 	/// <param name="tickres">Tick resolution; how often to annotate the axis.</param>
 	private void renderAxisAnnotations(double[] from, double[] to, double tickres)
 	{
-		double[] delta    = to.Subtract(from);
+		double[] delta = to.Subtract(from);
 
 		// if too small, don't annotate anything (otherwise it will just be a mess)
 		double[] proj = camera.TransformH(delta).Submatrix(0, 1);
@@ -697,9 +750,11 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 		double[] postick = zero.Add(tickunit);
 		double[] negtick = zero.Subtract(tickunit);
 
-		float a = SceneDest.Width / (MapClip[1] - MapClip[0]);
-		float x = SceneDest.Center.X;
-		float y = SceneDest.Center.Y;
+		float a = SceneBuffer.Width / (MapClip[1] - MapClip[0]);
+		float x = SceneBuffer.Width / 2;
+		float y = SceneBuffer.Height / 2;
+
+		float scale = 12.0f;
 
 		for (int i = 1; i <= nticks; i++) {
 			double[] ppos = camera.TransformH(postick);
@@ -709,21 +764,21 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 			Vector2 n = new Vector2(a * (float) npos[0] + x, a * (float) -npos[1] + y);
 
 			string ptext  = (tickres * i).ToString("F0");
-			Vector2 psize = font.MeasureString(ptext);
+			Vector2 psize = font.MeasureString(ptext) * scale;
 
 			string ntext  = (-tickres * i).ToString("F0");
-			Vector2 nsize = font.MeasureString(ntext);
+			Vector2 nsize = font.MeasureString(ntext) * scale;
 
-			p.X = p.X - psize.X / 2 - 7;
-			n.X = n.X - nsize.X / 2 - 7;
+			p.X = p.X - psize.X / 2 - 7 * scale;
+			n.X = n.X - nsize.X / 2 - 7 * scale;
 
-			if (SceneDest.Contains(new Rectangle((int) p.X, (int) p.Y, 15, 20))) {
+			if (SceneBuffer.Bounds.Contains(new Rectangle((int) p.X, (int) p.Y, (int) (15 * scale), (int) (20 * scale)))) {
 
-				Flip.DrawString(font, ptext, p, Color.Black);
+				Flip.DrawString(font, ptext, p, Color.Black, 0, new Vector2(0, 0), scale, SpriteEffects.None, 0);
 			}
 
-			if (SceneDest.Contains(new Rectangle((int) n.X, (int) n.Y, 15, 20))) {
-				Flip.DrawString(font, ntext, n, Color.Black);
+			if (SceneBuffer.Bounds.Contains(new Rectangle((int) n.X, (int) n.Y, (int) (15 * scale), (int) (20 * scale)))) {
+				Flip.DrawString(font, ntext, n, Color.Black, 0, new Vector2(0, 0), scale, SpriteEffects.None, 0);
 			}
 
 			postick = postick.Add(tickunit);

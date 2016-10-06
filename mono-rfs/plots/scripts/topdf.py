@@ -203,6 +203,9 @@ def plot(layers, tags, axes, label, outfile):
 	
 	if tags is not None:
 		for tag in tags:
+			if tag[1].startswith("screenshot"):  # these tags are not interesting
+				continue
+			
 			color = "#ff2222" if tag[1].startswith("!") else "#bbbbbb"
 			mp.axvline(tag[0], color=color, linewidth=0.5)
 			mp.annotate(xy=(tag[0], ymax), s=tag[1], color=color, fontsize=5, family="sans-serif",
