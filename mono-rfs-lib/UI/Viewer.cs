@@ -287,8 +287,8 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 		//      if ambiguities arise, adding a command line flag could force it
 		//      instead of guessing from the text structure (though the edge cases
 		//      are pretty uninteresting)
-		bool online = (estimate[1].Item2.Count < estimate[estimate.Count - 1].Item2.Count &&
-		               estimate.Count == trajectory.Count);
+		bool online = !((estimate[1].Item2.Count < estimate[estimate.Count - 1].Item2.Count &&
+		               estimate.Count == trajectory.Count));
 
 		return new Viewer<MeasurerT, PoseT, MeasurementT>("monorfs - viewing " + datafile, explorer,
 		                                                  trajectory, estimate, map, measurements, tags,

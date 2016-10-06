@@ -571,7 +571,7 @@ public class Simulation<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT,
 		double[] odometry = Explorer.Pose.AddKeyboardInput(autocmd, keycmd);
 		
 		if (Paused) {
-			Explorer.Pose = Explorer.Pose.Add(odometry);
+			Explorer.Pose = Explorer.Pose.AddOdometry(odometry);
 		}
 		else {
 			if (commandindex < Commands.Count) {
