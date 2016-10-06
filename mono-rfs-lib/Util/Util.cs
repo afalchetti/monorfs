@@ -301,10 +301,10 @@ public static class Util
 
 				int h = 0;
 				for (int k = 0; k < height; k++) {
-					for (int i = 0; i < width;  i++) {
-						bitmap[k, i] = new Bgr<byte>(frame[h].B, frame[h].G, frame[h].R);
-						h++;
-					}
+				for (int i = 0; i < width;  i++) {
+					bitmap[k, i] = new Bgr<byte>(frame[h].B, frame[h].G, frame[h].R);
+					h++;
+				}
 				}
 
 				writer.Write(bitmap.Lock());
@@ -346,6 +346,50 @@ public static class Util
 		File.WriteAllLines(filename, dpose.ConvertAll(dp => dp.ToString("g12")));
 
 		return pose0;
+	}
+
+	/// <summary>
+	/// Interpolate a trajectory in new time points.
+	/// </summary>
+	/// <param name="trajectory">Original trajectory.</param>
+	/// <param name="times">New time points (must be non-negative and in ascending order).</param>
+	/// <returns>Interpolated trajectory.</returns>
+	public static TimedState InterpolateTrajectory<PoseT>(TimedState trajectory, List<double> times)
+		where PoseT : IPose<PoseT>, new()
+	{
+		PoseT  dummy = new PoseT();
+		double time  = 0;
+		double ptime = -1;
+		PoseT  pose  = dummy.FromState(trajectory[0].Item2);
+		PoseT  ppose = dummy.FromState(trajectory[0].Item2);
+		int    k     = 0;
+
+		TimedState interpolated = new TimedState();
+
+		foreach (double itime in times) {
+			while (k < trajectory.Count && trajectory[k].Item1 < itime) {
+				ptime = trajectory[k].Item1;
+				ppose = dummy.FromState(trajectory[k].Item2);
+
+				k++;
+			}
+
+			if (k < trajectory.Count) {
+				time = trajectory[k].Item1;
+				pose = dummy.FromState(trajectory[k].Item2);
+			}
+			else {
+				time = double.PositiveInfinity;
+				pose = dummy.FromState(trajectory[trajectory.Count - 1].Item2);
+			}
+
+			double alpha = (itime - ptime) / (time - ptime);
+			PoseT  ipose = ppose.Add(alpha.Multiply(pose.Subtract(ppose)));
+
+			interpolated.Add(Tuple.Create(itime, ipose.State));
+		}
+
+		return interpolated;
 	}
 }
 }
