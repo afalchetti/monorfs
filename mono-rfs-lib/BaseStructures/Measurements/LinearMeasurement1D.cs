@@ -1,8 +1,8 @@
-﻿// LinearMeasurement2D.cs
-// Measurement structure consisting in the 2D coordinate differences
+﻿// LinearMeasurement1D.cs
+// Measurement structure consisting in 1D coordinate differences
 // Part of MonoRFS
 //
-// Copyright (c) 2015, Angelo Falchetti
+// Copyright (c) 2015-2016, Angelo Falchetti
 // All rights reserved.
 // 
 // Redistribution and use in source and binary forms, with or without
@@ -31,11 +31,11 @@ using System;
 namespace monorfs
 {
 /// <summary>
-/// Measurement structure consisting in (dx, dy) differences.
+/// Measurement structure consisting in a dx coordinate difference.
 /// </summary>
-public class LinearMeasurement2D : IMeasurement<LinearMeasurement2D>
+public class LinearMeasurement1D : IMeasurement<LinearMeasurement1D>
 {
-	public static LinearMeasurement2D Zero { get; private set; }
+	public static LinearMeasurement1D Zero { get; private set; }
 
 	/// <summary>
 	/// Pixel x-coordinate difference.
@@ -43,41 +43,33 @@ public class LinearMeasurement2D : IMeasurement<LinearMeasurement2D>
 	public double X { get; set; }
 
 	/// <summary>
-	/// Pixel y-coordinate difference.
-	/// </summary>
-	public double Y { get; set; }
-
-	/// <summary>
 	/// Number of measurement coordinates.
 	/// </summary>
-	public int Size { get { return 2; } }
+	public int Size { get { return 1; } }
 
 	/// <summary>
 	/// Global constants initialization.
 	/// </summary>
-	static LinearMeasurement2D()
+	static LinearMeasurement1D()
 	{
-		Zero = new LinearMeasurement2D(0, 0);
+		Zero = new LinearMeasurement1D(0);
 	}
 
 	/// <summary>
-	/// Construct a new LinearMeasurement2D from its scalar components.
+	/// Construct a new LinearMeasurement1D from its scalar components.
 	/// </summary>
 	/// <param name="dx">Pixel x coordinate difference.</param>
-	/// <param name="dy">Pixel y coordinate difference.</param>
-	public LinearMeasurement2D(double dx, double dy)
+	public LinearMeasurement1D(double dx)
 	{
 		X = dx;
-		Y = dy;
 	}
 
 	/// <summary>
-	/// Construct a new default (zero) LinearMeasurement2D.
+	/// Construct a new default (zero) LinearMeasurement1D.
 	/// </summary>
-	public LinearMeasurement2D()
+	public LinearMeasurement1D()
 	{
 		X = 0;
-		Y = 0;
 	}
 
 	/// <summary>
@@ -86,7 +78,7 @@ public class LinearMeasurement2D : IMeasurement<LinearMeasurement2D>
 	/// <returns>Local representation.</returns>
 	public double[] ToLinear()
 	{
-		return new double[2] {X, Y};
+		return new double[1] {X};
 	}
 
 	/// <summary>
@@ -94,21 +86,21 @@ public class LinearMeasurement2D : IMeasurement<LinearMeasurement2D>
 	/// </summary>
 	/// <param name="linear">Linear representation.</param>
 	/// <returns>Measurement.</returns>
-	public LinearMeasurement2D FromLinear(double[] linear)
+	public LinearMeasurement1D FromLinear(double[] linear)
 	{
-		if (linear == null || linear.Length != 2) {
+		if (linear == null || linear.Length != 1) {
 			throw new ArgumentException("Linear representation must contain " +
-			                            "exactly two values: (dx, dy).");
+			                            "exactly one value: (dx).");
 		}
 
-		return new LinearMeasurement2D(linear[0], linear[1]);
+		return new LinearMeasurement1D(linear[0]);
 	}
 
 	/// <summary>
-	/// Get a zero measurement, with dx = dy = 0.
+	/// Get a zero measurement, with dx = 0.
 	/// </summary>
 	/// <returns>Zero measurement.</returns>
-	public LinearMeasurement2D ZeroM()
+	public LinearMeasurement1D ZeroM()
 	{
 		return Zero;
 	}
@@ -129,7 +121,7 @@ public class LinearMeasurement2D : IMeasurement<LinearMeasurement2D>
 	/// <returns>Simulated vehicle descriptor string.</returns>
 	public string ToString(string format)
 	{
-		return "(" + X.ToString(format) + ", " + Y.ToString(format) + ")";
+		return "(" + X.ToString(format) + ")";
 	}
 }
 }

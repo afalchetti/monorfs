@@ -1,8 +1,8 @@
-﻿// Linear2DMeasurer.cs
-// Very simple 2D measurer
+﻿// Linear1DMeasurer.cs
+// Very simple 1D measurer
 // Part of MonoRFS
 //
-// Copyright (c) 2015, Angelo Falchetti
+// Copyright (c) 2015-2016, Angelo Falchetti
 // All rights reserved.
 // 
 // Redistribution and use in source and binary forms, with or without
@@ -38,9 +38,9 @@ namespace monorfs
 {
 /// <summary>
 /// Measuring and related methods and configurations for
-/// a very simple LinearPose2D + LinearMeasurement2D combination.
+/// a very simple LinearPose1D + LinearMeasurement1D combination.
 /// </summary>
-public class Linear2DMeasurer : IMeasurer<Linear2DMeasurer, LinearPose2D, LinearMeasurement2D>
+public class Linear1DMeasurer : IMeasurer<Linear1DMeasurer, LinearPose1D, LinearMeasurement1D>
 {
 	/// <summary>
 	/// Sizes for the visibility ramp, one per measurement-space coordinate;
@@ -50,21 +50,21 @@ public class Linear2DMeasurer : IMeasurer<Linear2DMeasurer, LinearPose2D, Linear
 	public static double[] VisibilityRamp { get { return Config.VisibilityRamp; } }
 
 	/// <summary>
-	/// Maximum visible distance (in uniform norm, i.e. a square of 2 * Range around the pose).
+	/// Maximum visible distance (in uniform norm, i.e. a segment of 2 * Range around the pose).
 	/// </summary>
 	public double Range { get; private set; }
 
 	/// <summary>
-	/// Construct a new Linear2DMeasurer object from default camera parameters.
+	/// Construct a new Linear1DMeasurer object from default camera parameters.
 	/// </summary>
-	public Linear2DMeasurer()
+	public Linear1DMeasurer()
 		: this(2.0) {}
 
 	/// <summary>
-	/// Construct a new Linear2DMeasurer object from its camera parameters.
+	/// Construct a new Linear1DMeasurer object from its camera parameters.
 	/// </summary>
 	/// <param name="range">Visible range.</param>
-	public Linear2DMeasurer(double range)
+	public Linear1DMeasurer(double range)
 	{
 		Range = range;
 	}
@@ -83,13 +83,13 @@ public class Linear2DMeasurer : IMeasurer<Linear2DMeasurer, LinearPose2D, Linear
 	/// </summary>
 	/// <param name="linear">Linear representation.</param>
 	/// <returns>Measurer.</returns>
-	public Linear2DMeasurer FromLinear(double[] linear)
+	public Linear1DMeasurer FromLinear(double[] linear)
 	{
 		if (linear.Length != 1) {
 			throw new ArgumentException("Linear representation must have exactly one parameter.");
 		}
 
-		return new Linear2DMeasurer(linear[0]);
+		return new Linear1DMeasurer(linear[0]);
 	}
 
 	/// <summary>
@@ -97,7 +97,7 @@ public class Linear2DMeasurer : IMeasurer<Linear2DMeasurer, LinearPose2D, Linear
 	/// </summary>
 	public double Volume()
 	{
-		return 4 * Range * Range;
+		return 2 * Range;
 	}
 
 	/// <summary>
@@ -107,9 +107,9 @@ public class Linear2DMeasurer : IMeasurer<Linear2DMeasurer, LinearPose2D, Linear
 	/// <param name="pose">Pose from which the measurement was made.</param>
 	/// <param name="landmark">Landmark 3d location against which the measurement is performed.</param>
 	/// <returns>Measurement.</returns>
-	public LinearMeasurement2D MeasurePerfect(LinearPose2D pose, double[] landmark)
+	public LinearMeasurement1D MeasurePerfect(LinearPose1D pose, double[] landmark)
 	{
-		return new LinearMeasurement2D(landmark[0] - pose.X, landmark[1] - pose.Y);
+		return new LinearMeasurement1D(landmark[0] - pose.X);
 	}
 
 	/// <summary>
@@ -118,10 +118,9 @@ public class Linear2DMeasurer : IMeasurer<Linear2DMeasurer, LinearPose2D, Linear
 	/// <param name="pose">Pose from which the measurement was made.</param>
 	/// <param name="landmark">Landmark 3d location against which the measurement is performed.</param>
 	/// <returns>Measurement model linearization jacobian.</returns>
-	public double[][] MeasurementJacobianL(LinearPose2D pose, double[] landmark)
+	public double[][] MeasurementJacobianL(LinearPose1D pose, double[] landmark)
 	{
-		return new double[2][] { new double[3] {1, 0, 0},
-		                         new double[3] {0, 1, 0}};
+		return new double[1][] { new double[3] {1, 0, 0}};
 	}
 
 	/// <summary>
@@ -130,10 +129,9 @@ public class Linear2DMeasurer : IMeasurer<Linear2DMeasurer, LinearPose2D, Linear
 	/// <param name="pose">Pose from which the measurement was made.</param>
 	/// <param name="landmark">Landmark 3d location against which the measurement is performed.</param>
 	/// <returns>Measurement model linearization jacobian.</returns>
-	public double[][] MeasurementJacobianP(LinearPose2D pose, double[] landmark)
+	public double[][] MeasurementJacobianP(LinearPose1D pose, double[] landmark)
 	{
-		return new double[2][] { new double[2] {-1, 0},
-		                         new double[2] {0, -1} };
+		return new double[1][] { new double[1] {-1} };
 	}
 
 	/// <summary>
@@ -143,21 +141,20 @@ public class Linear2DMeasurer : IMeasurer<Linear2DMeasurer, LinearPose2D, Linear
 	/// <param name="measurement">Measurement.</param>
 	/// <param name="landmark">Landmark.</param>
 	/// <returns>Best fit for the landmark-measurement pair.</returns>
-	public LinearPose2D FitToMeasurement(LinearPose2D pose0, LinearMeasurement2D measurement, double[] landmark)
+	public LinearPose1D FitToMeasurement(LinearPose1D pose0, LinearMeasurement1D measurement, double[] landmark)
 	{
-		return new LinearPose2D(new double[2] {landmark[0] - measurement.X, landmark[1] - measurement.Y});
+		return new LinearPose1D(new double[1] {landmark[0] - measurement.X});
 	}
 
 	/// <summary>
 	/// Obtain a noise measurement, uniformly random in the visible area.
 	/// </summary>
 	/// <returns>Random measurement.</returns>
-	public LinearMeasurement2D RandomMeasure()
+	public LinearMeasurement1D RandomMeasure()
 	{
 		double x = Util.Uniform.Next() * 2 * Range - Range;
-		double y = Util.Uniform.Next() * 2 * Range - Range;
 
-		return new LinearMeasurement2D(x, y);
+		return new LinearMeasurement1D(x);
 	}
 
 	/// <summary>
@@ -166,10 +163,9 @@ public class Linear2DMeasurer : IMeasurer<Linear2DMeasurer, LinearPose2D, Linear
 	/// </summary>
 	/// <param name="landmark">Queried landmark in pixel-range coordinates.</param>
 	/// <returns>True if the landmark is visible; false otherwise.</returns>
-	public virtual bool VisibleM(LinearMeasurement2D landmark)
+	public virtual bool VisibleM(LinearMeasurement1D landmark)
 	{
-		return -Range < landmark.X && landmark.X < Range &&
-		       -Range < landmark.Y && landmark.Y < Range;
+		return -Range < landmark.X && landmark.X < Range;
 	}
 
 	/// <summary>
@@ -178,15 +174,12 @@ public class Linear2DMeasurer : IMeasurer<Linear2DMeasurer, LinearPose2D, Linear
 	/// </summary>
 	/// <param name="landmark">Queried landmark in pixel-range coordinates.</param>
 	/// <returns>True if the landmark is visible; false otherwise.</returns>
-	public virtual double FuzzyVisibleM(LinearMeasurement2D landmark)
+	public virtual double FuzzyVisibleM(LinearMeasurement1D landmark)
 	{
 		double minwdistance = double.PositiveInfinity;
 
 		minwdistance = Math.Min(minwdistance, (landmark.X - -Range) / VisibilityRamp[0]);
 		minwdistance = Math.Min(minwdistance, (Range - landmark.X)  / VisibilityRamp[0]);
-
-		minwdistance = Math.Min(minwdistance, (landmark.Y - -Range) / VisibilityRamp[1]);
-		minwdistance = Math.Min(minwdistance, (Range - landmark.Y)  / VisibilityRamp[1]);
 
 		return Math.Max(0, Math.Min(1, minwdistance));
 	}
@@ -197,9 +190,9 @@ public class Linear2DMeasurer : IMeasurer<Linear2DMeasurer, LinearPose2D, Linear
 	/// <param name="pose">Pose from which the measurement was made.</param>
 	/// <param name="measurement">Measurement expressed as pixel-range.</param>
 	/// <returns>Measurement expressed in 3D space.</returns>
-	public double[] MeasureToMap(LinearPose2D pose, LinearMeasurement2D measurement)
+	public double[] MeasureToMap(LinearPose1D pose, LinearMeasurement1D measurement)
 	{
-		return new double[3] {pose.X + measurement.X, pose.Y + measurement.Y, 0};
+		return new double[3] {pose.X + measurement.X, 0, 0};
 	}
 
 	/// <summary>
@@ -208,7 +201,7 @@ public class Linear2DMeasurer : IMeasurer<Linear2DMeasurer, LinearPose2D, Linear
 	/// <param name="graphics">Graphic context.</param>
 	/// <param name="pose">Pose.</param>
 	/// <param name="camera">Camera 4d transform matrix.</param>
-	public void RenderBody(GraphicsDevice graphics, LinearPose2D pose, double[][] camera)
+	public void RenderBody(GraphicsDevice graphics, LinearPose1D pose, double[][] camera)
 	{
 		const float halflen = 0.06f;
 
@@ -240,18 +233,20 @@ public class Linear2DMeasurer : IMeasurer<Linear2DMeasurer, LinearPose2D, Linear
 	/// <param name="graphics">Graphic context.</param>
 	/// <param name="pose">Pose.</param>
 	/// <param name="camera">Camera 4d transform matrix.</param>
-	public void RenderFOV(GraphicsDevice graphics, LinearPose2D pose, double[][] camera)
+	public void RenderFOV(GraphicsDevice graphics, LinearPose1D pose, double[][] camera)
 	{
 		Color incolor  = Color.LightGreen; incolor .A = 30;
 		Color outcolor = Color.DarkGreen;  outcolor.A = 30;
 
+		const double yrange = 0.2;  // fake range just so the frustum is visible
+
 		double[][]            frustum     = new double[4][];
 		VertexPositionColor[] invertices  = new VertexPositionColor[4];
 
-		frustum[0] = camera.TransformH(new double[3] {pose.X - Range, pose.Y - Range, 0});
-		frustum[1] = camera.TransformH(new double[3] {pose.X - Range, pose.Y + Range, 0});
-		frustum[2] = camera.TransformH(new double[3] {pose.X + Range, pose.Y + Range, 0});
-		frustum[3] = camera.TransformH(new double[3] {pose.X + Range, pose.Y - Range, 0});
+		frustum[0] = camera.TransformH(new double[3] {pose.X - Range, 0 - yrange, 0});
+		frustum[1] = camera.TransformH(new double[3] {pose.X - Range, 0 + yrange, 0});
+		frustum[2] = camera.TransformH(new double[3] {pose.X + Range, 0 + yrange, 0});
+		frustum[3] = camera.TransformH(new double[3] {pose.X + Range, 0 - yrange, 0});
 
 		invertices[0] = new VertexPositionColor(frustum[0].ToVector3(), incolor);
 		invertices[1] = new VertexPositionColor(frustum[1].ToVector3(), incolor);

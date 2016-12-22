@@ -178,6 +178,14 @@ public class Program
 
 		try {
 		switch (Config.Model) {
+		case DynamicsModel.Linear1D:
+			Run<Linear1DMeasurer, LinearPose1D, LinearMeasurement1D>(
+			    recfile, scenefile, commandfile,
+			    particlecount, onlymapping, realtime, viewer,
+			    filterhistory, reftime, screenshotmode, headless, noterminate,
+			    input, algorithm);
+			break;
+		
 		case DynamicsModel.Linear2D:
 			Run<Linear2DMeasurer, LinearPose2D, LinearMeasurement2D>(
 			    recfile, scenefile, commandfile,
@@ -185,7 +193,7 @@ public class Program
 			    filterhistory, reftime, screenshotmode, headless, noterminate,
 			    input, algorithm);
 			break;
-
+		
 		case DynamicsModel.PRM3D:
 		default:
 			if (input == VehicleType.Kinect) {

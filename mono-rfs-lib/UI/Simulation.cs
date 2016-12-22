@@ -52,7 +52,7 @@ public enum NavigationAlgorithm { Odometry, PHD, LoopyPHD, ISAM2 }
 /// <summary>
 /// Navigation algorithm.
 /// </summary>
-public enum DynamicsModel { PRM3D, Linear2D }
+public enum DynamicsModel { PRM3D, Linear2D, Linear1D }
 
 /// <summary>
 /// Vehicle input type.
