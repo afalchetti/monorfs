@@ -249,6 +249,11 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 	private SpriteFont font;
 
 	/// <summary>
+	/// Render font for axes.
+	/// </summary>
+	private SpriteFont fontaxis;
+
+	/// <summary>
 	/// Text message position.
 	/// </summary>
 	private Vector2 messagepos;
@@ -394,7 +399,7 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 		Graphics .SamplerStates[0]  = SamplerState.LinearClamp;
 
 		effect            = new BasicEffect(Graphics);
-		effect.Alpha      = 1.0f;
+		effect.Alpha      = 1;
 		effect.View       = Microsoft.Xna.Framework.Matrix.Identity;
 		effect.World      = Microsoft.Xna.Framework.Matrix.Identity;
 		effect.Projection = Microsoft.Xna.Framework.Matrix.CreateOrthographicOffCenter(MapClip[0], MapClip[1], MapClip[2], MapClip[3], -100, 100);
@@ -457,7 +462,8 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 	{
 		Flip          = new SpriteBatch(Graphics);
 		Explorer.Flip = this.Flip;
-		font          = Content.Load<SpriteFont>("pescadero");
+		font          = Content.Load<SpriteFont>("OpenSans");
+		fontaxis      = Content.Load<SpriteFont>("OpenSansLarge");
 	}
 
 	/// <summary>
@@ -573,10 +579,19 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 		Graphics.SetRenderTarget(SceneBuffer);
 		Graphics.Clear(Color.White);
 
+		Graphics .DepthStencilState = DepthStencilState.Default;
+
 		foreach (EffectPass pass in effect.CurrentTechnique.Passes) {
 			pass.Apply();
 			
 			Navigator.Render(camera);
+		}
+		
+		Graphics .DepthStencilState = DepthStencilState.None;
+
+		foreach (EffectPass pass in effect.CurrentTechnique.Passes) {
+			pass.Apply();
+
 			RenderHUD(camera);
 		}
 
@@ -584,9 +599,9 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 		           DepthStencilState.Default, RasterizerState.CullNone);
 
 		double limit = Config.AxisLimit;
-		renderAxisAnnotations(new double[3] {-limit, 0, 0}, new double[3] {+limit, 0, 0}, 5);
-		renderAxisAnnotations(new double[3] {0, -limit, 0}, new double[3] {0, +limit, 0}, 5);
-		renderAxisAnnotations(new double[3] {0, 0, -limit}, new double[3] {0, 0, +limit}, 5);
+		renderAxisAnnotations(new double[3] {-limit, 0, 0}, new double[3] {+limit, 0, 0}, 2, "x [m]", false);
+		renderAxisAnnotations(new double[3] {0, -limit, 0}, new double[3] {0, +limit, 0}, 2, "y [m]", true);
+		renderAxisAnnotations(new double[3] {0, 0, -limit}, new double[3] {0, 0, +limit}, 2, "z [m]", false);
 
 		Flip.End();
 
@@ -731,7 +746,9 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 	/// <param name="from">From here.</param>
 	/// <param name="to">To here.</param>
 	/// <param name="tickres">Tick resolution; how often to annotate the axis.</param>
-	private void renderAxisAnnotations(double[] from, double[] to, double tickres)
+	/// <param name="name">Axis name, written on top the ticks.</param>
+	/// <param name="vertical">This is a vertical axis, so move the anootations to the left.</param>
+	private void renderAxisAnnotations(double[] from, double[] to, double tickres, string name, bool vertical)
 	{
 		double[] delta = to.Subtract(from);
 
@@ -754,7 +771,40 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 		float x = SceneBuffer.Width / 2;
 		float y = SceneBuffer.Height / 2;
 
-		float scale = 12.0f;
+		float scale = 1.5f;
+		float rotangle = (float)(Util.NormalizeAngle(-Math.Atan2(proj[1], proj[0])));
+
+		bool invertoffset = false;
+
+		if (Math.Abs(rotangle) > Math.PI/2 && !vertical) {
+			rotangle    += (float) Math.PI;
+			invertoffset = true;
+		}
+
+		double[] nproj = proj.Normalize();
+
+		if (nproj[0] < 0) {
+			nproj = (-1).Multiply(nproj);
+			invertoffset ^= true;
+		}
+
+		Vector2 t;
+
+		if (vertical) {
+			t = new Vector2((float)(x + 450 * scale * nproj[0] - 350 * nproj[1]),
+			                (float)(y - 450 * scale * nproj[1] - 350 * nproj[0]));
+		}
+		else if (!invertoffset) {
+			t = new Vector2((float)(x + ((name == "x [m]") ? 420 : 600) * scale * nproj[0] + 120 * nproj[1]),
+			                (float)(y - ((name == "x [m]") ? 420 : 600) * scale * nproj[1] + 120 * nproj[0]));
+		}
+		else {
+			t = new Vector2((float)(x + 580 * scale * nproj[0] - 120 * nproj[1]),
+			                (float)(y - 580 * scale * nproj[1] - 120 * nproj[0]));
+		}
+
+		Flip.DrawString(fontaxis, name, t, Color.Black, rotangle,
+		                new Vector2(0, 0), scale, SpriteEffects.None, 0);
 
 		for (int i = 1; i <= nticks; i++) {
 			double[] ppos = camera.TransformH(postick);
@@ -764,21 +814,25 @@ public abstract class Manipulator<MeasurerT, PoseT, MeasurementT> : Game
 			Vector2 n = new Vector2(a * (float) npos[0] + x, a * (float) -npos[1] + y);
 
 			string ptext  = (tickres * i).ToString("F0");
-			Vector2 psize = font.MeasureString(ptext) * scale;
+			Vector2 psize = fontaxis.MeasureString(ptext) * scale;
 
 			string ntext  = (-tickres * i).ToString("F0");
-			Vector2 nsize = font.MeasureString(ntext) * scale;
+			Vector2 nsize = fontaxis.MeasureString(ntext) * scale;
 
-			p.X = p.X - psize.X / 2 - 7 * scale;
-			n.X = n.X - nsize.X / 2 - 7 * scale;
+			p.X = p.X - psize.X / 2;
+			n.X = n.X - nsize.X / 2;
 
-			if (SceneBuffer.Bounds.Contains(new Rectangle((int) p.X, (int) p.Y, (int) (15 * scale), (int) (20 * scale)))) {
-
-				Flip.DrawString(font, ptext, p, Color.Black, 0, new Vector2(0, 0), scale, SpriteEffects.None, 0);
+			if (vertical) {
+				p.X = p.X - psize.X / 2 - 30 * scale;
+				n.X = n.X - nsize.X / 2 - 30 * scale;
 			}
 
-			if (SceneBuffer.Bounds.Contains(new Rectangle((int) n.X, (int) n.Y, (int) (15 * scale), (int) (20 * scale)))) {
-				Flip.DrawString(font, ntext, n, Color.Black, 0, new Vector2(0, 0), scale, SpriteEffects.None, 0);
+			if (SceneBuffer.Bounds.Contains(new Rectangle((int) p.X, (int) p.Y, (int) (psize.X), (int) (psize.Y)))) {
+				Flip.DrawString(fontaxis, ptext, p, Color.Black, 0, new Vector2(0, 0), scale, SpriteEffects.None, 0);
+			}
+
+			if (SceneBuffer.Bounds.Contains(new Rectangle((int) n.X, (int) n.Y, (int) (nsize.X), (int) (nsize.Y)))) {
+				Flip.DrawString(fontaxis, ntext, n, Color.Black, 0, new Vector2(0, 0), scale, SpriteEffects.None, 0);
 			}
 
 			postick = postick.Add(tickunit);

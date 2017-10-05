@@ -1,8 +1,8 @@
 # Output files
-bin/*
-obj/*
-packages/*
-assets/*
+bin
+obj
+packages
+assets
 *.suo
 *.user
 *.userprefs
