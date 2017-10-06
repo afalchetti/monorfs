@@ -517,6 +517,22 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 	/// <summary>
 	/// Calculate the set log-likelihood log(P(Z|X, M)), but do not consider visibility
 	/// (everything is fully visible). This is used to avoid uninteresting solution to the
+	/// optimization problem max_X log(P(Z|X, M)).
+	/// </summary>
+	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
+	/// <param name="map">Map model.</param>
+	/// <param name="pose">Vehicle pose.</param>
+	/// <returns>Set log-likelihood.</returns>
+	public static double QuasiSetLogLikelihood(List<MeasurementT> measurements, IMap map,
+	                                           SimulatedVehicle<MeasurerT, PoseT, MeasurementT> pose)
+	{
+		double[] dummy = null;
+		return quasiSetLogLikelihood(measurements, map, pose, false, out dummy);
+	}
+
+	/// <summary>
+	/// Calculate the set log-likelihood log(P(Z|X, M)), but do not consider visibility
+	/// (everything is fully visible). This is used to avoid uninteresting solution to the
 	/// optimization problem max_X log(P(Z|X, M)). Also gives the pose gradient at the evaluated pose.
 	/// </summary>
 	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
@@ -528,40 +544,86 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 	                                           SimulatedVehicle<MeasurerT, PoseT, MeasurementT> pose,
 	                                           out double[] gradient)
 	{
+		return quasiSetLogLikelihood(measurements, map, pose, true, out gradient);
+	}
+
+	/// <summary>
+	/// Calculate the set log-likelihood log(P(Z|X, M)), but do not consider visibility
+	/// (everything is fully visible). This is used to avoid uninteresting solution to the
+	/// optimization problem max_X log(P(Z|X, M)). Also gives the pose gradient at the evaluated pose.
+	/// </summary>
+	/// <param name="measurements">Sensor measurements in pixel-range form.</param>
+	/// <param name="map">Map model.</param>
+	/// <param name="pose">Vehicle pose.</param>
+	/// <param name="calcgradient">If true, calculate the gradient; otherwise, the gradient param will be null.</param>
+	/// <param name="gradient">Log-likelihood gradient wrt. the pose.</param>
+	/// <returns>Set log-likelihood.</returns>
+	private static double quasiSetLogLikelihood(List<MeasurementT> measurements, IMap map,
+	                                            SimulatedVehicle<MeasurerT, PoseT, MeasurementT> pose,
+	                                            bool calcgradient, out double[] gradient)
+	{
 		// exact calculation if there are few components/measurements;
 		// use the most probable components approximation otherwise
 		SparseMatrix llmatrix = new SparseMatrix(map.Count + measurements.Count, map.Count + measurements.Count, double.NegativeInfinity);
-		var          dlldp    = new SparseMatrix<double[]>(map.Count + measurements.Count, map.Count + measurements.Count, new double[OdoSize]);
+		var          dlldp    = new SparseMatrix<double[]>();
+
+		if (calcgradient) {
+			dlldp = new SparseMatrix<double[]>(map.Count + measurements.Count, map.Count + measurements.Count, new double[OdoSize]);
+		}
 
 		double       logPD      = Math.Log(pose.PD);
 		double       log1PD     = Math.Log(1 - pose.PD);
 		double       logclutter = Math.Log(pose.ClutterDensity);
 		Gaussian[]   zprobs     = new Gaussian[map.Count];
-		double[][][] zjacobians = new double[map.Count][][];
+		double[][][] zjacobians = (calcgradient) ? new double[map.Count][][] : null;
 
 		int n = 0;
 		foreach (Gaussian landmark in map) {
 			MeasurementT m       = pose.Measurer.MeasurePerfect(pose.Pose, landmark.Mean);
 			double[]     mlinear = m.ToLinear();
-			zprobs[n]     = new Gaussian(mlinear, pose.MeasurementCovariance, 1);
-			zjacobians[n] = pose.Measurer.MeasurementJacobianP(pose.Pose, landmark.Mean);
+			zprobs[n]            = new Gaussian(mlinear, pose.MeasurementCovariance, 1);
 			n++;
 		}
-		
-		for (int i = 0; i < zprobs.Length;      i++) {
-		for (int k = 0; k < measurements.Count; k++) {
-			double[] m = measurements[k].ToLinear();
-			double   d = zprobs[i].Mahalanobis(m);
-			if (d < 5) {
-				// prob = log (pD * zprob(measurement))
-				// this way multiplying probabilities equals to adding (negative) profits
-				llmatrix[i, k] = logPD + Math.Log(zprobs[i].Multiplier) - 0.5 * d * d;
-				dlldp   [i, k] = (m.Subtract(zprobs[i].Mean)).Transpose().
-				                     Multiply(zprobs[i].CovarianceInverse).
-				                     Multiply(zjacobians[i]).
-				                     GetRow(0);
+
+		if (calcgradient) {
+			n = 0;
+			foreach (Gaussian landmark in map) {
+				zjacobians[n] = pose.Measurer.MeasurementJacobianP(pose.Pose, landmark.Mean);
+				n++;
 			}
 		}
+
+		if (calcgradient) {
+			for (int i = 0; i < zprobs.Length;      i++) {
+			for (int k = 0; k < measurements.Count; k++) {
+				double[] m = measurements[k].ToLinear();
+				double   d = zprobs[i].Mahalanobis(m);
+				
+				if (d < 12) {
+					// prob = log (pD * zprob(measurement))
+					// this way multiplying probabilities equals to adding (negative) profits
+					llmatrix[i, k] = logPD + Math.Log(zprobs[i].Multiplier) - 0.5 * d * d;
+					dlldp   [i, k] = (m.Subtract(zprobs[i].Mean)).Transpose().
+					                     Multiply(zprobs[i].CovarianceInverse).
+					                     Multiply(zjacobians[i]).
+					                     GetRow(0);
+				}
+			}
+			}
+		}
+		else {
+			for (int i = 0; i < zprobs.Length;      i++) {
+			for (int k = 0; k < measurements.Count; k++) {
+				double[] m = measurements[k].ToLinear();
+				double   d = zprobs[i].Mahalanobis(m);
+				
+				if (d < 12) {
+					// prob = log (pD * zprob(measurement))
+					// this way multiplying probabilities equals to adding (negative) profits
+					llmatrix[i, k] = logPD + Math.Log(zprobs[i].Multiplier) - 0.5 * d * d;
+				}
+			}
+			}
 		}
 		
 		for (int i = 0; i < map.Count; i++) {
@@ -575,16 +637,16 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 		List<SparseMatrix> connectedfull = GraphCombinatorics.ConnectedComponents(llmatrix);
 		
 		double[]   logcomp    = new double[200];
-		double[][] dlogcompdp = new double[200][];
+		double[][] dlogcompdp = (calcgradient) ? new double[200][] : null;
 		double     total      = 0;
 		
-		gradient = new double[OdoSize];
+		gradient = (calcgradient) ? new double[OdoSize] : null;
 		
 		for (int i = 0; i < connectedfull.Count; i++) {
 			int[]        rows;
 			int[]        cols;
-			SparseMatrix component = connectedfull[i].Compact(out rows, out cols);
-			var          dcomp     = dlldp.Submatrix(rows, cols);
+			SparseMatrix           component = connectedfull[i].Compact(out rows, out cols);
+			SparseMatrix<double[]> dcomp     = (calcgradient) ? dlldp.Submatrix(rows, cols) : null;
 			
 			// fill the (Misdetection x Clutter) quadrant of the matrix with zeros (don't contribute)
 			// NOTE this is filled after the connected components partition because
@@ -611,23 +673,39 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 			}
 
 			int m = 0;
-			foreach (Tuple<int[], double> assignment in assignments) {
-				if (m >= logcomp.Length || (!enumerateall && logcomp[m] - logcomp[0] < -10)) {
-					break;
+
+			if (calcgradient) {
+				foreach (Tuple<int[], double> assignment in assignments) {
+					if (m >= logcomp.Length || (!enumerateall && logcomp[m] - logcomp[0] < -10)) {
+						break;
+					}
+					
+					logcomp   [m] = assignment.Item2;
+					dlogcompdp[m] = new double[OdoSize];
+					
+					for (int p = 0; p < assignment.Item1.Length; p++) {
+						dlogcompdp[m] = dlogcompdp[m].Add(dcomp[p, assignment.Item1[p]]);
+					}
+					
+					m++;
 				}
-
-				logcomp   [m] = assignment.Item2;
-				dlogcompdp[m] = new double[OdoSize];
-
-				for (int p = 0; p < assignment.Item1.Length; p++) {
-					dlogcompdp[m] = dlogcompdp[m].Add(dcomp[p, assignment.Item1[p]]);
+			}
+			else {
+				foreach (Tuple<int[], double> assignment in assignments) {
+					if (m >= logcomp.Length || (!enumerateall && logcomp[m] - logcomp[0] < -10)) {
+						break;
+					}
+					
+					logcomp[m] = assignment.Item2;
+					m++;
 				}
-
-				m++;
 			}
 
 			total   += logcomp.LogSumExp(0, m);
-			gradient = gradient.Add(dlogcompdp.TemperedAverage(logcomp, 0, m));
+
+			if (calcgradient) {
+				gradient = gradient.Add(dlogcompdp.TemperedAverage(logcomp, 0, m));
+			}
 
 		}
 
