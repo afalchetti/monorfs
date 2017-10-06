@@ -53,8 +53,10 @@ public class FakeVehicle<MeasurerT, PoseT, MeasurementT> : Vehicle<MeasurerT, Po
 	/// Construct a dummy vehicle copying metadata from another vehicle.
 	/// </summary>
 	/// <param name="that">Reference vehicle.</param>
-	public FakeVehicle(Vehicle<MeasurerT, PoseT, MeasurementT> that)
-		: base(that, false) {}
+	/// <param name="copytrajectory">If true, the vehicle historic trajectory is copied.
+	/// Relatively heavy operation.</param>
+	public FakeVehicle(Vehicle<MeasurerT, PoseT, MeasurementT> that, bool copytrajectory = false)
+		: base(that, copytrajectory) {}
 	
 	/// <summary>
 	/// Apply the motion model to the vehicle. It does nothing.

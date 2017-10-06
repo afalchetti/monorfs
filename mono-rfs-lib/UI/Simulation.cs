@@ -367,9 +367,7 @@ public class Simulation<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT,
 				                new PHDNavigator<MeasurerT, PoseT, MeasurementT>(explorer, particlecount, onlymapping));
 			}
 
-			var fakeexplorer       = new FakeVehicle<MeasurerT, PoseT, MeasurementT>(explorer);
-			fakeexplorer.WayPoints = explorer.WayPoints;
-			explorer               = fakeexplorer;
+			explorer = new FakeVehicle<MeasurerT, PoseT, MeasurementT>(explorer, true);
 
 			Console.WriteLine("Loopy PHD initialized");
 
