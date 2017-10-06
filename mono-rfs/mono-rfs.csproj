@@ -168,6 +168,24 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="packages.config" />
+    <None Include="plots\scripts\screenshots.sh">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="plots\scripts\chap5\S1-trivial.sh">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="plots\scripts\chap5\S2-standard.sh">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="plots\scripts\chap5\default2d.cfg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="plots\scripts\chap5\trivial.cfg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="plots\scripts\chap5\trivialestimate.cfg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\DotImaging.IO.4.8.1\build\DotImaging.IO.targets" Condition="Exists('..\packages\DotImaging.IO.4.8.1\build\DotImaging.IO.targets')" />
@@ -180,5 +198,8 @@
       <Project>{A46436BE-076A-4A63-A5C5-E9E653D6068E}</Project>
       <Name>postanalysis</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="plots\scripts\chap5\" />
   </ItemGroup>
 </Project>

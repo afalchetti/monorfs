@@ -26,3 +26,8 @@ for script in chap4/S*.sh; do
 	echo "executing ${script}"
 	$script "${outdir}/chap4" "${assetdir}" "${solverdir}"
 done
+
+for script in chap5/S*.sh; do
+	echo "executing ${script}"
+	$script "${outdir}/chap5" "${assetdir}" "${solverdir}"
+done
