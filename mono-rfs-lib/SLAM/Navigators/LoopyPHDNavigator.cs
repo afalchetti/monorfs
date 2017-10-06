@@ -39,6 +39,7 @@ using Microsoft.Xna.Framework.Graphics;
 using TimedState        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedArray        = System.Collections.Generic.List<System.Tuple<double, double[]>>;
 using TimedMapModel     = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<monorfs.Gaussian>>>;
+using TimedMixture      = System.Collections.Generic.List<System.Tuple<double, double, System.Collections.Generic.List<monorfs.Gaussian>>>;
 using TimedGaussian     = System.Collections.Generic.List<System.Tuple<double, monorfs.Gaussian>>;
 using TimedMeasurements = System.Collections.Generic.List<System.Tuple<double, System.Collections.Generic.List<double[]>>>;
 
@@ -95,8 +96,10 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 
 	/// <summary>
 	/// Messages from the map to the poses.
+	/// Each message consists of a constant term and a gaussian mixture, i.e.
+	/// a factor of the form a_0 + sum(a_i * N(mu, sigma)).
 	/// </summary>
-	public TimedGaussian MessagesFromMap { get; private set; }
+	public TimedMixture MessagesFromMap { get; private set; }
 
 	/// <summary>
 	/// Current pose estimates.
@@ -233,6 +236,13 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 		clock        = 0;
 
 		initMessages(trajectory);
+
+		WayMaps         = new List<Tuple<double, Map>>(3);
+		WayTrajectories = new List<Tuple<double, TimedState>>();
+
+		GameTime zero = new GameTime();
+		UpdateLPTrajectory(zero);
+		UpdateMapHistory(zero);
 	}
 
 	/// <summary>
@@ -255,6 +265,13 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 		Measurements.Insert(0, Tuple.Create(double.PositiveInfinity, new List<double[]>()));
 
 		initMessages(trajectory);
+
+		WayMaps         = new List<Tuple<double, Map>>(3);
+		WayTrajectories = new List<Tuple<double, TimedState>>();
+
+		GameTime zero = new GameTime();
+		UpdateLPTrajectory(zero);
+		UpdateMapHistory(zero);
 	}
 
 	/// <summary>
@@ -266,7 +283,8 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 		LinearizationPoints = new List<Tuple<double, PoseT>>();
 		MessagesFromPast    = new TimedGaussian();
 		MessagesFromFuture  = new TimedGaussian();
-		MessagesFromMap     = new TimedGaussian();
+		MessagesFromMap     = new TimedMixture();
+		MapMessages         = new List<Tuple<double, PoseT>>();
 
 		double[][] infcov = Util.InfiniteCovariance(OdoSize);
 
@@ -274,7 +292,8 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 			LinearizationPoints.Add(Tuple.Create(0.0, new PoseT().IdentityP()));
 			MessagesFromPast   .Add(Tuple.Create(0.0, (Gaussian) null));
 			MessagesFromFuture .Add(Tuple.Create(0.0, (Gaussian) null));
-			MessagesFromMap    .Add(Tuple.Create(0.0, (Gaussian) null));
+			MessagesFromMap    .Add(Tuple.Create(0.0, 0.0, (List<Gaussian>) null));
+			MapMessages        .Add(Tuple.Create(0.0, new PoseT()));
 		}
 
 		Parallel.For(0, initial.Count,
@@ -282,13 +301,13 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 			LinearizationPoints[i] = Tuple.Create(initial[i].Item1, new PoseT().FromState(initial[i].Item2));
 			MessagesFromPast   [i] = Tuple.Create(initial[i].Item1, new Gaussian(new double[OdoSize], infcov, 1.0));
 			MessagesFromFuture [i] = Tuple.Create(initial[i].Item1, new Gaussian(new double[OdoSize], infcov, 1.0));
-			MessagesFromMap    [i] = Tuple.Create(initial[i].Item1, new Gaussian(new double[OdoSize], infcov, 1.0));
+			MessagesFromMap    [i] = Tuple.Create(initial[i].Item1, 0.0, new List<Gaussian>());
 		});
 
 		MessagesFromPast[0] = Tuple.Create(MessagesFromPast[0].Item1, Util.DiracDelta(new double[OdoSize]));
 
 		FusedEstimate = GetFusedEstimate();
-		MapMessages   = GetMapMessages();
+		UpdateMapMessages();
 	}
 
 	/// <summary>
@@ -347,42 +366,70 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 	/// <param name="measurements">Sensor measurements in pixel-range form. Not used.</param>
 	public override void SlamUpdate(GameTime time, List<MeasurementT> measurements)
 	{
-		if (clock % 2 == 0) {
-			MessagesFromPast = GetMessagesFromPast();
-			MapMessages      = GetMapMessages();
-			MessagesFromMap  = GetMessagesFromMap();
-		}
-		else {
-			MessagesFromFuture = GetMessagesFromFuture();
-			MessagesFromMap    = GetMessagesFromMap();
-			MapMessages        = GetMapMessages();
+		int    timeindex   = clock % FusedEstimate.Count;
+		double temperature = 5.0 / (clock / FusedEstimate.Count + 1);
+
+		for (int i = 0; i < 2; i++) {
+			UpdateMessagesFromPast(timeindex, timeindex + 1);
+			UpdateMessagesFromFuture(timeindex, timeindex + 1);
+			UpdateMessagesFromMap(timeindex, timeindex + 1, clock + 1, temperature);
+			UpdateMapMessages();
 		}
 
-		UpdateLPTrajectory(time);
-		UpdateMapHistory(time);
-		Console.WriteLine((clock++ % 2 == 0) ? "tick" : "tock");
+		Console.Write(clock + ", ");
+		clock++;
+
+		GameTime timestamp      = new GameTime();
+		timestamp.TotalGameTime = new TimeSpan(10000000L * clock / FusedEstimate.Count);
+
+		UpdateLPTrajectory(timestamp);
+		UpdateMapHistory(timestamp);
+
+	}
+
+	/// <summary>
+	/// Get all messages from the past given the current estimates.
+	/// </summary>
+	public void UpdateMessagesFromPast()
+	{
+		UpdateMessagesFromPast(0, MessagesFromPast.Count);
+	}
+
+	/// <summary>
+	/// Get all messages from the future given the current estimates.
+	/// </summary>
+	public void UpdateMessagesFromFuture()
+	{
+		UpdateMessagesFromFuture(0, MessagesFromFuture.Count);
+	}
+
+	/// <summary>
+	/// Get all messages from the map given the current estimates.
+	/// </summary>
+	public void UpdateMessagesFromMap()
+	{
+		UpdateMessagesFromMap(0, MessagesFromMap.Count, MessagesFromMap.Count, 0);
+	}
+
+	/// <summary>
+	/// Get all messages to the map given the current estimates.
+	/// </summary>
+	public void UpdateMapMessages()
+	{
+		UpdateMapMessages(0, MapMessages.Count);
 	}
 
 	/// <summary>
 	/// Get messages from the past given the current estimates.
 	/// </summary>
-	/// <returns>Messages from the past.</returns>
-	public TimedGaussian GetMessagesFromPast()
+	/// <param name="from">Update messages starting from this index (inclusive).</param>
+	/// <param name="to">Update messages up to this index (exclusive).</param>
+	public void UpdateMessagesFromPast(int from, int to)
 	{
-		TimedGaussian messages = new TimedGaussian();
+		from = Math.Max(1, from);
+		to   = Math.Min(MessagesFromPast.Count, to);
 
-		messages.Add(Tuple.Create(MessagesFromPast[0].Item1, Util.DiracDelta(new double[OdoSize])));
-		FusedEstimate[0] = Tuple.Create(FusedEstimate[0].Item1,
-			Gaussian.Fuse(Gaussian.Fuse(messages[0].Item2,
-			                            MessagesFromFuture[0].Item2), MessagesFromMap[0].Item2));
-
-		for (int i = 1; i < MessagesFromPast.Count; i++) {
-			messages.Add(MessagesFromPast[i]);
-		}
-
-		for (int i = 1; i < MessagesFromPast.Count; i++) {
-		//Parallel.For(1, MessagesFromPast.Count,
-		//             new ParallelOptions { MaxDegreeOfParallelism = Config.NParallel}, i => {
+		for (int i = from; i < to; i++) {
 			PoseT   linearpoint     = LinearizationPoints[i]    .Item2;
 			PoseT   prevlinearpoint = LinearizationPoints[i - 1].Item2;
 			Gaussian fusedF     = FusedEstimate     [i - 1].Item2;
@@ -393,7 +440,7 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 			PoseT estpose = hfpose.AddOdometry(Odometry[i - 1].Item2);
 			
 			double[][] jacobian = MotionJacobian(prevlinearpoint, linearpoint,
-			                                     halffusedF.Mean, Odometry[i-1].Item2);
+			                                     halffusedF.Mean, Odometry[i - 1].Item2);
 			double[][] newcovariance = jacobian.Multiply(halffusedF.Covariance).MultiplyByTranspose(jacobian);
 
 			Gaussian estimate = new Gaussian(estpose.Subtract(linearpoint),
@@ -404,41 +451,25 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 			// the linearization point are small, pose-deltas are a unitary linear space
 			// (and they are expected to be small)
 
-			messages[i] = Tuple.Create(MessagesFromPast[i].Item1, estimate);
+			MessagesFromPast[i] = Tuple.Create(MessagesFromPast[i].Item1, estimate);
 
 			FusedEstimate[i] = Tuple.Create(FusedEstimate[i].Item1,
-				Gaussian.Fuse(Gaussian.Fuse(messages[i].Item2,
-				                            MessagesFromFuture[i].Item2), MessagesFromMap[i].Item2));
-		//});
+				GetFusedEstimate(MessagesFromPast[i].Item2, MessagesFromFuture[i].Item2,
+				                 Tuple.Create(MessagesFromMap[i].Item2, MessagesFromMap[i].Item3)));
 		}
-			
-		return messages;
 	}
 
 	/// <summary>
 	/// Get messages from the future given the current estimates.
 	/// </summary>
-	/// <returns>Messages from the future.</returns>
-	public TimedGaussian GetMessagesFromFuture()
+	/// <param name="from">Update messages starting from this index (inclusive).</param>
+	/// <param name="to">Update messages up to this index (exclusive).</param>
+	public void UpdateMessagesFromFuture(int from, int to)
 	{
-		TimedGaussian messages = new TimedGaussian();
+		from = Math.Max(0, from);
+		to   = Math.Min(MessagesFromFuture.Count - 1, to);
 
-		for (int i = 0; i < MessagesFromFuture.Count - 1; i++) {
-			messages.Add(MessagesFromFuture[i]);
-		}
-
-		int lastindex = FusedEstimate.Count - 1;
-		var lastpose = FusedEstimate[lastindex];
-		messages.Add(Tuple.Create(lastpose.Item1,
-		                          new Gaussian(lastpose.Item2.Mean, Util.InfiniteCovariance(OdoSize), 1.0)));
-		
-		FusedEstimate[lastindex] = Tuple.Create(FusedEstimate[lastindex].Item1,
-			Gaussian.Fuse(Gaussian.Fuse(messages[lastindex].Item2,
-			                            MessagesFromPast[lastindex].Item2), MessagesFromMap[lastindex].Item2));
-
-		for (int i = MessagesFromFuture.Count - 2; i >= 0 ; i--) {
-		//Parallel.For(0, MessagesFromFuture.Count - 1,
-		//             new ParallelOptions { MaxDegreeOfParallelism = Config.NParallel}, i => {
+		for (int i = to - 1; i >= from; i--) {
 			PoseT   linearpoint     = LinearizationPoints[i]    .Item2;
 			PoseT   nextlinearpoint = LinearizationPoints[i + 1].Item2;
 			Gaussian fusedG     = FusedEstimate   [i + 1].Item2;
@@ -461,121 +492,86 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 			// the linearization point are small, pose-deltas are a unitary linear space
 			// (and they are expected to be small)
 
-			messages[i] = Tuple.Create(MessagesFromFuture[i].Item1, estimate);
+			MessagesFromFuture[i] = Tuple.Create(MessagesFromFuture[i].Item1, estimate);
 
 			FusedEstimate[i] = Tuple.Create(FusedEstimate[i].Item1,
-				Gaussian.Fuse(Gaussian.Fuse(messages[i].Item2,
-				                            MessagesFromPast[i].Item2), MessagesFromMap[i].Item2));
-		//});
+				GetFusedEstimate(MessagesFromPast[i].Item2, MessagesFromFuture[i].Item2,
+				                 Tuple.Create(MessagesFromMap[i].Item2, MessagesFromMap[i].Item3)));
 		}
-
-		return messages;
 	}
 
 	/// <summary>
 	/// Get messages from the map given the current estimates.
 	/// </summary>
-	/// <returns>Messages from the map to the poses.</returns>
-	public TimedGaussian GetMessagesFromMap()
+	/// <param name="from">Update messages starting from this index (inclusive).</param>
+	/// <param name="to">Update messages up to this index (exclusive).</param>
+	/// <param name="tofilter">Run the filter up to this index (exclusive).</param>
+	/// <param name="temperature">Smoothing term in [0, Inf); the biggest,
+	/// the less relevant these messages become.</param>
+	public void UpdateMessagesFromMap(int from, int to, int tofilter, double temperature)
 	{
-		TimedGaussian messages = new TimedGaussian();
+		// the mixture models must have a gaussian inside beause later on it is
+		// assumed that it can be merged into a single gaussian; not having at least
+		// one component makes it impossible to guess the number of dimensions; so
+		// to make everything smoother, just add an uninformative component
+		List<Gaussian> dummymix = new List<Gaussian>();
+		var dummyestimate = Tuple.Create(0.0, dummymix);
 
-		for (int i = 0; i < MessagesFromMap.Count; i++) {
-			messages.Add(Tuple.Create(0.0, (Gaussian) null));
-		}
+		MeasurementT dummyM = new MeasurementT();
 
-		double[][] infcovariance = Util.InfiniteCovariance(OdoSize);
-		double[]   infdelta      = new double[OdoSize];
+		from = Math.Max(0, from);
+		to   = Math.Min(MessagesFromMap.Count, to);
 
-		for (int k = 0; k < OdoSize; k++) {
-			infdelta[k] = 1e5;
-		}
-
-		// Pose very far from the map (distance to everything is > 10-sigma)
-		PoseT infpose  = new PoseT().IdentityP().Add(infdelta);
-		var infvehicle = new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>(infpose, new List<double[]>());
-
-		MeasurementT dummy = new MeasurementT();
-
-		for (int i = 0; i < MessagesFromMap.Count; i++) {
-		//Parallel.For(0, MessagesFromMap.Count,
-		//             new ParallelOptions { MaxDegreeOfParallelism = Config.NParallel}, i => {
-			List<Gaussian> estimates     = null;
-			Gaussian       totalestimate = null;
-			Gaussian pastfuture = Gaussian.Fuse(MessagesFromPast[i].Item2, MessagesFromFuture[i].Item2);
+		Parallel.For(from, to,
+		             new ParallelOptions { MaxDegreeOfParallelism = Config.NParallel}, i => {
+			var      mixestimate = dummyestimate;
+			Gaussian pastfuture  = Gaussian.Fuse(MessagesFromPast[i].Item2, MessagesFromFuture[i].Item2);
 
 			if (Measurements[i].Item2.Count > 0) {
 				// typed list (instead of list of array of doubles)
-				List<MeasurementT> measurements = Measurements[i].Item2.ConvertAll(m => dummy.FromLinear(m));
+				List<MeasurementT> measurements = Measurements[i].Item2.ConvertAll(m => dummyM.FromLinear(m));
 
-				Map dMap  = FilterMissing(MapMessages, Measurements, i);
-				estimates = GuidedFitGaussian(pastfuture.Mean, measurements, dMap, LinearizationPoints[i].Item2);
-				
-				// Modelling P(Z|X, M) as one big gaussian is not enough;
-				// besides the multimodality (which is less severe),
-				// the function never goes to zero (it reaches a lower
-				// bound empty-space probability, i.e. everything is
-				// misdetected and clutter).
-				// If we're close to the gaussian part, that doesn't matter
-				// much, but if the distance between this gaussian and the
-				// past-future gaussians is too large, the product will be a
-				// very small gaussian, which usually after normalization
-				// would be just fine, but the product can fall below the
-				// empty-space threshold. In that case, normalization would
-				// not bring the small gaussian into a "regular" integral=1
-				// gaussian; instead the product of the constant threshold
-				// and the original past-future gaussians would become prevalent.
-				// This behaviour is smooth between "far away gaussians"
-				// and close ones, but will be approximated by a hard max{...}
+				Map dMap    = FilterMissing(MapMessages, Measurements, i, tofilter);
+				mixestimate = GuidedFitMixture(pastfuture.Mean, measurements, dMap, LinearizationPoints[i].Item2);
 
-				double emptyspace = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
-				                        SetLogLikelihood(measurements, dMap, infvehicle);
-
-				List<Gaussian> fusecandidates = estimates.ConvertAll(e => Gaussian.Fuse(pastfuture, e));
-				//double   fusealpha     = estimate.LogEvaluate(fusecandidate.Mean) + Math.Log(estimate.Weight);
-
-				fusecandidates.Add(pastfuture.Reweight(emptyspace));
-
-				Gaussian fused = Gaussian.Merge(fusecandidates);
-				totalestimate  = Gaussian.Unfuse(fused, pastfuture);
-
-				//if (fusealpha < emptyspace || fusecandidate.Mean.SquareEuclidean(pastfuture.Mean) > 0.25) {
-				//	estimate = new Gaussian(pastfuture.Mean, infcovariance, 1.0);
-				//}
-			}
-			else {
-				totalestimate = new Gaussian(pastfuture.Mean, infcovariance, 1.0);
+				for (int k = 0; k < mixestimate.Item2.Count; k++) {
+					Gaussian original = mixestimate.Item2[k];
+					mixestimate.Item2[k] = new Gaussian(original.Mean,
+					                                    original.Covariance.Add(
+					                                        (1 + temperature).Multiply(pastfuture.Covariance)),
+					                                    original.Weight);
+				}
 			}
 
-			messages[i] = Tuple.Create(MapMessages[i].Item1, totalestimate);
-
-			FusedEstimate[i] = Tuple.Create(FusedEstimate[i].Item1, Gaussian.Fuse(pastfuture, totalestimate));
-		//});
-		}
-
-		return messages;
+			MessagesFromMap[i] = Tuple.Create(MapMessages[i].Item1, mixestimate.Item1, mixestimate.Item2);
+			FusedEstimate  [i] = Tuple.Create(FusedEstimate[i].Item1,
+			                                  GetFusedEstimate(MessagesFromPast[i].Item2,
+			                                                   MessagesFromFuture[i].Item2,
+			                                                   mixestimate));
+		});
 	}
 
 	/// <summary>
 	/// Get messages to the map given the current estimates.
 	/// </summary>
-	/// <returns>Messages from the poses to the map.</returns>
-	public List<Tuple<double, PoseT>> GetMapMessages()
+	/// <param name="from">Update messages starting from this index (inclusive).</param>
+	/// <param name="to">Update messages up to this index (exclusive).</param>
+	public void UpdateMapMessages(int from, int to)
 	{
-		var           messages = new List<Tuple<double, PoseT>>();
-		TimedGaussian hfused   = FuseGaussians(MessagesFromPast, MessagesFromFuture);
+		TimedGaussian hfused = FuseGaussians(MessagesFromPast, MessagesFromFuture);
 
-		for (int i = 0; i < hfused.Count; i++) {
-			messages.Add(Tuple.Create(0.0, new PoseT().IdentityP()));
-		}
+		from = Math.Max(0, from);
+		to   = Math.Min(MapMessages.Count, to);
 
-		Parallel.For(0, hfused.Count,
+		Parallel.For(from, to,
 		             new ParallelOptions { MaxDegreeOfParallelism = Config.NParallel}, i => {
 			PoseT pose  = LinearizationPoints[i].Item2.Add(hfused[i].Item2.Mean);
-			messages[i] = Tuple.Create(hfused[i].Item1, pose);
+			MapMessages[i] = Tuple.Create(hfused[i].Item1, pose);
 		});
 
-		return messages;
+		if (from < to) {  // if anything changed, invalidate the map cache
+			MapCached = false;
+		}
 	}
 
 	/// <summary>
@@ -600,10 +596,96 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 	/// <summary>
 	/// Get current pose estimates from message factors.
 	/// </summary>
-	  public TimedGaussian GetFusedEstimate()
+	public TimedGaussian GetFusedEstimate()
 	{
-		return FuseGaussians(FuseGaussians(MessagesFromPast, MessagesFromFuture), MessagesFromMap);
+		TimedGaussian fused = new TimedGaussian(MessagesFromPast.Count);
+
+		for (int i = 0; i < MessagesFromPast.Count; i++) {
+			Gaussian reduced = GetFusedEstimate(MessagesFromPast[i].Item2, MessagesFromFuture[i].Item2,
+			                                    Tuple.Create(MessagesFromMap[i].Item2, MessagesFromMap[i].Item3));
+			fused.Add(Tuple.Create(MessagesFromPast[i].Item1, reduced));
+		}
+
+		return fused;
 	}
+
+	/// <summary>
+	/// Get current pose estimates from message factors.
+	/// </summary>
+	public Gaussian GetFusedEstimate(Gaussian past, Gaussian future, Tuple<double, List<Gaussian>> map)
+	{
+		// should be Gaussian.Multiply, but it is equivalent 
+		// (as the fusion only addds a constant multiplicative constant)
+		return Mixdown(Fuse(Gaussian.Fuse(past, future), map));
+	}
+
+	/// <summary>
+	/// Fuse a gaussian with a mixture model.
+	/// </summary>
+	/// <param name="gaussian">Gaussian component.</param>
+	/// <param name="mixture">Mixture model.</param>
+	/// <returns></returns>
+	public static List<Gaussian> Fuse(Gaussian gaussian, Tuple<double, List<Gaussian>> mixture)
+	{
+		List<Gaussian> fused   = new List<Gaussian>(mixture.Item2.Count + 1); 
+		double         wsum    = 0;
+		double         invwsum = 0;
+
+		// weight does not matter, everything is multiplied by the same constant
+		// (and will be normalized at the end);
+		// a unitary weight gives better FP precision
+		gaussian = gaussian.Reweight(1.0);
+
+		// constant term multiplication
+		Gaussian prod = gaussian.Reweight(Math.Exp(mixture.Item1));
+		fused.Add(prod);
+		wsum = prod.Weight;
+
+		// gaussian mixture multiplications
+		foreach (Gaussian component in mixture.Item2) {
+			prod = Gaussian.Multiply(gaussian, component);
+			fused.Add(prod);
+			wsum += prod.Weight;
+		}
+
+		invwsum = 1.0 / wsum;
+
+		for (int i = 0; i < fused.Count; i++) {
+			fused[i] = fused[i].Reweight(fused[i].Weight * invwsum);
+		}
+
+		return fused;
+	}
+
+	/// <summary>
+	/// Compress a gaussian mixture model into one component.
+	/// Information will be lost; depending on the scenario,
+	/// the output could be so uncertain as to be useless.
+	/// </summary>
+	/// <param name="mixture">Mixture model.</param>
+	/// <returns>Merged gaussian.</returns>
+	public static Gaussian Mixdown(List<Gaussian> mixture)
+	{
+		return Gaussian.Merge(mixture);
+	}
+
+	/// <summary>
+	/// Compress gaussian mixture models into one component each (disregards the constant terms).
+	/// Information will be lost; depending on the scenario, the output could be so
+	/// uncertain as to be useless.
+	/// </summary>
+	/// <param name="mixtures">Timed mixture model.</param>
+	/// <returns>Merged gaussians.</returns>
+	public static TimedGaussian Mixdown(TimedMixture mixtures)
+	{
+		TimedGaussian mixdown = new TimedGaussian(mixtures.Count);
+
+		foreach (var mixture in mixtures) {
+			mixdown.Add(Tuple.Create(mixture.Item1, Gaussian.Merge(mixture.Item3)));
+		}
+
+		return mixdown;
+	} 
 
 	/// <summary>
 	/// Fuses two trajectory estimates with gaussians in each pose.
@@ -633,7 +715,7 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 	/// <param name="factors">Map factors.</param>
 	public Map Filter(List<Tuple<double, PoseT>> trajectory, TimedMeasurements factors)
 	{
-		return FilterMissing(trajectory, factors, -1);
+		return FilterMissing(trajectory, factors, trajectory.Count, trajectory.Count);
 	}
 
 	/// <summary>
@@ -643,15 +725,13 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 	/// <param name="factors">Map factors.</param>
 	/// <param name="index">Removed factor index from the filtering;
 	/// if it's outside of the trajectory time boundaries, it will filter normally.</param>
-	public Map FilterMissing(List<Tuple<double, PoseT>> trajectory, TimedMeasurements factors, int index)
+	/// <param name="to">Filter up to this index (exclusive).</param> 
+	public Map FilterMissing(List<Tuple<double, PoseT>> trajectory, TimedMeasurements factors, int index, int to)
 	{
 		InnerFilter = new PHDNavigator<MeasurerT, PoseT, MeasurementT>(InnerFilter.RefVehicle, 1, true);
 
-		if (index < 0) {
-			index = trajectory.Count;
-			// if the index is bigger or equal to the trajectory length
-			// the second loop won't do anything, i.e. full filter
-		}
+		to    = Math.Min(trajectory.Count, to);
+		index = (index < 0) ? to : Math.Min(to, index);
 
 		MeasurementT dummy = new MeasurementT();
 
@@ -670,7 +750,7 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 		//      so it wouldn't do anything. The birth rate could be
 		//      proportional to dt, but its effect should be marginal
 
-		for (int i = index + 1; i < trajectory.Count; i++) {
+		for (int i = index + 1; i < to; i++) {
 			GameTime time = new GameTime(new TimeSpan((int) (trajectory[i].Item1 * 100000000)), Config.MeasureElapsed);
 
 			InnerFilter.BestEstimate.Pose = trajectory[i].Item2;
@@ -683,7 +763,7 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 	}
 
 	/// <summary>
-	/// Fit a gaussian probability to the pose distribution
+	/// Fit a gaussian mixture to the pose distribution
 	/// using gradient descent and quadratic regression.
 	/// To guide the fitting process, a number of best guesses
 	/// are used to initialize the estimation based on the
@@ -693,9 +773,10 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 	/// <param name="measurements">Fixed measurements.</param>
 	/// <param name="map">Fixed map.</param>
 	/// <param name="linearpoint">Linearization point.</param>
-	/// <returns>Fitted gaussian.</returns>
-	public static List<Gaussian> GuidedFitGaussian(double[] pose0, List<MeasurementT> measurements,
-	                                               Map map, PoseT linearpoint)
+	/// <returns>Fitted gaussian mixture.</returns>
+	public static Tuple<double, List<Gaussian>> GuidedFitMixture(double[] pose0,
+	                                                             List<MeasurementT> measurements,
+	                                                             Map map, PoseT linearpoint)
 	{
 		List<double[]> guesses  = new List<double[]>();
 		MeasurerT      measurer = new MeasurerT();
@@ -727,21 +808,31 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 		PoseT infpose     = new PoseT().IdentityP().Add(infdelta);
 		var infvehicle    = new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>(infpose, new List<double[]>());
 		double emptyspace = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
-		                        SetLogLikelihood(measurements, jmap, infvehicle);
+		                        QuasiSetLogLikelihood(measurements, jmap, infvehicle);
 
 		foreach (double[] guess in guesses) {
 			double localmax = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
-				SetLogLikelihood(measurements, jmap,
+				QuasiSetLogLikelihood(measurements, jmap,
 					new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>(
 						linearpoint.Add(guess), new List<double[]>())
 					);
 
+			if (localmax - emptyspace < 0) {
+				continue;
+			}
+
 			double[] localpose = LogLikeGradientAscent(guess, measurements, jmap, linearpoint, out localmax);
 
+			bool alreadycounted = false;
 			foreach (Gaussian component in components) {
-				if (component.Mahalanobis(localpose) < 0.01) {
-					continue;
+				if (component.Mahalanobis(localpose) < 0.1) {
+					alreadycounted = true;
+					break;
 				}
+			}
+
+			if (alreadycounted) {
+				continue;
 			}
 
 			double[][] localcov = LogLikeFitCovariance(maxpose, measurements, jmap, linearpoint);
@@ -752,7 +843,7 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 			components.Add(new Gaussian(localpose, localcov, weight));
 		}
 
-		return components;
+		return Tuple.Create(emptyspace, components);
 	}
 
 	/// <summary>
@@ -786,7 +877,6 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 	{
 		const double eps      = 1e-5;
 		double[]     gradient = new double[OdoSize];
-		double[]     gradient2;
 		var          dvehicle = new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>();
 
 		//dvehicle.Pose = linearpoint.Add(pose);
@@ -799,12 +889,12 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 			ds[i]         = eps;
 			dvehicle.Pose = linearpoint.Add(pose.Add(ds));
 			double lplus  = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
-			                    QuasiSetLogLikelihood(measurements, map, dvehicle, out gradient2);
+			                    QuasiSetLogLikelihood(measurements, map, dvehicle);
 
 			ds[i]         = -eps;
 			dvehicle.Pose = linearpoint.Add(pose.Add(ds));
 			double lminus = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
-			                    QuasiSetLogLikelihood(measurements, map, dvehicle, out gradient2);
+			                    QuasiSetLogLikelihood(measurements, map, dvehicle);
 
 			gradient[i] = (lplus - lminus) / (2 * eps);
 		}
@@ -825,7 +915,7 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 	public static double[] LogLikeGradientAscent(double[] initial, List<MeasurementT> measurements, Map map,
 	                                             PoseT linearpoint, out double loglike)
 	{
-		const double loglikethreshold = 1e-2;
+		const double loglikethreshold = 1e-3;
 
 		double[] pose        = initial;
 		double[] nextpose    = pose;
@@ -833,7 +923,6 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 
 		double   prevvalue = double.NegativeInfinity;
 		double[] gradient;
-		double[] dummy;
 
 		loglike = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
 		              QuasiSetLogLikelihood(measurements, map, nextvehicle, out gradient);
@@ -841,16 +930,22 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 		double multiplier;
 
 		while (loglike - prevvalue > loglikethreshold) {
-			//gradient   = LogLikeGradient(pose, measurements, map, linearpoint);
+			PHDNavigator<MeasurerT, PoseT, MeasurementT>.
+				QuasiSetLogLikelihood(measurements, map, nextvehicle, out gradient);
+			double gradsize = gradient.Euclidean();
+
+			if (gradsize > GradientClip) {
+				gradient = gradient.Multiply(GradientClip / gradsize);
+			}
+
 			multiplier = GradientAscentRate;
-			gradient   = gradient.Clamp(-GradientClip, GradientClip);
 
 			int counter = 0;
 			do {
 				nextpose         = pose.Add(multiplier.Multiply(gradient));
 				nextvehicle.Pose = linearpoint.Add(nextpose);
 				nextloglike      = PHDNavigator<MeasurerT, PoseT, MeasurementT>.
-				                       QuasiSetLogLikelihood(measurements, map, nextvehicle, out dummy);
+				                       QuasiSetLogLikelihood(measurements, map, nextvehicle);
 				multiplier      /= 2.0;
 
 				counter++;
@@ -879,26 +974,24 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 	public static double[][] LogLikeFitCovariance(double[] pose, List<MeasurementT> measurements,
 	                                              Map map, PoseT linearpoint)
 	{
-		const double eps      = 1e-5;
-		double[][]   hessian  = new double[OdoSize][];
+		const double eps     = 1e-5;
+		double[][]   hessian = new double[OdoSize][];
+		var          vehicle = new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>();
 
 		for (int i = 0; i < hessian.Length; i++) {
 			double[] ds = new double[OdoSize];
+			double[] lplus;
+			double[] lminus;
 
-			ds[i]          = eps;
-			double[] lplus = LogLikeGradient(pose.Add(ds), measurements, map, linearpoint);
+			ds[i]         = eps;
+			vehicle.Pose = linearpoint.Add(pose.Add(ds));
+			PHDNavigator<MeasurerT, PoseT, MeasurementT>.
+		    	QuasiSetLogLikelihood(measurements, map, vehicle, out lplus);
 
-			ds[i]           = -eps;
-			double[] lminus = LogLikeGradient(pose.Add(ds), measurements, map, linearpoint);
-
-			/*if (lplus.HasNaN() || lminus.HasNaN()) {
-				Console.WriteLine("Ouch!");
-				ds[i]          = eps;
-				lplus = LogLikeGradient(pose.Add(ds), measurements, map, linearpoint);
-
-				ds[i]           = -eps;
-				lminus = LogLikeGradient(pose.Add(ds), measurements, map, linearpoint);
-			}*/
+			ds[i]         = -eps;
+			vehicle.Pose = linearpoint.Add(pose.Add(ds));
+			PHDNavigator<MeasurerT, PoseT, MeasurementT>.
+		    	QuasiSetLogLikelihood(measurements, map, vehicle, out lminus);
 
 			hessian[i] = (lplus.Subtract(lminus)).Divide(2 * eps);
 		}
@@ -958,9 +1051,23 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 		//RefVehicle.RenderBody(camera);
 		RenderTimedGaussian(MessagesFromPast, Color.Red, camera);
 		RenderTimedGaussian(MessagesFromFuture, Color.Green, camera);
-		RenderTimedGaussian(MessagesFromMap, Color.Orange, camera);
+		RenderTimedGaussian(Mixdown(MessagesFromMap), Color.Orange, camera);
 		RenderTimedGaussian(FusedEstimate, new Color(128, 120, 160, 140), camera);
 		RenderMap(camera);
+
+		foreach (Gaussian component in MessagesFromMap[9].Item3) {
+			double[] location = LinearizationPoints[9].Item2.Add(component.Mean).Location;
+
+			double[][] loccov = MatrixExtensions.Zero(3);
+			double[][] cov2d  = component.Covariance;
+			for (int h = 0; h < cov2d.Length;    h++) {
+			for (int k = 0; k < cov2d[h].Length; k++) {
+				loccov[h][k] = cov2d[h][k];
+			}
+			}
+
+			RenderGaussian(new Gaussian(location, loccov, component.Weight), camera, Color.Green);
+		}
 	}
 
 	public void RenderMeasurements(double[][] camera)
@@ -997,20 +1104,13 @@ public class LoopyPHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<Measu
 	{
 		TimedState trajectory = new TimedState();
 
-		for (int i = 0; i < FusedEstimate.Count; i++) {
-			PoseT    pose     = LinearizationPoints[i].Item2.Add(gaussians[i].Item2.Mean);
-			double[] location = pose.Location;
-			// double[][] loccov = MatrixExtensions.Zero(3);
-			// double[][] cov2d  = gaussians[i].Item2.Covariance;
-			// 
-			// for (int h = 0; h < cov2d.Length; h++) {
-			// 	for (int k = 0; k < cov2d[h].Length; k++) {
-			// 		loccov[h][k] = cov2d[h][k];
-			// 	}
-			// }
-			// 
-			// RenderGaussian(new Gaussian(location, loccov, 1.0), camera, color);
-			
+		for (int i = 0; i < gaussians.Count; i++) {
+			if (gaussians[i].Item2 == null) {
+				continue;
+			}
+
+			PoseT pose = LinearizationPoints[i].Item2.Add(gaussians[i].Item2.Mean);
+
 			trajectory.Add(Tuple.Create(gaussians[i].Item1, Util.SClone(pose.State)));
 		}
 
