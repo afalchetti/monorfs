@@ -722,11 +722,6 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 		// here's a little cheat: only do it on areas
 		// there has been a new measurement lately
 		Map predicted = new Map(model);
-		
-		// birth RFS
-		foreach (double[] candidate in unexplored) {
-			predicted.Add(new Gaussian(candidate, BirthCovariance, BirthWeight));
-		}
 
 		unexplored.Clear();
 
@@ -735,6 +730,11 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 			if (!Explored(model, candidate)) {
 				unexplored.Add(candidate);
 			}
+		}
+		
+		// birth RFS
+		foreach (double[] candidate in unexplored) {
+			predicted.Add(new Gaussian(candidate, BirthCovariance, BirthWeight));
 		}
 
 		return predicted;
@@ -787,7 +787,7 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 			mc[n] = new Gaussian(mp[n], S[n], component.Weight);
 			PD[n] = pose.DetectionProbabilityM(dummyM.FromLinear(mp[n]));
 
-			qindex.Add(component, n);
+			qindex[component] = n;
 			n++;
 		}
 
@@ -877,7 +877,7 @@ public class PHDNavigator<MeasurerT, PoseT, MeasurementT> : Navigator<MeasurerT,
 	/// <returns>True if the location has been explored.</returns>
 	public bool Explored(Map model, double[] x)
 	{
-		return model.Evaluate(x) >= ExplorationThreshold;
+		return model.Evaluate(x, 3 * DensityDistanceThreshold) >= ExplorationThreshold;
 	}
 
 	/// <summary>
