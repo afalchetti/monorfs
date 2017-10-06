@@ -89,6 +89,7 @@
     <Reference Include="DotImaging.IO">
       <HintPath>..\packages\DotImaging.IO.4.8.2\lib\net45\DotImaging.IO.dll</HintPath>
     </Reference>
+    <Reference Include="System.IO.Compression" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />

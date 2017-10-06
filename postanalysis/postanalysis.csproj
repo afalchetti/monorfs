@@ -46,6 +46,8 @@
     <Reference Include="Accord.Imaging">
       <HintPath>..\packages\Accord.Imaging.3.0.2\lib\net45\Accord.Imaging.dll</HintPath>
     </Reference>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />

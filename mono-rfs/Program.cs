@@ -151,6 +151,8 @@ public class Program
 			Environment.Exit(2);
 		}
 
+		// Reading configuration from cfg file specified in argument
+		// or (if none was specified) from the internal config file of the recording file
 		if (!string.IsNullOrEmpty(configfile)) {
 			try {
 				Config.FromFile(configfile);
@@ -159,6 +161,17 @@ public class Program
 				Console.WriteLine("Error: Configuration file '" + e.FileName + "' not found.");
 				Environment.Exit(3);
 			}
+		}
+		else if (input == VehicleType.Record) {
+			try {
+				Config.FromRecordFile(recfile);
+			}
+			catch (IOException) {
+				Console.WriteLine("Couldn't read config data from record file. Using default configuration.");
+			}
+		}
+		else {
+			Console.WriteLine("Using default configuration.");
 		}
 
 		try {

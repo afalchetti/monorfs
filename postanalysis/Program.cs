@@ -27,9 +27,14 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
-using NDesk.Options;
+using System.IO.Compression;
 using System.IO;
+using System.Text;
+
+using NDesk.Options;
+
 using monorfs;
+using System.Collections.Generic;
 
 namespace postanalysis
 {
@@ -50,6 +55,10 @@ class Program
 
 	}
 
+	/// <summary>
+	/// The entry point of the program, where the program control starts and ends.
+	/// </summary>
+	/// <param name="args">The command-line arguments.</param>
 	public static void Main(string[] args)
 	{
 		string   file      = "data.zip";
@@ -83,9 +92,44 @@ class Program
 			return;
 		}
 
-		var plot = Plot<PRM3DMeasurer, Pose3D, PixelRangeMeasurement>.
-		               FromFiles(file, histmode, ospac, ospap, reftime);
+		try {
+			Config.FromRecordFile(file);
+		}
+		catch (IOException) {
+			Console.WriteLine("Couldn't open the recording file.");
+			Environment.Exit(2);
+		}
 
+		try {
+		switch (Config.Model) {
+		case DynamicsModel.Linear2D:
+			Run(Plot<Linear2DMeasurer, LinearPose2D, LinearMeasurement2D>.
+			        FromFiles(file, histmode, ospac, ospap, reftime), file);
+			break;
+		
+		case DynamicsModel.PRM3D:
+		default:
+			Run(Plot<PRM3DMeasurer, Pose3D, PixelRangeMeasurement>.
+			        FromFiles(file, histmode, ospac, ospap, reftime), file);
+			break;
+		}
+		}
+		catch (FileNotFoundException e) {
+			Console.WriteLine("Error: File '" + e.FileName + "' not found.");
+			Environment.Exit(3);
+		}
+	}
+
+	/// <summary>
+	/// Calculate all the relevant statistics and write them to files.
+	/// </summary>
+	/// <param name="plot">Plot object.</param>
+	/// <param name="file">Input file name; output file names will be derived from this.</param>
+	private static void Run<MeasurerT, PoseT, MeasurementT>(Plot<MeasurerT, PoseT, MeasurementT> plot, string file)
+		where PoseT        : IPose<PoseT>, new()
+		where MeasurementT : IMeasurement<MeasurementT>, new()
+		where MeasurerT    : IMeasurer<MeasurerT, PoseT, MeasurementT>, new()
+	{
 		File.WriteAllText(file + ".loc.data",         plot.SerializedLocationError);
 		File.WriteAllText(file + ".rot.data",         plot.SerializedRotationError);
 		File.WriteAllText(file + ".odoloc.data",      plot.SerializedOdoLocationError);

@@ -30,6 +30,10 @@ using System;
 using System.Reflection;
 
 using Accord.Math;
+using System.Collections.Generic;
+using System.IO.Compression;
+using System.IO;
+using System.Text;
 
 namespace monorfs
 {
@@ -87,7 +91,7 @@ public static class Config
 	public static double NavigatorClutterDensity         = ClutterDensity;
 
 	// LoopyPHDNavigator
-	public static double GradientAscentRate = 4e-4;
+	public static double GradientAscentRate = 1e-2;
 	public static double GradientClip       = 10;
 
 	// ISAM2Navigator
@@ -113,8 +117,44 @@ public static class Config
 	/// <param name="filename">File name.</param>
 	public static void FromFile(string filename)
 	{
+		FromDescriptor(System.IO.File.ReadAllLines(filename));
+	}
+
+	/// <summary>
+	/// Read configuration instructions from the internal
+	/// configuration of a record file. Any missing parameter
+	/// will be left as is.
+	/// </summary>
+	/// <param name="filename">Record file name.</param>
+	public static void FromRecordFile(string filename)
+	{
+		List<string> lines = new List<string>();
+
+		using (ZipArchive zfile = ZipFile.Open(filename, ZipArchiveMode.Read, null)) {
+			ZipArchiveEntry config = zfile.GetEntry("config.cfg");
+
+			using (Stream       cfgstream = config.Open()) {
+			using (StreamReader reader    = new StreamReader(cfgstream, Encoding.UTF8)) {
+				string line = null;
+
+				while ((line = reader.ReadLine()) != null) {
+					lines.Add(line);
+				}
+			}
+			}
+		}
+
+		Config.FromDescriptor(lines.ToArray());
+	}
+
+	/// <summary>
+	/// Read configuration instructions from descriptor lines,
+	/// one field per line. Any missing parameter will be left as is.
+	/// </summary>
+	/// <param name="lines">Config descriptor.</param>
+	public static void FromDescriptor(string[] lines)
+	{
 		FieldInfo[] fields = typeof (Config).GetFields(BindingFlags.Static | BindingFlags.Public);
-		string[]    lines  = System.IO.File.ReadAllLines(filename);
 
 		foreach (string line in lines)
 		{
@@ -136,7 +176,7 @@ public static class Config
 					}
 					else if (field.FieldType == typeof (double[])) {
 						field.SetValue(null, Matrix.ParseJagged(strvalue,
-							new OctaveMatrixFormatProvider(DefaultMatrixFormatProvider.CurrentCulture)).Transpose()[0]);
+							new OctaveMatrixFormatProvider(DefaultMatrixFormatProvider.CurrentCulture))[0]);
 					}
 					else if (field.FieldType == typeof (TimeSpan)) {
 						double seconds = double.Parse(strvalue);
