@@ -35,6 +35,8 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 
+using Accord.Math;
+
 using DotImaging;
 
 using FP = monorfs.FileParser;
@@ -181,7 +183,7 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 
 		VehicleWaypoints = new TimedTrajectory();
 
-		if (!xnavigator.Online) {
+		if (xnavigator.Online) {
 			for (int i = 0; i < Trajectory.Count; i++) {
 				TimedState partialtrajectory = new TimedState();
 
@@ -254,6 +256,45 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 			Map              = map;
 			Measurements     = measurements;
 			VehicleWaypoints = waypoints;
+		}
+		else {
+			RefTime = Trajectory.BinarySearch(Tuple.Create(reftime, new double[0]),
+			                                  new ComparisonComparer<Tuple<double, double[]>>(
+			                                  (Tuple<double, double[]> a, Tuple<double, double[]> b) =>
+			                                      Math.Sign(a.Item1 - b.Item1)));
+			RefTime = (RefTime >= 0) ? RefTime : (RefTime != ~Trajectory.Count) ? ~RefTime : 0;
+			
+			PoseT dummy = new PoseT();
+			
+			for (int i = 0; i < Estimate.Count; i++) {
+				if (Estimate[i].Item2.Count > RefTime) {
+					double[] delta = dummy.FromState(Trajectory[RefTime].Item2).Subtract(
+					                     dummy.FromState(Estimate[i].Item2[RefTime].Item2));
+					PoseT deltaP = dummy.FromLinear(delta);
+			
+					double[]   dtranslation = deltaP.Location;
+					double[][] drotation    = deltaP.Orientation.ToMatrix();
+					double[]   rotcenter    = dummy.FromState(Estimate[i].Item2[RefTime].Item2).Location;
+			
+					for (int k = 0; k < Estimate[i].Item2.Count; k++) {
+						PoseT transformed    = dummy.FromState(Estimate[i].Item2[k].Item2).Add(delta);
+						Estimate[i].Item2[k] = Tuple.Create(Estimate[i].Item2[k].Item1, transformed.State);
+					}
+			
+					Map refmap = new Map(3);
+					
+					foreach (var component in Map[i].Item2) {
+						double[] transformed = drotation.Multiply(component.Mean.Subtract(rotcenter)).Add(rotcenter).
+						                           Add(dtranslation);
+					
+						refmap.Add(new Gaussian(transformed,
+						                        drotation.Multiply(component.Covariance).MultiplyByTranspose(drotation),
+						                        component.Weight));
+					}
+					
+					Map[i] = Tuple.Create(Map[i].Item1, refmap);
+				}
+			}
 		}
 
 		mapindices = new int[estimate.Count];
@@ -361,12 +402,8 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 			explorer = new SimulatedVehicle<MeasurerT, PoseT, MeasurementT>(new PoseT().IdentityP(), new List<double[]>());
 		}
 
-		// NOTE heuristic (estimate length grows on online but not offline);
-		//      if ambiguities arise, adding a command line flag could force it
-		//      instead of guessing from the text structure (though the edge cases
-		//      are pretty uninteresting)
-		bool online = !((estimate[1].Item2.Count < estimate[estimate.Count - 1].Item2.Count &&
-		               estimate.Count == trajectory.Count));
+		bool online = (estimate[0].Item2.Count < estimate[estimate.Count - 1].Item2.Count &&
+		               estimate.Count == trajectory.Count);
 
 		return new Viewer<MeasurerT, PoseT, MeasurementT>("monorfs - viewing " + datafile, explorer,
 		                                                  trajectory, estimate, map, measurements, tags,
@@ -546,15 +583,15 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 		base.Draw(time);
 
 		// overwrite the sidebar
-		Graphics.SetRenderTarget(null);
-		Flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
-		           DepthStencilState.Default, RasterizerState.CullNone);
-
 		if (xnavigator.Online) {
-			Flip.Draw(SidebarHistory[preframeindex], SideDest, SidebarHistory[preframeindex].Bounds, Color.White);
-		}
+			Graphics.SetRenderTarget(null);
+			Flip.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied, SamplerState.LinearClamp,
+			           DepthStencilState.Default, RasterizerState.CullNone);
 
-		Flip.End();
+			Flip.Draw(SidebarHistory[preframeindex], SideDest, SidebarHistory[preframeindex].Bounds, Color.White);
+
+			Flip.End();
+		}
 	}
 
 	/// <summary>

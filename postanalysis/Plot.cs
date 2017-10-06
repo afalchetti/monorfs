@@ -70,6 +70,8 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 	public double P { get; set; }
 	public int    RefTime { get; set; }
 
+	public bool Online { get; set; }
+
 	/// <summary>
 	/// Construct a visualization from its components.
 	/// </summary>
@@ -78,8 +80,12 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 	/// <param name="map">Recorded maximum-a-posteriori estimate for the map.</param>
 	public Plot(TimedState trajectory, TimedTrajectory estimate, TimedMapModel map,
 	            TimedMapModel visiblelandmarks, Map landmarks, double c, double p, double reftime,
-	            HistMode histmode, TimedMessage tags)
+	            HistMode histmode, TimedMessage tags, bool online)
 	{
+		if (!online && histmode != HistMode.Timed) {
+			throw new ArgumentException("Only time-average history is compatible with offline estimation.");
+		}
+
 		Trajectory       = trajectory;
 		Estimate         = estimate;
 		Map              = map;
@@ -89,6 +95,7 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 		Tags             = tags;
 		C                = c;
 		P                = p;
+		Online           = online;
 		RefTime          = Trajectory.BinarySearch(Tuple.Create(reftime, new double[0]), new ComparisonComparer<Tuple<double, double[]>>(
 		                                          (Tuple<double, double[]> a, Tuple<double, double[]> b) => Math.Sign(a.Item1 - b.Item1)));
 		RefTime          = (RefTime >= 0) ? RefTime : (RefTime != ~Trajectory.Count) ? ~RefTime : 0;
@@ -177,8 +184,18 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 			tags = new TimedMessage();
 		}
 
+		bool online = (estimate[0].Item2.Count < estimate[estimate.Count - 1].Item2.Count &&
+		               estimate.Count == trajectory.Count);
+
+		if (!online && histmode != HistMode.Timed) {
+			Console.WriteLine("Warning: Offline mode is not compatible with the selected history mode. " +
+			                  "Switching to time-average.");
+
+			histmode = HistMode.Timed;
+		}
+
 		return new Plot<MeasurerT, PoseT, MeasurementT>(trajectory, estimate, map, vislandmarks,
-		                                                landmarks, c, p, reftime, histmode, tags);
+		                                                landmarks, c, p, reftime, histmode, tags, online);
 	}
 
 	/// <summary>
