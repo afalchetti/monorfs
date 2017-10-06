@@ -192,8 +192,8 @@ public class Linear2DMeasurer : IMeasurer<Linear2DMeasurer, LinearPose2D, Linear
 		minwdistance = Math.Min(minwdistance, (landmark.X - -Range) / VisibilityRamp[0]);
 		minwdistance = Math.Min(minwdistance, (Range - landmark.X)  / VisibilityRamp[0]);
 
-		minwdistance = Math.Min(minwdistance, (landmark.Y  - -Range) / VisibilityRamp[1]);
-		minwdistance = Math.Min(minwdistance, (Range - landmark.Y)   / VisibilityRamp[1]);
+		minwdistance = Math.Min(minwdistance, (landmark.Y - -Range) / VisibilityRamp[1]);
+		minwdistance = Math.Min(minwdistance, (Range - landmark.Y)  / VisibilityRamp[1]);
 
 		return Math.Max(0, Math.Min(1, minwdistance));
 	}

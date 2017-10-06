@@ -165,13 +165,19 @@ public static class Util
 
 	/// <summary>
 	/// Realize a random vector from a gaussian distribution around a specified mean
-	/// vector with a given covvariance.
+	/// vector with a given covariance.
 	/// </summary>
 	/// <param name="mean">Distribution mean vector.</param>
 	/// <param name="covariance">Distribution covariance matrix.</param>
 	/// <returns>Random vector.</returns>
 	public static double[] RandomGaussianVector(double[] mean, double[][] covariance)
 	{
+		for (int i = 0; i < covariance.Length; i++) {
+			if (covariance[i][i] < 1e-40) {
+				covariance[i][i] = 1e-40;
+			}
+		}
+
 		// first find the square root of the covariance matrix
 		// C such as C * C^T = covariance
 		var       cholesky = new CholeskyDecomposition(covariance.ToMatrix());

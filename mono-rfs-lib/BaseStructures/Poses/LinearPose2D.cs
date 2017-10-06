@@ -128,7 +128,7 @@ public class LinearPose2D : IPose<LinearPose2D>
 	public LinearPose2D FromState(double[] state)
 	{
 		if (state.Length != 2) {
-			throw new ArgumentException("State should have exactly seven parameters.");
+			throw new ArgumentException("State should have exactly two parameters. It has " + state.Length + ".");
 		}
 
 		return new LinearPose2D(state);

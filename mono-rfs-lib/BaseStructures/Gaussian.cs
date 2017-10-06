@@ -296,6 +296,10 @@ public class Gaussian
 	/// <returns>Merged gaussian.</returns>
 	public static Gaussian Merge(List<Gaussian> components)
 	{
+		if (components == null || components.Count == 0) {
+			return null;
+		}
+
 		Gaussian   first      = components[0];
 		double     weight     = 0.0;
 		double[]   mean       = new double[first.Mean.Length];

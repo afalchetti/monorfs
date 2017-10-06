@@ -27,9 +27,9 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
-using System.Collections.Generic;
 
 using Accord.Math;
 
@@ -326,7 +326,6 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 			// note that if the tag is not present, Find will return the default Tuple<double, String>
 			// and slamtime will be 0.0, which is correct
 
-
 			for (int i = 0; i < Estimate.Count; i++) {
 				TimedValue localerror = internalerror(Trajectory, Estimate[i].Item2);
 				double     mean       = 0;
@@ -450,7 +449,7 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 		{
 			if (spatialMapError == null) {
 				TimedValue dummy = MapError;
-				// calling MapError computes the spatial error
+				// reading MapError computes the spatial error
 			}
 
 			return spatialMapError;

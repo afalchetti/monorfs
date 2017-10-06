@@ -432,10 +432,10 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 
 		bool speedup = keyboard.IsKeyDown(Keys.LeftShift);
 
-		preframeindex        = FrameIndex;
-		Explorer .WayPoints  = VehicleWaypoints[FrameIndex].Item2;
-		Explorer .Pose       = new PoseT().FromState(Explorer.WayPoints[Explorer.WayPoints.Count - 1].Item2);
-		xnavigator.MapModel  = Map[mapindices[FrameIndex]].Item2;
+		preframeindex       = FrameIndex;
+		Explorer .WayPoints = VehicleWaypoints[FrameIndex].Item2;
+		Explorer .Pose      = new PoseT().FromState(Explorer.WayPoints[Explorer.WayPoints.Count - 1].Item2);
+		xnavigator.MapModel = Map[mapindices[FrameIndex]].Item2;
 		xnavigator.WayTrajectories[0] = Estimate[FrameIndex];
 		xnavigator.Vehicle.WayPoints  = Estimate[FrameIndex].Item2;
 		xnavigator.Vehicle.Pose       = new PoseT().FromState(Navigator.BestEstimate.WayPoints[Navigator.BestEstimate.WayPoints.Count - 1].Item2);
