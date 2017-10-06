@@ -268,7 +268,7 @@ public abstract class Navigator<MeasurerT, PoseT, MeasurementT> : IDisposable
 	/// <param name="time">Provides a snapshot of timing values.</param>
 	protected void UpdateMapHistory(GameTime time)
 	{
-		WayMaps.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, BestMapModel));
+		WayMaps.Add(Tuple.Create(time.TotalGameTime.TotalSeconds, new Map(BestMapModel)));
 	}
 
 	/// <summary>
@@ -281,10 +281,9 @@ public abstract class Navigator<MeasurerT, PoseT, MeasurementT> : IDisposable
 	/// <param name="camera">Camera 4d transform matrix.</param>
 	public virtual void Render(double[][] camera)
 	{
-		RefVehicle.Render(camera);
-
-		RenderTrajectory(camera);
 		RenderMap(camera);
+		RenderTrajectory(camera);
+		RefVehicle.Render(camera);
 	}
 
 	/// <summary>
