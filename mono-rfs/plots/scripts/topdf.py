@@ -46,7 +46,7 @@ rcParams['font.serif']      = ['Computer Modern Roman']
 rcParams['text.usetex']     = True
 rcParams['figure.figsize']  = 4, 2.5
 
-labels = {"map":     "OSPA map error",
+labels = {"map":     "OSPA map error [m]",
           "loc":     "Pose location error [m]",
           "rot":     "Pose rotation error [rads]",
           "odoloc":  "Pose delta location error [m]",
@@ -56,6 +56,7 @@ labels = {"map":     "OSPA map error",
 
 def formatlegend(legend):
 	legend = legend.replace("phd", "PHD")
+	legend = legend.replace("loopy", "Loopy PHD")
 	legend = legend.replace("isam", "iSAM")
 	legend = legend.replace("nopre", " (no preprocessing)")
 	legend = legend.replace("known", " (known association)")
@@ -71,6 +72,8 @@ def getstyle(legend):
 	
 	if "phd" in legend:
 		style = "-b"
+	elif "loopy" in legend:
+		style = "-g"
 	elif "odometry" in legend:
 		style = "-k"
 	elif "isam" in legend:
@@ -201,20 +204,34 @@ def plot(layers, tags, axes, label, outfile):
 	
 	ymax = axes[3]
 	
-	if tags is not None:
-		for tag in tags:
-			if tag[1].startswith("screenshot"):  # these tags are not interesting
-				continue
-			
-			color = "#ff2222" if tag[1].startswith("!") else "#bbbbbb"
-			mp.axvline(tag[0], color=color, linewidth=0.5)
-			mp.annotate(xy=(tag[0], ymax), s=tag[1], color=color, fontsize=5, family="sans-serif",
-				xycoords='data', xytext=(1, -2), textcoords='offset points', rotation="vertical", verticalalignment="top")
+	online = not any(layer["legend"] == "Loopy PHD" for layer in layers)
 	
-	for layer in layers:
-		mp.plot(layer["data"][:, 0], layer["data"][:, 1], layer["style"], label = layer["legend"])
+	if online:
+		if tags is not None:
+			for tag in tags:
+				if tag[1].startswith("screenshot"):  # these tags are not interesting
+					continue
+				
+				color = "#ff2222" if tag[1].startswith("!") else "#bbbbbb"
+				mp.axvline(tag[0], color=color, linewidth=0.5)
+				mp.annotate(xy=(tag[0], ymax), s=tag[1], color=color, fontsize=5, family="sans-serif",
+					xycoords='data', xytext=(1, -2), textcoords='offset points', rotation="vertical", verticalalignment="top")
+		
+		for layer in layers:
+			mp.plot(layer["data"][:, 0], layer["data"][:, 1], layer["style"], label = layer["legend"])
+		
+		mp.xlabel("Time [s]")
+		
+	else:
+		for layer in layers:
+			if "Loopy" not in layer["legend"]:
+				finalvalue = layer["data"][-1, 1]
+				mp.plot([axes[0], axes[1]], [finalvalue, finalvalue], layer["style"], label = layer["legend"])
+			else:
+				mp.plot(layer["data"][:, 0], layer["data"][:, 1], layer["style"], label = layer["legend"])
+		
+		mp.xlabel("Time [iterations]")
 	
-	mp.xlabel("Time [s]")
 	mp.ylabel(label)
 	mp.axis(axes)
 	
@@ -228,8 +245,6 @@ def plot(layers, tags, axes, label, outfile):
 
 def plotfiles(filedata, tags, directory):
 	for highlevel in filedata:
-		xmin = float("inf")
-		xmax = float("-inf")
 		ymin = float("inf")
 		ymax = float("-inf")
 		
@@ -244,12 +259,9 @@ def plotfiles(filedata, tags, directory):
 			sortedlevels[sublevel] = sortedlayers
 			for layer in sortedlayers:
 				data = layer["data"]
-				xmin = min(xmin, min(data[:, 0]))
-				xmax = max(xmax, max(data[:, 0]))
 				ymin = min(ymin, min(data[:, 1]))
 				ymax = max(ymax, max(data[:, 1]))
 		
-		xmin = min(xmin, 0)
 		ymin = min(ymin, 0)
 		
 		levels = [1e-4, 2e-4, 5e-4, 1e-3, 2e-3, 3e-3, 5e-3, 1e-2, 2e-2, 3e-2, 5e-2, 1e-1, 2e-1, 3e-1, 5e-1, 1, 2, 3, 5, 10, 20, 30, 50]
@@ -258,6 +270,14 @@ def plotfiles(filedata, tags, directory):
 		
 		for sublevel in sortedlevels:
 			label = labels.get(highlevel, "Value")
+			
+			xmin = float("inf")
+			xmax = float("-inf")
+			for layer in sortedlevels[sublevel]:
+				data = layer["data"]
+				xmin = min(xmin, min(data[:, 0]))
+				xmax = max(xmax, max(data[:, 0]))
+			
 			plot(sortedlevels[sublevel], tags, [xmin, xmax, ymin, ymax], label,
 			     os.path.join(directory, ".".join(filter(None, (highlevel, sublevel))) + ".pdf"))
 
