@@ -140,6 +140,13 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 	public bool ScreenshotMode { get; private set; }
 
 	/// <summary>
+	/// Time to align the groundtruth and the estimate.
+	/// For the steps where the estimate is not long enough to contain
+	/// this time, the reference time is zero.
+	/// </summary>
+	public int RefTime { get; private set; }
+
+	/// <summary>
 	/// Construct a visualization from its components.
 	/// </summary>
 	/// <param name="title">Window title.</param>
@@ -149,6 +156,7 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 	/// <param name="map">Recorded maximum-a-posteriori estimate for the map.</param>
 	/// <param name="measurements">Recorded vehicle measurements.</param>
 	/// <param name="tags">Tags in the timeline.</param>
+	/// <param name="reftime">Reference time.</param>
 	/// <param name="online">True if the navigator works
 	/// incrementally with each time step.</param>
 	/// <param name="fps">Frame rate.</param>
@@ -159,7 +167,7 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 	              SimulatedVehicle<MeasurerT, PoseT, MeasurementT> explorer,
 	              TimedState trajectory, TimedTrajectory estimate,
 	              TimedMapModel map, TimedMeasurements measurements, TimedMessage tags,
-	              bool online, double fps, string sidebarfile, bool screenshotmode)
+	              double reftime, bool online, double fps, string sidebarfile, bool screenshotmode)
 		: base(title, explorer, new FakeNavigator<MeasurerT, PoseT, MeasurementT>(explorer, online), false, fps)
 	{
 		xnavigator   = Navigator as FakeNavigator<MeasurerT, PoseT, MeasurementT>;
@@ -286,7 +294,7 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 	/// <returns>Prepared visualization object.</returns>
 	/// <remarks>All file must be previously sorted by time value. This property is assumed.</remarks>
 	public static Viewer<MeasurerT, PoseT, MeasurementT> FromFiles(string datafile, bool filterhistory,
-	                                                               bool screenshotmode, out string tmpdir)
+	                                                               double reftime, bool screenshotmode, out string tmpdir)
 	{
 		tmpdir         = Util.TemporaryDir();
 		string datadir = Path.Combine(tmpdir, "data");
@@ -362,7 +370,7 @@ public class Viewer<MeasurerT, PoseT, MeasurementT> : Manipulator<MeasurerT, Pos
 
 		return new Viewer<MeasurerT, PoseT, MeasurementT>("monorfs - viewing " + datafile, explorer,
 		                                                  trajectory, estimate, map, measurements, tags,
-		                                                  online, 30, sidebarfile, screenshotmode);
+		                                                  reftime, online, 30, sidebarfile, screenshotmode);
 	}
 
 	/// <summary>

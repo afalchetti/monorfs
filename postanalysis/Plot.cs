@@ -101,7 +101,8 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 	/// <param name="datafile">Compressed prerecorded data file.</param>
 	/// <returns>Prepared visualization object.</returns>
 	public static Plot<MeasurerT, PoseT, MeasurementT>
-	                  FromFiles(string datafile, HistMode histmode, double c, double p, double t)
+	                  FromFiles(string datafile, HistMode histmode,
+	                            double c, double p, double reftime)
 	{
 		string tmpdir  = Util.TemporaryDir();
 		string datadir = Path.Combine(tmpdir, "data");
@@ -176,7 +177,8 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 			tags = new TimedMessage();
 		}
 
-		return new Plot<MeasurerT, PoseT, MeasurementT>(trajectory, estimate, map, vislandmarks, landmarks, c, p, t, histmode, tags);
+		return new Plot<MeasurerT, PoseT, MeasurementT>(trajectory, estimate, map, vislandmarks,
+		                                                landmarks, c, p, reftime, histmode, tags);
 	}
 
 	/// <summary>
@@ -467,11 +469,36 @@ public class Plot<MeasurerT, PoseT, MeasurementT>
 			double carderror;
 			double spatialerror;
 
-			Map visited = VisitedMap;
+			Map   visited = VisitedMap;
+			PoseT dummy   = new PoseT();
+
+			double[][] identity = Matrix.JaggedIdentity(3);
 
 			for (int i = 0; i < Map.Count; i++) {
-				Map jmap     = Map[i].Item2.BestMapEstimate;
-				ospaerror    = OSPA(visited, jmap, out carderror);
+				double[]   dtranslation = new double[3];
+				double[]   rotcenter    = new double[3];
+				double[][] drotation    = Matrix.JaggedIdentity(3);
+
+				if (Estimate[i].Item2.Count > RefTime) {
+					PoseT delta = dummy.FromLinear(dummy.FromState(Estimate[i].Item2[RefTime].Item2).Subtract(
+					                  dummy.FromState(Trajectory[RefTime].Item2)));
+					
+					dtranslation = (-1.0).Multiply(delta.Location);
+					drotation    = delta.Orientation.Conjugate().ToMatrix();
+					rotcenter    = dummy.FromState(Estimate[i].Item2[RefTime].Item2).Location;
+				}
+
+				Map jmap   = Map[i].Item2.BestMapEstimate;
+				Map refmap = new Map(3);
+
+				foreach (var component in jmap) {
+					double[] transformed = drotation.Multiply(component.Mean.Subtract(rotcenter)).Add(rotcenter).
+					                           Add(dtranslation);
+
+					refmap.Add(new Gaussian(transformed, identity, 1.0));
+				}
+
+				ospaerror    = OSPA(visited, refmap, out carderror);
 				spatialerror = Math.Pow(Math.Pow(ospaerror, P) - Math.Pow(carderror, P), 1.0 / P);
 
 				oerror.Add(Tuple.Create(Map[i].Item1, ospaerror));

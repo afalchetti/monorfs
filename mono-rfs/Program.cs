@@ -98,6 +98,7 @@ public class Program
 		string commandfile    = "";
 		string configfile     = "";
 		int    particlecount  = 1;
+		double reftime        = 0;
 		bool   onlymapping    = false;
 		bool   realtime       = false;
 		bool   viewer         = false;
@@ -111,21 +112,22 @@ public class Program
 		NavigationAlgorithm algorithm = NavigationAlgorithm.PHD;
 
 		OptionSet options = new OptionSet {
-			{ "f|scene=",      "Scene description file. Simulated, recorded or device id.",      f       => scenefile      = f },
-			{ "r|recfile=",    "Recording file. Saves State and events for reviewing.",          r       => recfile        = r },
-			{ "c|command=",    "Auto-command file (simulates user input).",                      c       => commandfile    = c },
-			{ "g|config=",     "Configuration file. Contains global constants.",                 g       => configfile     = g },
-			{ "a|algorithm=",  "SLAM solver algorithm ('odometry', 'phd', 'loopy' or 'isam2').", a       => algorithm      = (a == "isam2") ? NavigationAlgorithm.ISAM2 : (a == "odometry") ? NavigationAlgorithm.Odometry : (a == "loopy") ? NavigationAlgorithm.LoopyPHD : NavigationAlgorithm.PHD },
-			{ "p|particles=",  "Number of particles used for the RB-PHD.",                       (int p) => particlecount  = p },
-			{ "y|onlymap",     "Only do mapping, assuming known localization.",                  y       => onlymapping    = y != null },
-			{ "i|input=",      "Vehicle input stream: 'kinect', 'simulation' or 'record'.",      i       => input          = (i == "kinect") ? VehicleType.Kinect : (i == "record") ? VehicleType.Record : VehicleType.Simulation },
-			{ "R|realtime",    "Process the system in realtime, instead of a fixed step.",       R       => realtime       = R != null },
-			{ "v|view",        "View a precorded session.",                                      v       => viewer         = v != null },
-			{ "H|history=",    "Trajectory history mode: either 'filter' or 'smooth'.",          h       => filterhistory  = (h == "filter") },
-			{ "s|screenshot",  "Screenshot mode: just take the screenshots in the tags.",        s       => screenshotmode = s != null },
-			{ "x|headless",    "Run headless, i.e. with no GUI.",                                x       => headless       = x != null },
-			{ "t|noterminate", "Skip simulation termination due command depletion o similars.",  t       => noterminate    = t != null },
-			{ "h|help",        "Show this message and exit.",                                    h       => showhelp       = h != null }
+			{ "f|scene=",      "Scene description file. Simulated, recorded or device id.",      f         => scenefile      = f },
+			{ "r|recfile=",    "Recording file. Saves State and events for reviewing.",          r         => recfile        = r },
+			{ "c|command=",    "Auto-command file (simulates user input).",                      c         => commandfile    = c },
+			{ "g|config=",     "Configuration file. Contains global constants.",                 g         => configfile     = g },
+			{ "a|algorithm=",  "SLAM solver algorithm ('odometry', 'phd', 'loopy' or 'isam2').", a         => algorithm      = (a == "isam2") ? NavigationAlgorithm.ISAM2 : (a == "odometry") ? NavigationAlgorithm.Odometry : (a == "loopy") ? NavigationAlgorithm.LoopyPHD : NavigationAlgorithm.PHD },
+			{ "p|particles=",  "Number of particles used for the RB-PHD.",                       (int p)   => particlecount  = p },
+			{ "y|onlymap",     "Only do mapping, assuming known localization.",                  y         => onlymapping    = y != null },
+			{ "i|input=",      "Vehicle input stream: 'kinect', 'simulation' or 'record'.",      i         => input          = (i == "kinect") ? VehicleType.Kinect : (i == "record") ? VehicleType.Record : VehicleType.Simulation },
+			{ "R|realtime",    "Process the system in realtime, instead of a fixed step.",       R         => realtime       = R != null },
+			{ "v|view",        "View a precorded session.",                                      v         => viewer         = v != null },
+			{ "H|history=",    "Trajectory history mode: either 'filter' or 'smooth'.",          h         => filterhistory  = (h == "filter") },
+			{ "t|reftime=",    "Reference time.",                                               (double t) => reftime        = t },
+			{ "s|screenshot",  "Screenshot mode: just take the screenshots in the tags.",        s         => screenshotmode = s != null },
+			{ "x|headless",    "Run headless, i.e. with no GUI.",                                x         => headless       = x != null },
+			{ "q|noterminate", "Skip simulation termination due command depletion o similars.",  q         => noterminate    = q != null },
+			{ "h|help",        "Show this message and exit.",                                    h         => showhelp       = h != null }
 		};
 
 		try {
@@ -180,23 +182,24 @@ public class Program
 			Run<Linear2DMeasurer, LinearPose2D, LinearMeasurement2D>(
 			    recfile, scenefile, commandfile,
 			    particlecount, onlymapping, realtime, viewer,
-			    filterhistory, screenshotmode, headless, noterminate,
+			    filterhistory, reftime, screenshotmode, headless, noterminate,
 			    input, algorithm);
 			break;
+
 		case DynamicsModel.PRM3D:
 		default:
 			if (input == VehicleType.Kinect) {
 			Run<KinectMeasurer, Pose3D, PixelRangeMeasurement>(
 			    recfile, scenefile, commandfile,
 			    particlecount, onlymapping, realtime, viewer,
-			    filterhistory, screenshotmode, headless, noterminate,
+			    filterhistory, reftime, screenshotmode, headless, noterminate,
 				input, algorithm);
 			}
 			else {
 			Run<PRM3DMeasurer, Pose3D, PixelRangeMeasurement>(
 			    recfile, scenefile, commandfile,
 			    particlecount, onlymapping, realtime, viewer,
-			    filterhistory, screenshotmode, headless, noterminate,
+			    filterhistory, reftime, screenshotmode, headless, noterminate,
 				input, algorithm);
 			}
 			break;
@@ -217,7 +220,7 @@ public class Program
 	public static void Run<MeasurerT, PoseT, MeasurementT>(
 	                       string recfile, string scenefile, string commandfile,
 	                       int particlecount, bool onlymapping, bool realtime, bool viewer,
-	                       bool filterhistory, bool screenshotmode, bool headless, bool noterminate,
+	                       bool filterhistory, double reftime, bool screenshotmode, bool headless, bool noterminate,
 	                       VehicleType input, NavigationAlgorithm algorithm)
 		where PoseT        : IPose<PoseT>, new()
 		where MeasurementT : IMeasurement<MeasurementT>, new()
@@ -228,7 +231,7 @@ public class Program
 			string tmpdir;
 
 			using (var sim = Viewer<MeasurerT, PoseT, MeasurementT>.
-			                     FromFiles(recfile, filterhistory, screenshotmode, out tmpdir)) {
+			                     FromFiles(recfile, filterhistory, reftime, screenshotmode, out tmpdir)) {
 				sim.ScreenshotPrefix = recfile + "-screenshot-";
 				setSignalHandler(sim);
 
